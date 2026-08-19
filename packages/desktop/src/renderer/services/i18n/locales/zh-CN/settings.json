@@ -1393,7 +1393,7 @@
   "appOperationsModel": {
     "title": "应用操作模型",
     "panelLabel": "应用操作",
-    "panelInfo": "使用自己的模型运行后台工作，与每个对话使用的模型互不影响。",
+    "panelInfo": "WePrompt 用它处理自身的后台工作——目前是在对话过长时进行摘要，让对话得以继续。这不会影响各个聊天所用的模型。",
     "popoverSubtitle": "仅用于后台工作。更改它不会影响你的对话。",
     "selectionLabel": "选择",
     "auto": "自动",

@@ -1395,7 +1395,7 @@
   "appOperationsModel": {
     "title": "App operations model",
     "panelLabel": "App operations",
-    "panelInfo": "Runs background work with its own model, independently of the model each chat uses.",
+    "panelInfo": "WePrompt uses this for its own background work — currently, summarising long chats so they can keep going. Your chats are unaffected.",
     "popoverSubtitle": "Background work only. Changing it does not affect your conversations.",
     "selectionLabel": "Selection",
     "auto": "Auto",

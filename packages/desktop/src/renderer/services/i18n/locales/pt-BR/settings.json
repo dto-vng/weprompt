@@ -1401,7 +1401,7 @@
   "appOperationsModel": {
     "title": "Modelo para operações do aplicativo",
     "panelLabel": "Operações do aplicativo",
-    "panelInfo": "Executa o trabalho em segundo plano com o próprio modelo, independentemente do modelo usado por cada conversa.",
+    "panelInfo": "O WePrompt usa isto para o próprio trabalho em segundo plano — por enquanto, resumir conversas longas para que possam continuar. Seus chats não são afetados.",
     "popoverSubtitle": "Apenas para trabalho em segundo plano. Alterar isso não afeta suas conversas.",
     "selectionLabel": "Seleção",
     "auto": "Automático",

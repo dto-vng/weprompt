@@ -1395,7 +1395,7 @@
   "appOperationsModel": {
     "title": "Modell für App-Vorgänge",
     "panelLabel": "App-Vorgänge",
-    "panelInfo": "Führt Hintergrundarbeit mit einem eigenen Modell aus, unabhängig vom Modell der jeweiligen Unterhaltung.",
+    "panelInfo": "WePrompt nutzt dies für eigene Hintergrundaufgaben – derzeit, um lange Unterhaltungen zusammenzufassen, damit sie fortgesetzt werden können. Ihre Chats bleiben unverändert.",
     "popoverSubtitle": "Nur für Hintergrundarbeit. Eine Änderung wirkt sich nicht auf Ihre Unterhaltungen aus.",
     "selectionLabel": "Auswahl",
     "auto": "Automatisch",

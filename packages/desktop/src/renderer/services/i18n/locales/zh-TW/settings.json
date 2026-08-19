@@ -1394,7 +1394,7 @@
   "appOperationsModel": {
     "title": "應用程式操作模型",
     "panelLabel": "應用程式操作",
-    "panelInfo": "使用自己的模型執行背景工作，與每個對話使用的模型互不影響。",
+    "panelInfo": "WePrompt 用它處理自身的背景工作——目前是在對話過長時進行摘要，讓對話能夠繼續。這不會影響各個聊天所用的模型。",
     "popoverSubtitle": "僅用於背景工作。變更它不會影響你的對話。",
     "selectionLabel": "選擇",
     "auto": "自動",

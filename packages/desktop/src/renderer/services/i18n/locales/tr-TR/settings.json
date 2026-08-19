@@ -1395,7 +1395,7 @@
   "appOperationsModel": {
     "title": "Uygulama işlemleri modeli",
     "panelLabel": "Uygulama işlemleri",
-    "panelInfo": "Arka plan işlerini, her sohbetin kullandığı modelden bağımsız olarak kendi modeliyle yürütür.",
+    "panelInfo": "WePrompt bunu kendi arka plan işleri için kullanır — şu anda uzun sohbetleri özetleyip devam edebilmelerini sağlar. Sohbetleriniz etkilenmez.",
     "popoverSubtitle": "Yalnızca arka plan işleri için. Bunu değiştirmek sohbetlerinizi etkilemez.",
     "selectionLabel": "Seçim",
     "auto": "Otomatik",
