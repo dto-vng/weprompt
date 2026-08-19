@@ -523,22 +523,6 @@
   white-space: nowrap;
 }
 
-.context-handoff-budget {
-  margin-top: 2px;
-  padding: 0 2px;
-}
-
-.context-handoff-budget-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 3px;
-  color: var(--color-text-3);
-  font-size: 12px;
-  line-height: 16px;
-}
-
 .context-handoff-pinned-title {
   display: inline-flex;
   align-items: center;

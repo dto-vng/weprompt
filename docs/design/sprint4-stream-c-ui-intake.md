@@ -616,6 +616,21 @@ live verification in the running app.
   The project-home card keeps its narrowing.
 
 
+### C-29 — Remove the Budget row and gauge from the Context panel
+
+- **Asked for:** "remove the budget and gauge... we have another place to show it".
+- **Confirmed the other place before removing it.** The composer renders a live `Context …%`
+  indicator — verified in the same session, with the panel's copy gone and the composer's still
+  present. So this deletes a duplicate readout, not the only one.
+- **Removed:** the `Budget` label row and the Arco `Progress` gauge from `ContextHandoffPanel`, plus
+  the three imports that became unused (`Progress`, `contextUsageProgressPercent`,
+  `formatContextUsagePercent`) and the two orphaned CSS rules. Lint clean.
+- **The budget computation stays.** `budget` still feeds telemetry (`last_budget_status`), so only
+  the render was cut — removing the subscription would have changed behaviour, not just appearance.
+- **Result:** the panel now reads `Context.md · Not created` and `Pinned context`, which is the state
+  the file itself cannot show. That is the whole reason the tab was restored in C-25.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |
