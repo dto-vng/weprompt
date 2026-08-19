@@ -560,6 +560,8 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   const filesPanePortal = paneContainers.files ? createPortal(filesPanel, paneContainers.files) : null;
   const changesPanePortal =
     paneContainers.changes && changesPanel ? createPortal(changesPanel, paneContainers.changes) : null;
+  const contextPanePortal =
+    paneContainers.context && contextPanel ? createPortal(contextPanel, paneContainers.context) : null;
   // The tabbed pane hosts Files, Changes and Context, so the Project flyout would be a second
   // entry point to the same three panels. `paneActiveView` is non-null ONLY when ChatLayout
   // mounted that pane (the project-menu presentation) — the `panel` presentation Teams uses has
@@ -572,6 +574,7 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
       {shouldRenderLocalMessageContext && messageContext}
       {filesPanePortal}
       {changesPanePortal}
+      {contextPanePortal}
       <div
         className='chat-workspace size-full flex flex-col relative'
         tabIndex={0}

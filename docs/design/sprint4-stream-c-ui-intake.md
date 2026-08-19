@@ -540,11 +540,22 @@ live verification in the running app.
 - **Raised by the reporter** once the pane carried Files, Changes, Preview and Browser: the flyout
   offered `Files / Context / Changes`, so two of its three entries were a second door to the same
   panels.
-- **Decision: remove the flyout, and drop Context rather than moving it.** The reporter's reasoning —
-  users can read `Context.md` directly — checks out and understates the case: **`/context` already
-  exposes `open`, `compact`, `pin` and `handoff`**, so the panel was the only *UI* for capabilities
-  that remain fully reachable. Nothing is lost. (A Context tab was briefly built before this was
-  settled, then reverted.)
+- **Decision, and then its reversal — worth recording as a pair.** The flyout was removed and Context
+  dropped with it, on the reasoning that users can read `Context.md` directly and that `/context`
+  already exposes `open`, `compact`, `pin` and `handoff`. **That reasoning was correct about
+  capability and wrong about discoverability.** The reporter went looking for Context within minutes,
+  in a temporary-workspace conversation where the file had never been created, and found an empty
+  tree and no affordance. The command does everything the panel did — but only for someone who
+  already knows it exists.
+- **Context is therefore back as a pane tab** (`Files / Changes / Context / Preview / Browser`),
+  gated on `backend === 'aionrs'` to match the panel's own `showContextSection` check, since a tab
+  that can only ever be empty is worse than no tab. The flyout stays removed: the redundancy is gone
+  without losing the readout. Verified live — the panel reports `Context.md · Not created`,
+  `Budget · Estimated 0%`, `No pinned context yet`, which is precisely the state the reporter could
+  not otherwise see.
+- **The lesson is about what "redundant" meant.** Files and Changes genuinely were duplicated. Context
+  looked duplicated because a *file* existed with the same name, but the panel also carried state the
+  file cannot show — whether it exists at all, the budget, and pinned entries.
 - **Two constraints made this more than a deletion:**
   1. **The Workspace component must still render.** The pane's Files and Changes tabs are portals out
      of that instance, and its drag-import and paste handlers wrap the chat. Only the flyout's own

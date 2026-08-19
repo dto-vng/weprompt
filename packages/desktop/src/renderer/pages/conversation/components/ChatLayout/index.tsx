@@ -31,6 +31,7 @@ import './chat-layout.css';
 const PANE_TAB_LABEL_KEYS = {
   files: 'conversation.workspace.changes.filesTab',
   changes: 'conversation.workspace.changes.tab',
+  context: 'conversation.contextHandoff.sectionTitle',
   preview: 'conversation.workspace.changes.previewTab',
   browser: 'conversation.workspace.changes.browserTab',
 } as const;
@@ -41,6 +42,13 @@ const PANE_TAB_LABEL_KEYS = {
  * live from the first paint, so a blank start costs the user one keystroke and nothing else.
  */
 const BROWSER_START_URL = 'about:blank';
+
+/**
+ * Context sits with the other workspace-state views, ahead of the content views. It is filtered
+ * out for backends other than aionrs, matching the panel's own `showContextSection` gate — a tab
+ * that can only ever be empty is worse than no tab.
+ */
+const PANE_TAB_ORDER = ['files', 'changes', 'context', 'preview', 'browser'] as const;
 
 // headerExtra allows injecting custom actions (e.g., model picker) into the header's right area
 const ChatLayout: React.FC<{
@@ -181,6 +189,7 @@ const ChatLayout: React.FC<{
   const [artifactPaneView, setArtifactPaneView] = useState<WorkspacePaneView>('files');
   const [filesPaneEl, setFilesPaneEl] = useState<HTMLElement | null>(null);
   const [changesPaneEl, setChangesPaneEl] = useState<HTMLElement | null>(null);
+  const [contextPaneEl, setContextPaneEl] = useState<HTMLElement | null>(null);
   const browserOpenedRef = React.useRef(false);
   // Don't pay for a webview until the user actually asks for the browser.
   const browserEverOpened = artifactPaneView === 'browser' || browserOpenedRef.current;
@@ -188,8 +197,8 @@ const ChatLayout: React.FC<{
   const artifactPaneViewRef = React.useRef(artifactPaneView);
   artifactPaneViewRef.current = artifactPaneView;
   const panePortalTargets = React.useMemo(
-    () => ({ files: filesPaneEl, changes: changesPaneEl }),
-    [filesPaneEl, changesPaneEl]
+    () => ({ files: filesPaneEl, changes: changesPaneEl, context: contextPaneEl }),
+    [filesPaneEl, changesPaneEl, contextPaneEl]
   );
 
   // Opening a preview must also REVEAL the preview. PreviewContext dispatches this event on
@@ -377,7 +386,7 @@ const ChatLayout: React.FC<{
             */}
             <div className='shrink-0 flex items-center justify-between gap-8px px-10px pt-8px'>
               <div className='flex items-center gap-2px' role='tablist'>
-              {(['files', 'changes', 'preview', 'browser'] as const).map((view) => (
+              {PANE_TAB_ORDER.filter((view) => view !== 'context' || backend === 'aionrs').map((view) => (
                 <Button
                   key={view}
                   type='text'
@@ -435,6 +444,13 @@ const ChatLayout: React.FC<{
               hidden={artifactPaneView !== 'changes'}
             >
               <div ref={setChangesPaneEl} className='workspace-pane-section h-full overflow-hidden' />
+            </div>
+            <div
+              className='flex-1 min-h-0 overflow-hidden'
+              data-testid='artifact-pane-context'
+              hidden={artifactPaneView !== 'context'}
+            >
+              <div ref={setContextPaneEl} className='workspace-pane-section h-full overflow-hidden' />
             </div>
             <div className='flex-1 min-h-0 overflow-hidden' hidden={artifactPaneView !== 'preview'}>
               <PreviewPanel fullBleed onRequestCollapse={collapseArtifactPaneFromPreview} />

@@ -32,8 +32,17 @@ describe('project flyout is removed where the pane replaces it', () => {
     expect(WORKSPACE).toMatch(/const paneHostsWorkspacePanels = paneActiveView !== null;/);
   });
 
-  it('does not add a Context tab — /context covers it', () => {
-    expect(CHAT_LAYOUT).not.toMatch(/artifact-pane-context/);
-    expect(CHAT_LAYOUT).toMatch(/\['files', 'changes', 'preview', 'browser'\] as const/);
+  it('keeps Context reachable as a pane tab', () => {
+    // Dropped with the flyout at first, on the reasoning that /context covers it. The reporter
+    // then went looking for Context and found nothing — the command does everything the panel
+    // does, but only if you already know it exists. Restored as a tab.
+    expect(CHAT_LAYOUT).toMatch(/artifact-pane-context/);
+    expect(CHAT_LAYOUT).toMatch(/const PANE_TAB_ORDER = \['files', 'changes', 'context', 'preview', 'browser'\] as const;/);
+  });
+
+  it('hides the Context tab on backends that have no context panel', () => {
+    // showContextSection is `eventPrefix === 'aionrs'`; a tab that can only ever be empty is
+    // worse than no tab.
+    expect(CHAT_LAYOUT).toMatch(/view !== 'context' \|\| backend === 'aionrs'/);
   });
 });

@@ -20,7 +20,7 @@ import React, { createContext, useContext } from 'react';
  * A container is null whenever the pane has not mounted that tab's slot; the Workspace then
  * renders nothing extra for it.
  */
-export type WorkspacePaneView = 'files' | 'changes' | 'preview' | 'browser';
+export type WorkspacePaneView = 'files' | 'changes' | 'context' | 'preview' | 'browser';
 
 type WorkspaceFilesPaneValue = {
   /**
