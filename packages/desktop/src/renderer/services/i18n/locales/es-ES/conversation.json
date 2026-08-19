@@ -516,6 +516,8 @@
     "changes": {
       "tab": "Cambios",
       "filesTab": "Archivos",
+      "previewTab": "Vista previa",
+      "browserTab": "Navegador",
       "currentBranchLabel": "Rama actual",
       "summary": "{{count}} archivo(s) modificado(s)",
       "insertions": "+{{count}} inserciones",

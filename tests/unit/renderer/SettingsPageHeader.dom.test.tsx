@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import SettingsPageHeader from '@/renderer/pages/settings/components/SettingsPageHeader';
 
 /**
- * The header's `bg-1` fill exists only to mask content scrolling underneath it
+ * The header's fill exists only to mask content scrolling underneath it
  * in sticky mode. Callers that render the header outside their scroll body —
  * inside a narrow centred column — used to get that fill painted at the column's
  * width instead of the page's, leaving a visible seam either side. Guard both
@@ -15,7 +15,9 @@ const headerEl = () => screen.getByTestId('page-header');
 describe('SettingsPageHeader background', () => {
   it('paints a background when sticky, so scrolled content cannot show through', () => {
     render(<SettingsPageHeader data-testid='page-header' title='Assistants' />);
-    expect(headerEl().className).toContain('bg-1');
+    // C-16: the mask must MATCH the page it masks, not merely be opaque. At bg-1 it read as a
+    // warm band on the lighter content plane C-04 introduced.
+    expect(headerEl().className).toContain('bg-chat-surface');
   });
 
   it('paints no background when not sticky, so it cannot seam against its wrapper', () => {

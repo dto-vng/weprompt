@@ -79,7 +79,12 @@ const WorkspaceCollapse: React.FC<WorkspaceCollapseProps> = ({
                 masks the tail of the title when they appear on hover. */}
             {trailing && (
               <div
-                className='absolute right-8px top-1/2 -translate-y-1/2 flex items-center justify-end gap-2px'
+                className='absolute right-12px top-1/2 -translate-y-1/2 flex items-center justify-end gap-2px'
+                /* right-12px, not 8px: this container is absolutely positioned, so it
+                   ignores the header's padding and sets its own inset. 12px is what the
+                   sider section labels use (`pr-12px`), which puts these icons on the same
+                   vertical line as the Teams/Projects/Chats `+`. At 8px they sat 5px
+                   further right — measured, not estimated. */
                 onClick={(e) => e.stopPropagation()}
               >
                 {trailing}

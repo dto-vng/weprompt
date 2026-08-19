@@ -516,6 +516,8 @@
     "changes": {
       "tab": "Изменения",
       "filesTab": "Файлы",
+      "previewTab": "Предпросмотр",
+      "browserTab": "Браузер",
       "currentBranchLabel": "Текущая ветка",
       "summary": "{{count}} файл(ов) изменено",
       "insertions": "+{{count}} добавлено",

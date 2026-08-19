@@ -27,6 +27,24 @@
   --bg-2: #f0e9db; /* warm cream — panels / cards / 三级背景 */
   --bg-3: #e5dcc9; /* warm hairline border / 边框分隔 */
   --bg-chat-surface: #fffdf9;
+  /* Inline-code chip fill. Light: one step lighter than the --bg-3 it used to borrow,
+     which is the hairline-BORDER tone and read as a heavy block in dense tables (C-02).
+     Dark keeps --bg-3, where that tone is the raised surface, not the heaviest one —
+     swapping the token outright would have flattened the chip against the page. */
+  --md-inline-code-bg: #f0e9db;
+  /* Text-input surface + hairline (C-17). A pair, because a fill alone cannot work in
+     both themes: light wants a shade *lighter* than Arco's --color-fill-2, while dark
+     needs one *raised above* the page — the light value (--bg-base) is the page itself in
+     dark, which made the field invisible. The border is what guarantees the field reads as
+     a field in either theme, independently of how close the fill sits to the page. */
+  --input-surface: #faf6ee;
+  --input-border: #d8cbb6;
+  /* Tile behind a vendor logo image. Light: none needed — the page is already near-white,
+     which is what these logos are drawn for. Dark: a near-white tile, because several are
+     bare dark glyphs (Amp, Autohand, Copilot's mark) with no self-contained background,
+     and they disappear against the #0b0e14 page. */
+  --agent-logo-surface: transparent;
+  --agent-logo-border: transparent;
   --bg-artifact-surface: #fffdf9;
   --studio-page-background: #e9e3d6;
   --studio-slate-surface: #f0eadd;
@@ -96,7 +114,7 @@
   --fill-0: #ffffff; /* 填充色 0 */
   --fill-white-to-black: #ffffff; /* 白到黑填充色 */
   --border-special: var(--bg-3); /* 特殊边框色 */
-  --color-guid-agent-bar: #f0e9db; /* 首页 Agent 选择条背景 — warm cream */
+  --color-guid-agent-bar: #faf6ee; /* 首页 Agent 选择条背景 — matches the composer surface (C-13) */
 
   /* Document Surface - Light Mode
      The artifact editor/preview body reads as a white "page" sitting inside the
@@ -130,6 +148,11 @@
   --bg-2: #161c27; /* 三级背景 */
   --bg-3: #1e2536; /* cards / raised surface / 边框分隔 */
   --bg-chat-surface: var(--bg-base);
+  --md-inline-code-bg: var(--bg-3); /* raised, not heaviest, in dark — keep as-is */
+  --input-surface: #161c27; /* raised above the #0b0e14 page, unlike --bg-base */
+  --input-border: #2a3344;
+  --agent-logo-surface: #f4f4f5;
+  --agent-logo-border: #2a3344;
   --bg-artifact-surface: var(--bg-1);
   --studio-page-background: var(--bg-base);
   --studio-slate-surface: var(--color-fill-2);

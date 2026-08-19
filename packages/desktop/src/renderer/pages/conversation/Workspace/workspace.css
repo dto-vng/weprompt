@@ -206,7 +206,13 @@
 
 .workspace-project-files-search {
   display: block;
-  margin: 0 0 6px;
+  /* Inset rather than full-bleed: at 439px inside a 441px container the field read as the
+     heaviest thing in the panel. The symmetric margin keeps it fluid when the pane is
+     resized, and lines its left edge up closer to the section label beneath it.
+     `width: auto` is required — Arco's input wrapper sets width:100% with content-box
+     sizing, so the margin alone just pushed the field into overflow instead of shrinking it. */
+  width: auto;
+  margin: 0 12px 6px;
 }
 
 .workspace-project-files-search .arco-input-inner-wrapper {
@@ -253,7 +259,13 @@
   min-width: 0;
 }
 
-.workspace-project-files-row {
+/* The `.arco-btn-text:not(.arco-btn-disabled)` qualifier is not decoration: these rows
+   are Arco text Buttons, and Arco's own selector scores (0,3,0) against this rule's
+   (0,1,0). Without it the colours below are silently overridden and every file name
+   renders in the brand orange — which read as an alert on a plain directory listing.
+   Same reason on the :hover rule, which must outscore Arco's (0,4,0) hover selector. */
+.workspace-project-files-row,
+.workspace-project-files-row.arco-btn-text:not(.arco-btn-disabled) {
   display: grid;
   grid-template-columns: 13px 16px minmax(0, 1fr) 6px;
   column-gap: 9px;
@@ -269,7 +281,9 @@
 }
 
 .workspace-project-files-row:hover,
-.workspace-project-files-row-context {
+.workspace-project-files-row-context,
+.workspace-project-files-row.arco-btn-text:not(.arco-btn-disabled):hover,
+.workspace-project-files-row-context.arco-btn-text:not(.arco-btn-disabled) {
   color: var(--color-text-1);
   background: var(--color-fill-1);
 }
@@ -361,6 +375,32 @@
 .workspace-section-scroll {
   max-height: min(420px, calc(100vh - 150px));
   overflow-y: auto;
+  /* Must be stated explicitly. Per spec, when one axis is not `visible` the other computes
+     from `visible` to `auto` — so `overflow-y: auto` alone silently enables a HORIZONTAL
+     scrollbar, and any 1px of overflow then draws a grey bar across the panel. */
+  overflow-x: hidden;
+}
+
+/* Portalled into the artifact pane rather than the flyout popover. The 420px cap above is
+   sized for that popover and leaves the panel stranded in the much taller pane. */
+.workspace-pane-section .workspace-section-scroll {
+  max-height: none;
+  height: 100%;
+}
+
+/* The popover supplied the panels' horizontal breathing room; the pane's portal slot did not,
+   so content sat 1px from the pane border. Padding here covers Files, Changes and Context in
+   one place rather than each panel inventing its own. */
+.workspace-pane-section {
+  padding: 0 12px;
+}
+
+/* The search field carries its own inset for the project-home card, which is not inside a pane
+   section. Inside the pane the container padding already does that job — keeping both would
+   double it and push the field out of line with the tree beneath it. */
+.workspace-pane-section .workspace-project-files-search {
+  margin-right: 0;
+  margin-left: 0;
 }
 
 @keyframes workspace-project-menu-in {
@@ -481,22 +521,6 @@
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.context-handoff-budget {
-  margin-top: 2px;
-  padding: 0 2px;
-}
-
-.context-handoff-budget-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 3px;
-  color: var(--color-text-3);
-  font-size: 12px;
-  line-height: 16px;
 }
 
 .context-handoff-pinned-title {

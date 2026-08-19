@@ -8,6 +8,7 @@ import type { IMessagePermission } from '@/common/chat/chatLib';
 import { ipcBridge } from '@/common';
 import { iconColors } from '@/renderer/styles/colors';
 import { Button, Card, Message, Typography } from '@arco-design/web-react';
+import { PERMISSION_DENY_BORDER } from '../permissionButtonStyles';
 import { Api, Attention, Bookmark, CheckOne, Edit, Lightning, Lock } from '@icon-park/react';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -104,6 +105,7 @@ const MessagePermission: React.FC<MessagePermissionProps> = React.memo(({ messag
                     <Button
                       key={value || `option_${index}`}
                       type={deEmphasize ? 'secondary' : 'primary'}
+                      className={deEmphasize ? PERMISSION_DENY_BORDER : undefined}
                       // Approving a delete is the highest-stakes confirm in the chat UI; it
                       // should not look like an ordinary primary action.
                       status={summary.destructive && !deEmphasize ? 'danger' : undefined}

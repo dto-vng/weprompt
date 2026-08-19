@@ -42,3 +42,22 @@ export const activateOnEnterOrSpace =
  *    it. Since it changed nothing on screen, keeping it would only have been dead CSS.
  */
 export const ROW_FOCUS_RING = 'focus-visible:[outline:1px_solid_rgb(var(--primary-6))]';
+
+/**
+ * Sider nav icon treatment: muted at rest, brand orange while the row is hovered.
+ *
+ * Mirrors what the Creative Studio entry does today — but that entry produces it by
+ * accident, not design: Arco's `.arco-btn-text:not(.arco-btn-disabled):hover` outranks
+ * the `bodyTextAction` module class that tries to pin the colour, so the button turns
+ * orange and only the label span holds grey. The non-Arco rows can't inherit that, so
+ * they state it explicitly here.
+ *
+ * Requires `group` on the row element — including the collapsed variant, which
+ * historically omitted it.
+ *
+ * Use `text-primary`, not `text-[rgb(var(--primary-6))]`: UnoCSS cannot tell whether
+ * an arbitrary `text-[...]` value is a size or a colour when it wraps a `var()`, so it
+ * emits no rule at all and the class silently does nothing. `bg-[rgba(var(--primary-6),…)]`
+ * works elsewhere in this file's callers only because `bg-` has no such ambiguity.
+ */
+export const NAV_ICON_HOVER = 'text-t-secondary group-hover:text-primary transition-colors';

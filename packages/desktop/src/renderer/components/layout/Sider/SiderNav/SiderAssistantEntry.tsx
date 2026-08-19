@@ -10,7 +10,7 @@ import { Tooltip } from '@arco-design/web-react';
 import { Ghost } from '@icon-park/react';
 import classNames from 'classnames';
 import type { SiderTooltipProps } from '@renderer/utils/ui/siderTooltip';
-import { ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
+import { NAV_ICON_HOVER, ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 
 interface SiderAssistantEntryProps {
   isMobile: boolean;
@@ -35,7 +35,7 @@ const SiderAssistantEntry: React.FC<SiderAssistantEntryProps> = ({
         <div
           className={classNames(
             ROW_FOCUS_RING,
-            'w-full h-34px flex items-center justify-center cursor-pointer transition-colors rd-8px text-t-primary',
+            'group w-full h-34px flex items-center justify-center cursor-pointer transition-colors rd-8px text-t-primary',
             isActive ? 'bg-fill-3' : 'hover:bg-fill-3 active:bg-fill-4'
           )}
           onClick={onClick}
@@ -48,7 +48,7 @@ const SiderAssistantEntry: React.FC<SiderAssistantEntryProps> = ({
             theme='outline'
             size='20'
             fill='currentColor'
-            className='block leading-none shrink-0'
+            className={classNames('block leading-none shrink-0', NAV_ICON_HOVER)}
             style={{ lineHeight: 0 }}
           />
         </div>
@@ -71,7 +71,7 @@ const SiderAssistantEntry: React.FC<SiderAssistantEntryProps> = ({
         aria-label={t('settings.assistants')}
         onKeyDown={activateOnEnterOrSpace(() => onClick?.())}
       >
-        <span className='size-22px flex items-center justify-center shrink-0 text-t-primary'>
+        <span className={classNames('size-22px flex items-center justify-center shrink-0', NAV_ICON_HOVER)}>
           <Ghost
             theme='outline'
             size='16'

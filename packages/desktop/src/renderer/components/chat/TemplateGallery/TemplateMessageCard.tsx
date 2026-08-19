@@ -140,7 +140,12 @@ export const TemplateReviewCard: React.FC<{ conversationId: string; filePath: st
             <Button
               type='primary'
               size='small'
-              className='w-fit'
+              // C-10: `flex items-center gap-8px` is load-bearing, not decoration. Arco's
+              // button computes display:block with text-align:center, so an `icon` prop sits
+              // flush against the label and `gap` alone does nothing. Same mechanism proved
+              // on the sider footer (C-08), where the identical markup rendered the glyph
+              // touching the text.
+              className='w-fit flex items-center gap-8px'
               loading={state.status === 'installing'}
               disabled={state.status === 'installing'}
               onClick={() => void confirm()}

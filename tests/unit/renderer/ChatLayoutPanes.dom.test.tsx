@@ -145,7 +145,12 @@ describe('ChatLayout chat + artifact two-region split (single chat / project-men
   it('drives the layout from a single chat<->artifact ratio split', () => {
     renderLayout();
 
-    expect(mocks.resizableSplitOptions).toHaveLength(1);
+    // Configuration, not invocation count: the pane resolves its portal containers through ref
+    // callbacks, so it legitimately renders more than once and a count measures renders. "A
+    // single split" means one storage key, which is what this asserts.
+    expect(new Set(mocks.resizableSplitOptions.map((o: { storageKey: string }) => o.storageKey))).toEqual(
+      new Set(['chat-artifact-split-ratio'])
+    );
     expect(mocks.resizableSplitOptions[0]).toEqual(
       expect.objectContaining({ unit: 'ratio', defaultWidth: 50, storageKey: 'chat-artifact-split-ratio' })
     );
@@ -163,9 +168,13 @@ describe('ChatLayout chat + artifact two-region split (single chat / project-men
 
     // The handle drives chatSplitRatio (the LEFT/chat pane), so it must NOT be
     // reversed — reverse:true would drag the divider backwards.
-    expect(mocks.dragHandleOptions).toHaveLength(1);
-    expect(mocks.dragHandleOptions[0].reverse).toBeFalsy();
-    expect(mocks.dragHandleOptions[0].linePlacement).toBe('start');
+    // Same reasoning as the split above — assert that EVERY handle created has the right
+    // semantics, rather than that exactly one call happened across all renders.
+    expect(mocks.dragHandleOptions.length).toBeGreaterThan(0);
+    for (const options of mocks.dragHandleOptions) {
+      expect(options.reverse).toBeFalsy();
+      expect(options.linePlacement).toBe('start');
+    }
   });
 
   it('removes the artifact pane from the DOM when collapsed and gives chat the full width', () => {

@@ -54,8 +54,14 @@ const SIZE = {
   },
 } as const;
 
-const CARD = 'w-160px h-100px';
-const TEMPLATE_NAME = 'text-12px text-t-secondary truncate';
+// The card's width is shared by the thumbnail AND its caption wrapper. Keeping them in
+// one constant is load-bearing: if the wrapper is left unconstrained it sizes to the
+// caption, so a long template name widens the whole card and breaks the row (C-07).
+const CARD_W = 'w-160px';
+const CARD = `${CARD_W} h-100px`;
+// `truncate` needs `min-w-0` to do anything inside a flex row — without it the span
+// claims its full intrinsic width and the ellipsis never appears.
+const TEMPLATE_NAME = 'text-12px text-t-secondary truncate min-w-0';
 
 // Fades sit over the scroller's own edges and match the panel fill so cards appear
 // to pass under it. `pb-4px` on the shelf is the scrollbar gutter, so the fade stops
@@ -154,7 +160,7 @@ const TemplateGalleryColumns: React.FC<{
                 const select = () => onSelect(template);
                 const labels = labelsOf(template);
                 return (
-                  <div key={id} className='flex flex-col shrink-0 snap-start'>
+                  <div key={id} className={`flex flex-col shrink-0 snap-start ${CARD_W}`}>
                     <Tooltip content={labels.description}>
                       <Card
                         hoverable

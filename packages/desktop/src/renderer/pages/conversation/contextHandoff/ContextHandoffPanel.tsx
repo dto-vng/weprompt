@@ -10,13 +10,11 @@ import { useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
 import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
-import { Button, Input, Message, Modal, Progress, Space, Tooltip, Typography } from '@arco-design/web-react';
+import { Button, Input, Message, Modal, Space, Tooltip, Typography } from '@arco-design/web-react';
 import { Add, Attention, Delete, Edit, FileText, Pin } from '@icon-park/react';
 import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  contextUsageProgressPercent,
-  formatContextUsagePercent,
   getActiveContextBudget,
   resolveConversationContextBudgetSnapshot,
   subscribeActiveContextBudget,
@@ -337,24 +335,6 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
               </span>
             </Tooltip>
           )}
-        </div>
-        <div className='context-handoff-budget'>
-          <div className='context-handoff-budget-label'>
-            <span>{t('conversation.contextHandoff.budgetLabel')}</span>
-            <span>
-              {budget.ratio === null
-                ? '--'
-                : budget.source === 'estimated'
-                  ? `${t('conversation.contextUsage.estimated')} · ${formatContextUsagePercent(budget.ratio)}`
-                  : formatContextUsagePercent(budget.ratio)}
-            </span>
-          </div>
-          <Progress
-            percent={contextUsageProgressPercent(budget.ratio)}
-            showText={false}
-            size='small'
-            color={`rgb(var(--${budget.status === 'too_large' ? 'danger' : budget.status === 'compress' ? 'warning' : 'primary'}-6))`}
-          />
         </div>
       </div>
 

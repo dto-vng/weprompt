@@ -74,6 +74,12 @@ const createInitStyle = (
     word-break: break-all;
     overflow-wrap: anywhere;
   }
+  /* C-03: colour alone was the only thing marking a link, and markdown.css's underline
+     rule never reaches this shadow root. Underline on hover gives a second, non-colour
+     signal without making prose noisy at rest. */
+  a:hover {
+    text-decoration: underline;
+  }
   .markdown-local-file-link {
     display: inline-flex;
     align-items: center;
@@ -83,7 +89,10 @@ const createInitStyle = (
     padding: 2px 6px;
     background: var(--bg-2);
     color: var(--text-primary);
-    border: 1px solid transparent;
+    /* C-03: a visible border is what separates this *clickable* chip from an inert inline
+       code chip. They share a fill — deliberately, after C-02 lightened code onto the same
+       tone — so the border carries the affordance, not the colour. */
+    border: 1px solid var(--bg-4);
     border-radius: 6px;
     box-shadow: none;
     font: inherit;
@@ -166,8 +175,12 @@ const createInitStyle = (
     font-weight: 600;
     color: var(--text-primary);
   }
+  /* C-02: this rule — not the one in markdown.css — is what chat replies actually get.
+     markdown.css carries a near-duplicate written with :where(), which contributes zero
+     specificity, so this class-scoped copy wins inside the shadow root. Both now read the
+     same token; changing only markdown.css does nothing visible in chat. */
   .markdown-shadow-body code:not(pre code) {
-    background: var(--bg-3);
+    background: var(--md-inline-code-bg);
     color: var(--text-primary);
     padding: 2px 6px;
     border-radius: 4px;

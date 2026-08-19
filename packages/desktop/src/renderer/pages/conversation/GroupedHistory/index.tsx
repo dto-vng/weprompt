@@ -46,7 +46,10 @@ import type { ConversationRowProps, WorkspaceGroupedHistoryProps } from './types
  * beats `.arco-btn`'s own `display` so the icon actually centres.
  */
 const PROJECT_ROW_ACTION_CLASS =
-  '!flex items-center justify-center !w-20px !h-20px !min-w-20px !p-0 !rounded-4px !text-t-secondary hover:!text-t-primary sider-action-btn';
+  // 22px, matching the sider section-label '+' buttons. At 20px the 14px icon centres
+  // 3px from the button edge instead of 4px, so the icons landed 1px apart even once
+  // their containers were aligned — the residue of the 5px gap this fixed.
+  '!flex items-center justify-center !w-22px !h-22px !min-w-22px !p-0 !rounded-4px !text-t-secondary hover:!text-t-primary sider-action-btn';
 const PROJECT_DISCLOSURE_CLASS = `${PROJECT_ROW_ACTION_CLASS} focus-visible:[outline:2px_solid_rgb(var(--primary-6))] focus-visible:outline-offset-2`;
 
 const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
