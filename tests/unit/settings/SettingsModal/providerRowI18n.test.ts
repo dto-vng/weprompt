@@ -93,7 +93,7 @@ describe('provider and model row locale templates', () => {
         for (const [variantName, template] of variants) {
           // Order is the translator's to choose; the SET of names is the contract.
           expect(placeholdersIn(template), `settings.${sectionName}.${variantName} in ${language}`).toEqual(
-            [...expected].sort()
+            [...expected].toSorted()
           );
         }
       }
