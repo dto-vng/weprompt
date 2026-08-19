@@ -284,8 +284,10 @@ const ConversationRow: React.FC<ConversationRowProps> = (props) => {
           ROW_FOCUS_RING,
           'chat-history__item h-34px rd-8px flex items-center group cursor-pointer relative overflow-hidden shrink-0 conversation-item [&.conversation-item+&.conversation-item]:mt-2px min-w-0 transition-colors',
           collapsed ? 'justify-center px-0' : 'justify-start gap-8px pr-16px',
-          // dimIcon means this row sits inside a project/cron parent — visually indent the row content while keeping the bg full-width
-          !collapsed && (dimIcon ? 'pl-34px' : 'pl-10px'),
+          // dimIcon means this row sits inside a project/cron parent. The title aligns on the
+          // same vertical as the parent's name rather than indenting under it, so a project and
+          // its chats read as one column; the row background stays full-width either way.
+          !collapsed && 'pl-10px',
           {
             'hover:bg-fill-3': !batchMode && !selected,
             '!bg-fill-3': selected,
