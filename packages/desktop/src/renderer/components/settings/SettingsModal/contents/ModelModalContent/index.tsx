@@ -38,7 +38,7 @@ import { useSettingsViewMode } from '../../settingsViewContext';
 import SettingsPageHeader from '@/renderer/pages/settings/components/SettingsPageHeader';
 import { consumePendingDeepLink } from '@/renderer/hooks/system/useDeepLink';
 import { StudioMediaModelsSection } from './StudioMediaModelsSection';
-import { getApiKeyCount } from './providerRowSummary';
+import { getApiKeyCount, summarizeProviderHealth } from './providerRowSummary';
 import '../../model-provider.css';
 
 /**
@@ -182,6 +182,16 @@ const ModelModalContent: React.FC = () => {
         message.error(t('settings.saveModelConfigFailed'));
       });
   };
+
+  /**
+   * "2 models · 1 key" as one translated string. The separator lives in the
+   * locale rather than in JSX so a language can reorder or replace it.
+   */
+  const providerCountsLabel = (platform: IProvider): string =>
+    t('settings.providerRow.counts', {
+      models: t('settings.providerRow.modelCount', { count: (platform.models ?? []).length }),
+      keys: t('settings.providerRow.apiKeyCount', { count: getApiKeyCount(platform.api_key) }),
+    });
 
   // 切换供应商启用状态（全选 ↔ 全不选）
   const toggleProviderEnabled = (platform: IProvider) => {
@@ -454,6 +464,7 @@ const ModelModalContent: React.FC = () => {
               {(data || []).map((platform: IProvider) => {
                 const key = platform.id;
                 const isExpanded = collapseKey[platform.id] ?? false;
+                const healthSummary = summarizeProviderHealth(platform);
                 return (
                   <Collapse
                     activeKey={isExpanded ? ['image-generation'] : []}
@@ -475,11 +486,20 @@ const ModelModalContent: React.FC = () => {
                       className='[&_.arco-collapse-item-header-title]:flex-1 group'
                       header={
                         <div className='group flex items-center justify-between w-full min-h-32px gap-8px min-w-0'>
-                          <span
-                            className={`text-14px font-500 truncate min-w-0 transition-colors ${isExpanded ? 'text-t-primary' : 'text-2 group-hover:text-1'}`}
-                          >
-                            {platform.name}
-                          </span>
+                          {/* Name and counts read together as one phrase, always visible. */}
+                          <div className='flex min-w-0 items-center gap-8px'>
+                            <span
+                              className={`text-14px font-500 truncate min-w-0 transition-colors ${isExpanded ? 'text-t-primary' : 'text-2 group-hover:text-1'}`}
+                            >
+                              {platform.name}
+                            </span>
+                            <span
+                              data-testid={`provider-counts-${platform.id}`}
+                              className='shrink-0 whitespace-nowrap font-mono text-11px text-t-secondary'
+                            >
+                              {providerCountsLabel(platform)}
+                            </span>
+                          </div>
                           <div
                             className='flex items-center gap-8px shrink-0'
                             onClick={(e) => {
@@ -489,24 +509,32 @@ const ModelModalContent: React.FC = () => {
                               e.stopPropagation();
                             }}
                           >
-                            <span className='text-12px text-t-secondary whitespace-nowrap hidden md:inline-flex items-center overflow-hidden max-w-0 opacity-0 group-hover:max-w-320px group-hover:opacity-100 transition-all duration-180'>
+                            {/* Health summary — always a dot plus a word, never colour alone.
+                                Dropped below md, matching the design's narrow variant. */}
+                            {healthSummary && (
                               <span
-                                className='cursor-pointer hover:text-t-primary transition-colors'
-                                onClick={() => setCollapseKey((prev) => ({ ...prev, [platform.id]: !isExpanded }))}
+                                data-testid={`provider-health-${platform.id}`}
+                                className={`hidden md:inline-flex items-center gap-6px whitespace-nowrap text-12px ${
+                                  healthSummary.kind === 'failing' ? 'text-danger-6' : 'text-t-secondary'
+                                }`}
                               >
-                                {t('settings.modelCount')}（{(platform.models ?? []).length}）
+                                {healthSummary.kind !== 'unchecked' && (
+                                  <span
+                                    className={`h-7px w-7px shrink-0 rounded-full ${
+                                      healthSummary.kind === 'failing' ? 'bg-danger' : 'bg-success'
+                                    }`}
+                                  />
+                                )}
+                                {healthSummary.kind === 'failing'
+                                  ? t('settings.providerRow.healthFailing', { count: healthSummary.failing })
+                                  : healthSummary.kind === 'checked'
+                                    ? t('settings.providerRow.healthChecked', {
+                                        checked: healthSummary.checked,
+                                        total: healthSummary.total,
+                                      })
+                                    : t('settings.providerRow.healthNotChecked')}
                               </span>
-                              <span className='mx-6px'>|</span>
-                              <span
-                                className='cursor-pointer hover:text-t-primary transition-colors'
-                                onClick={() => editModalCtrl.open({ data: platform })}
-                              >
-                                {t('settings.apiKeyCount')}（{getApiKeyCount(platform.api_key)}）
-                              </span>
-                            </span>
-                            <span className='text-12px text-t-secondary whitespace-nowrap md:hidden'>
-                              {(platform.models ?? []).length} / {getApiKeyCount(platform.api_key)}
-                            </span>
+                            )}
                             {/* 供应商启用开关 / Provider enable switch */}
                             <Switch
                               size='small'

@@ -875,6 +875,23 @@
   "includePrereleaseUpdates": "Incluir versiones previas/de desarrollo",
   "saveModelConfigFailed": "Error al guardar la configuración del modelo",
   "healthCheck": "Verificación de salud",
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "{{count}} modelos",
+    "modelCount_one": "{{count}} modelo",
+    "modelCount_many": "{{count}} modelos",
+    "modelCount_other": "{{count}} modelos",
+    "apiKeyCount": "{{count}} claves",
+    "apiKeyCount_one": "{{count}} clave",
+    "apiKeyCount_many": "{{count}} claves",
+    "apiKeyCount_other": "{{count}} claves",
+    "healthChecked": "{{checked}} de {{total}} comprobados",
+    "healthNotChecked": "Sin comprobar",
+    "healthFailing": "{{count}} con errores",
+    "healthFailing_one": "{{count}} con error",
+    "healthFailing_many": "{{count}} con errores",
+    "healthFailing_other": "{{count}} con errores"
+  },
   "providerHealth": {
     "configuredInferenceUnavailable": "Configurado · inferencia no disponible.",
     "setupNeedsAttention": "La configuración requiere atención.",

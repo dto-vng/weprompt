@@ -377,6 +377,78 @@ describe('ModelModalContent', () => {
     );
   });
 
+  // The counts and the health phrase are the two things the redesign promises are
+  // readable without hovering. jsdom compiles no UnoCSS and models no hover, so
+  // these assert the absence of the reveal utilities and the presence of one node
+  // — the same shape the repo's other row tests use.
+  describe('provider row summary', () => {
+    const providerWith = (overrides: Partial<IProvider>): IProvider => ({ ...provider, ...overrides });
+
+    it('renders the counts with no hover-reveal utilities left on them', async () => {
+      providersQueryData.current = [provider];
+      render(<ModelModalContent />);
+
+      const counts = await screen.findByTestId('provider-counts-provider-a');
+      expect(counts).toHaveTextContent('settings.providerRow.counts');
+      expect(counts.className).not.toContain('opacity-0');
+      expect(counts.className).not.toContain('group-hover:');
+      expect(counts.className).not.toContain('max-w-0');
+    });
+
+    it('renders the counts exactly once, with no breakpoint duplicate beside them', async () => {
+      providersQueryData.current = [provider];
+      render(<ModelModalContent />);
+
+      await screen.findByTestId('provider-counts-provider-a');
+      expect(screen.getAllByTestId('provider-counts-provider-a')).toHaveLength(1);
+      expect(screen.getAllByText('settings.providerRow.counts')).toHaveLength(1);
+      // The deleted md:hidden fallback rendered a bare "models / keys" pair.
+      expect(screen.queryByText('1 / 1')).not.toBeInTheDocument();
+    });
+
+    it('leads with the failure when any model is unhealthy', async () => {
+      providersQueryData.current = [
+        providerWith({
+          models: ['model-a', 'model-b'],
+          model_health: { 'model-a': { status: 'healthy' }, 'model-b': { status: 'unhealthy' } },
+        }),
+      ];
+      render(<ModelModalContent />);
+
+      const summary = await screen.findByTestId('provider-health-provider-a');
+      expect(summary).toHaveTextContent('settings.providerRow.healthFailing');
+    });
+
+    it('reports the checked fraction when the catalog is only partly measured', async () => {
+      providersQueryData.current = [
+        providerWith({
+          models: ['model-a', 'model-b'],
+          model_health: { 'model-a': { status: 'healthy' } },
+        }),
+      ];
+      render(<ModelModalContent />);
+
+      const summary = await screen.findByTestId('provider-health-provider-a');
+      expect(summary).toHaveTextContent('settings.providerRow.healthChecked');
+    });
+
+    it('says the provider is unchecked before any health check has run', async () => {
+      providersQueryData.current = [provider];
+      render(<ModelModalContent />);
+
+      const summary = await screen.findByTestId('provider-health-provider-a');
+      expect(summary).toHaveTextContent('settings.providerRow.healthNotChecked');
+    });
+
+    it('renders no health summary at all for a provider with no models', async () => {
+      providersQueryData.current = [providerWith({ models: [] })];
+      render(<ModelModalContent />);
+
+      await screen.findByTestId('provider-counts-provider-a');
+      expect(screen.queryByTestId('provider-health-provider-a')).not.toBeInTheDocument();
+    });
+  });
+
   it('retries once only when the provider supplies bounded retry guidance', async () => {
     // shouldAdvanceTime keeps Testing Library's real-timer polling alive while the
     // component's retry delay stays under advanceTimersByTime control.

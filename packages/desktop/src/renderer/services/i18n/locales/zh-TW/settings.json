@@ -885,6 +885,17 @@
   "includePrereleaseUpdates": "包含預發佈/dev 版本",
   "saveModelConfigFailed": "儲存模型設定失敗",
   "healthCheck": "健康檢測",
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "{{count}} 個模型",
+    "modelCount_other": "{{count}} 個模型",
+    "apiKeyCount": "{{count}} 個金鑰",
+    "apiKeyCount_other": "{{count}} 個金鑰",
+    "healthChecked": "已檢測 {{checked}}/{{total}}",
+    "healthNotChecked": "未檢測",
+    "healthFailing": "{{count}} 個異常",
+    "healthFailing_other": "{{count}} 個異常"
+  },
   "providerHealth": {
     "configuredInferenceUnavailable": "已設定 · 推論暫時無法使用。",
     "setupNeedsAttention": "設定需要處理。",

@@ -873,6 +873,20 @@
   "includePrereleaseUpdates": "Ön sürüm/geliştirici sürümlerini dahil et",
   "saveModelConfigFailed": "Model yapılandırması kaydedilemedi",
   "healthCheck": "Sağlık Kontrolü",
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "{{count}} model",
+    "modelCount_one": "{{count}} model",
+    "modelCount_other": "{{count}} model",
+    "apiKeyCount": "{{count}} anahtar",
+    "apiKeyCount_one": "{{count}} anahtar",
+    "apiKeyCount_other": "{{count}} anahtar",
+    "healthChecked": "{{total}} modelden {{checked}} tanesi kontrol edildi",
+    "healthNotChecked": "Kontrol edilmedi",
+    "healthFailing": "{{count}} başarısız",
+    "healthFailing_one": "{{count}} başarısız",
+    "healthFailing_other": "{{count}} başarısız"
+  },
   "providerHealth": {
     "configuredInferenceUnavailable": "Yapılandırıldı · çıkarım kullanılamıyor.",
     "setupNeedsAttention": "Kurulumun kontrol edilmesi gerekiyor.",

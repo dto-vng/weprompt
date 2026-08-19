@@ -885,6 +885,20 @@
   "includePrereleaseUpdates": "Include prerelease/dev builds",
   "saveModelConfigFailed": "Failed to save model configuration",
   "healthCheck": "Health Check",
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "{{count}} models",
+    "modelCount_one": "{{count}} model",
+    "modelCount_other": "{{count}} models",
+    "apiKeyCount": "{{count}} keys",
+    "apiKeyCount_one": "{{count}} key",
+    "apiKeyCount_other": "{{count}} keys",
+    "healthChecked": "{{checked}} of {{total}} checked",
+    "healthNotChecked": "Not checked",
+    "healthFailing": "{{count}} failing",
+    "healthFailing_one": "{{count}} failing",
+    "healthFailing_other": "{{count}} failing"
+  },
   "providerHealth": {
     "configuredInferenceUnavailable": "Configured · inference unavailable.",
     "setupNeedsAttention": "Setup needs attention.",

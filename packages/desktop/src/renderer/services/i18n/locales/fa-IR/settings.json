@@ -885,6 +885,20 @@
   "includePrereleaseUpdates": "شامل نسخه‌های پیش‌انتشار/توسعه",
   "saveModelConfigFailed": "ذخیره پیکربندی مدل ناموفق بود",
   "healthCheck": "بررسی سلامت",
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "{{count}} مدل",
+    "modelCount_one": "{{count}} مدل",
+    "modelCount_other": "{{count}} مدل",
+    "apiKeyCount": "{{count}} کلید",
+    "apiKeyCount_one": "{{count}} کلید",
+    "apiKeyCount_other": "{{count}} کلید",
+    "healthChecked": "{{checked}} از {{total}} بررسی‌شده",
+    "healthNotChecked": "بررسی‌نشده",
+    "healthFailing": "{{count}} ناموفق",
+    "healthFailing_one": "{{count}} ناموفق",
+    "healthFailing_other": "{{count}} ناموفق"
+  },
   "providerHealth": {
     "configuredInferenceUnavailable": "پیکربندی شده · استنتاج در دسترس نیست.",
     "setupNeedsAttention": "راه‌اندازی نیاز به بررسی دارد.",

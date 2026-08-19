@@ -873,6 +873,17 @@
   "includePrereleaseUpdates": "프리릴리즈/dev 빌드 포함",
   "saveModelConfigFailed": "모델 구성 저장 실패",
   "healthCheck": "상태 확인",
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "모델 {{count}}개",
+    "modelCount_other": "모델 {{count}}개",
+    "apiKeyCount": "키 {{count}}개",
+    "apiKeyCount_other": "키 {{count}}개",
+    "healthChecked": "{{total}}개 중 {{checked}}개 확인됨",
+    "healthNotChecked": "확인 안 됨",
+    "healthFailing": "{{count}}개 실패",
+    "healthFailing_other": "{{count}}개 실패"
+  },
   "providerHealth": {
     "configuredInferenceUnavailable": "구성됨 · 추론을 사용할 수 없습니다.",
     "setupNeedsAttention": "설정을 확인해야 합니다.",
