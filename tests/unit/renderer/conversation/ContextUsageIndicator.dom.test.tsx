@@ -40,6 +40,23 @@ vi.mock('react-i18next', () => ({
 }));
 
 describe('ContextUsageIndicator', () => {
+  // The gauge is coloured from how full the window is, not from the budget status:
+  // `compress` begins at 50%, which is when compaction becomes worthwhile, not when a
+  // user should be warned. Before this, the healthy colour was `--primary-6` — the brand
+  // orange — so an empty context looked the same as a nearly-full one.
+  it.each([
+    ['healthy well below the threshold', 120_000, 'rgb(var(--success-6))'],
+    ['still healthy just under 80%', 799_000, 'rgb(var(--success-6))'],
+    ['warns exactly at 80%', 800_000, 'rgb(var(--warning-6))'],
+    ['still warning just under the danger status', 890_000, 'rgb(var(--warning-6))'],
+  ])('colours the gauge: %s', async (_case, totalTokens, expected) => {
+    render(<ContextUsageIndicator tokenUsage={{ total_tokens: totalTokens }} context_limit={1_000_000} />);
+    fireEvent.focus(screen.getByRole('button', { name: /Show context usage/ }));
+
+    await screen.findByText('Context window');
+    expect(screen.getByTestId('context-usage-progress')).toHaveStyle({ backgroundColor: expected });
+  });
+
   it('opens the context usage popover on keyboard focus', async () => {
     render(<ContextUsageIndicator tokenUsage={{ total_tokens: 122_700 }} context_limit={1_000_000} />);
 

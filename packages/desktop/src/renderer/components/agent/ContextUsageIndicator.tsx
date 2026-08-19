@@ -67,7 +67,6 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
   const roundedPercentage = percentage === null ? null : contextUsagePercent(contextUsage.ratio);
   const displayTotal = typeof contextUsage.totalTokens === 'number' ? formatTokenCount(contextUsage.totalTokens) : null;
   const displayLimit = contextUsage.contextLimit ? formatTokenCount(contextUsage.contextLimit, true) : null;
-  const isWarning = contextUsage.status === 'compress';
   const isDanger = contextUsage.status === 'too_large';
 
   const strokeWidth = 2.5;
@@ -76,11 +75,19 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
   const visualPercentage = percentage === null ? 0 : Math.min(Math.max(percentage, 0), 100);
   const strokeDashoffset = circumference - (visualPercentage / 100) * circumference;
 
+  /**
+   * The gauge is coloured from how full the window is, not from the budget status.
+   * The two ladders are different on purpose: `compress` starts at 50% because that
+   * is when compaction becomes worthwhile, which is far too early to alarm anyone,
+   * and the healthy colour used to be `--primary-6` — the brand orange — so an empty
+   * context rendered in the same hue as a nearly-full one.
+   */
+  const WARNING_AT_PERCENT = 80;
   const getStrokeColor = () => {
     if (percentage === null) return 'var(--color-text-3)';
     if (isDanger) return 'rgb(var(--danger-6))';
-    if (isWarning) return 'rgb(var(--warning-6))';
-    return 'rgb(var(--primary-6))';
+    if (percentage >= WARNING_AT_PERCENT) return 'rgb(var(--warning-6))';
+    return 'rgb(var(--success-6))';
   };
 
   const percentageLabel =
