@@ -476,8 +476,9 @@ describe('ModelModalContent', () => {
 
   describe('provider row actions', () => {
     /** The action cluster stops click and mousedown, so the trigger is worth exercising for real. */
-    const openProviderMenu = async (): Promise<void> => {
-      const more = await screen.findByRole('button', { name: 'common.more' });
+    const openProviderMenu = async (index = 0): Promise<void> => {
+      await screen.findAllByRole('button', { name: 'common.more' });
+      const more = screen.getAllByRole('button', { name: 'common.more' })[index];
       await act(async () => {
         more.click();
       });
@@ -535,6 +536,33 @@ describe('ModelModalContent', () => {
       });
 
       await waitFor(() => expect(deleteProviderMock).toHaveBeenCalledWith({ id: 'provider-a' }));
+    });
+
+    it('clears health status for one provider only, behind its own confirm', async () => {
+      providersQueryData.current = [provider, { ...provider, id: 'provider-b', name: 'Provider B' }];
+      render(<ModelModalContent />);
+
+      await screen.findByTestId('provider-counts-provider-a');
+      await openProviderMenu();
+      const menuItem = await screen.findByTestId('menu-clear-health-provider-a');
+      await act(async () => {
+        menuItem.click();
+      });
+
+      expect(updateProviderMock).not.toHaveBeenCalled();
+      await waitFor(() => expect(modalConfirmMock).toHaveBeenCalledTimes(1));
+
+      const options = modalConfirmMock.mock.calls[0][0] as ConfirmOptions;
+      expect(options.title).toBe('settings.providerRow.clearHealthConfirmTitle');
+      // Recoverable by re-running the check, so it must not borrow the danger button.
+      expect(options.okButtonProps?.status).toBeUndefined();
+
+      await act(async () => {
+        await options.onOk?.();
+      });
+
+      await waitFor(() => expect(updateProviderMock).toHaveBeenCalledWith({ id: 'provider-a', model_health: {} }));
+      expect(updateProviderMock).toHaveBeenCalledTimes(1);
     });
   });
 

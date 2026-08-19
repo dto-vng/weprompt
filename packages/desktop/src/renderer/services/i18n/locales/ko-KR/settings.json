@@ -885,7 +885,11 @@
     "healthFailing_other": "{{count}}개 실패",
     "deleteConfirmTitle": "제공자 삭제",
     "deleteConfirmBody": "{{provider}} · {{counts}}",
-    "deleteConfirmDetail": "제공자와 해당 API 키 및 구성된 모든 모델을 삭제합니다. 기존 대화는 시작할 때 사용한 모델을 그대로 유지합니다."
+    "deleteConfirmDetail": "제공자와 해당 API 키 및 구성된 모든 모델을 삭제합니다. 기존 대화는 시작할 때 사용한 모델을 그대로 유지합니다.",
+    "clearHealth": "상태 기록 지우기",
+    "clearHealthConfirmTitle": "상태 기록 지우기",
+    "clearHealthConfirmBody": "{{provider}}에 기록된 상태 점검 결과를 버립니다. 다시 측정하려면 상태 점검을 실행하세요.",
+    "healthCleared": "{{provider}}의 상태 기록을 지웠습니다."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "구성됨 · 추론을 사용할 수 없습니다.",

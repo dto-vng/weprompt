@@ -900,7 +900,11 @@
     "healthFailing_other": "{{count}} ناموفق",
     "deleteConfirmTitle": "حذف ارائه‌دهنده",
     "deleteConfirmBody": "{{provider}} · {{counts}}",
-    "deleteConfirmDetail": "ارائه‌دهنده، کلیدهای API آن و همهٔ مدل‌هایی را که پیکربندی کرده حذف می‌کند. گفتگوهای موجود همان مدلی را که با آن آغاز شده‌اند حفظ می‌کنند."
+    "deleteConfirmDetail": "ارائه‌دهنده، کلیدهای API آن و همهٔ مدل‌هایی را که پیکربندی کرده حذف می‌کند. گفتگوهای موجود همان مدلی را که با آن آغاز شده‌اند حفظ می‌کنند.",
+    "clearHealth": "پاک کردن وضعیت سلامت",
+    "clearHealthConfirmTitle": "پاک کردن وضعیت سلامت",
+    "clearHealthConfirmBody": "نتایج ثبت‌شدهٔ بررسی سلامت برای {{provider}} حذف می‌شود. برای اندازه‌گیری دوباره، بررسی سلامت را اجرا کنید.",
+    "healthCleared": "وضعیت سلامت {{provider}} پاک شد."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "پیکربندی شده · استنتاج در دسترس نیست.",

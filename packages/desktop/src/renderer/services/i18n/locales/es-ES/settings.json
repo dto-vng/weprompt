@@ -893,7 +893,11 @@
     "healthFailing_other": "{{count}} con errores",
     "deleteConfirmTitle": "Eliminar proveedor",
     "deleteConfirmBody": "{{provider}} · {{counts}}",
-    "deleteConfirmDetail": "Elimina el proveedor, sus claves de API y todos los modelos que configura. Los chats existentes conservan el modelo con el que se iniciaron."
+    "deleteConfirmDetail": "Elimina el proveedor, sus claves de API y todos los modelos que configura. Los chats existentes conservan el modelo con el que se iniciaron.",
+    "clearHealth": "Borrar estado de comprobación",
+    "clearHealthConfirmTitle": "Borrar estado de comprobación",
+    "clearHealthConfirmBody": "Descarta los resultados de comprobación registrados de {{provider}}. Ejecuta una comprobación para volver a medirlos.",
+    "healthCleared": "Estado de comprobación de {{provider}} borrado."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Configurado · inferencia no disponible.",

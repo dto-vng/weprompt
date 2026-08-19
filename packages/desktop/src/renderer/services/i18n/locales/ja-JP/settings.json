@@ -885,7 +885,11 @@
     "healthFailing_other": "{{count}} 件失敗",
     "deleteConfirmTitle": "プロバイダーを削除",
     "deleteConfirmBody": "{{provider}} · {{counts}}",
-    "deleteConfirmDetail": "プロバイダーと、その API キーおよび設定済みのすべてのモデルを削除します。既存のチャットは開始時のモデルをそのまま使用します。"
+    "deleteConfirmDetail": "プロバイダーと、その API キーおよび設定済みのすべてのモデルを削除します。既存のチャットは開始時のモデルをそのまま使用します。",
+    "clearHealth": "ヘルス状態をクリア",
+    "clearHealthConfirmTitle": "ヘルス状態をクリア",
+    "clearHealthConfirmBody": "{{provider}} に記録されたヘルスチェック結果を破棄します。もう一度測定するにはヘルスチェックを実行してください。",
+    "healthCleared": "{{provider}} のヘルス状態をクリアしました。"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "設定済み · 推論を利用できません。",

@@ -892,7 +892,11 @@
     "healthFailing_other": "{{count}} fehlerhaft",
     "deleteConfirmTitle": "Anbieter löschen",
     "deleteConfirmBody": "{{provider}} · {{counts}}",
-    "deleteConfirmDetail": "Löscht den Anbieter, seine API-Schlüssel und alle von ihm konfigurierten Modelle. Bestehende Chats behalten das Modell, mit dem sie begonnen wurden."
+    "deleteConfirmDetail": "Löscht den Anbieter, seine API-Schlüssel und alle von ihm konfigurierten Modelle. Bestehende Chats behalten das Modell, mit dem sie begonnen wurden.",
+    "clearHealth": "Statusverlauf löschen",
+    "clearHealthConfirmTitle": "Statusverlauf löschen",
+    "clearHealthConfirmBody": "Verwirft die aufgezeichneten Prüfergebnisse für {{provider}}. Führen Sie eine Prüfung aus, um sie erneut zu messen.",
+    "healthCleared": "Statusverlauf für {{provider}} gelöscht."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Konfiguriert · Inferenz nicht verfügbar.",

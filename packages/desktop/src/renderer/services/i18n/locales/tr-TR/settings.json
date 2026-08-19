@@ -888,7 +888,11 @@
     "healthFailing_other": "{{count}} başarısız",
     "deleteConfirmTitle": "Sağlayıcıyı sil",
     "deleteConfirmBody": "{{provider}} · {{counts}}",
-    "deleteConfirmDetail": "Sağlayıcıyı, API anahtarlarını ve yapılandırdığı tüm modelleri siler. Mevcut sohbetler başlatıldıkları modeli korur."
+    "deleteConfirmDetail": "Sağlayıcıyı, API anahtarlarını ve yapılandırdığı tüm modelleri siler. Mevcut sohbetler başlatıldıkları modeli korur.",
+    "clearHealth": "Sağlık durumunu temizle",
+    "clearHealthConfirmTitle": "Sağlık durumunu temizle",
+    "clearHealthConfirmBody": "{{provider}} için kaydedilen sağlık sonuçlarını siler. Yeniden ölçmek için bir sağlık kontrolü çalıştırın.",
+    "healthCleared": "{{provider}} için sağlık durumu temizlendi."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Yapılandırıldı · çıkarım kullanılamıyor.",

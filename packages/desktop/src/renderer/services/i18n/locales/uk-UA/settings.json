@@ -845,7 +845,11 @@
     "healthFailing_other": "{{count}} з помилками",
     "deleteConfirmTitle": "Видалити провайдера",
     "deleteConfirmBody": "{{provider}} · {{counts}}",
-    "deleteConfirmDetail": "Видаляє провайдера, його API-ключі та всі налаштовані ним моделі. Наявні чати збережуть модель, з якою їх було розпочато."
+    "deleteConfirmDetail": "Видаляє провайдера, його API-ключі та всі налаштовані ним моделі. Наявні чати збережуть модель, з якою їх було розпочато.",
+    "clearHealth": "Очистити стан",
+    "clearHealthConfirmTitle": "Очистити стан",
+    "clearHealthConfirmBody": "Записані результати перевірок для «{{provider}}» буде видалено. Запустіть перевірку, щоб виміряти їх знову.",
+    "healthCleared": "Стан провайдера «{{provider}}» очищено."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Налаштовано · інференс недоступний.",

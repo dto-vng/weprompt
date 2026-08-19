@@ -206,6 +206,51 @@ const ModelModalContent: React.FC = () => {
     });
 
   /**
+   * Per-provider replacement for the global "Clear status" button removed in
+   * 06a2f7eea, which wiped model_health for EVERY provider with no confirmation.
+   * Same write, scoped to one provider, and confirmed.
+   */
+  const clearProviderHealth = (platform: IProvider) => {
+    const nextArray = (data ?? []).map((item: IProvider) =>
+      item.id === platform.id ? { ...item, model_health: undefined as IProvider['model_health'] } : item
+    );
+    void mutate(nextArray, false);
+
+    ipcBridge.mode.updateProvider
+      .invoke({ id: platform.id, model_health: {} })
+      .then(() => {
+        signalProviderPersisted();
+        void mutate();
+        markProviderCatalogChanged();
+        Message.success({
+          content: t('settings.providerRow.healthCleared', { provider: platform.name }),
+          duration: 2000,
+        });
+      })
+      .catch((error) => {
+        void mutate();
+        console.error('Failed to clear provider health status:', error);
+        message.error(t('settings.saveModelConfigFailed'));
+      });
+  };
+
+  /**
+   * Confirmed even though the data is recoverable by re-running a health check:
+   * the item sits one row above Delete in the same menu.
+   */
+  const confirmClearProviderHealth = (platform: IProvider) => {
+    Modal.confirm({
+      title: t('settings.providerRow.clearHealthConfirmTitle'),
+      content: <span>{t('settings.providerRow.clearHealthConfirmBody', { provider: platform.name })}</span>,
+      okText: t('settings.providerRow.clearHealth'),
+      cancelText: t('common.cancel'),
+      alignCenter: true,
+      getPopupContainer: () => document.body,
+      onOk: () => clearProviderHealth(platform),
+    });
+  };
+
+  /**
    * Deleting a provider destroys its API keys, every model it configures and all
    * per-model state, so the confirm names the provider and its scale. It replaces
    * a Popconfirm, which cannot survive the move into a menu: clicking a Menu.Item
@@ -237,9 +282,13 @@ const ModelModalContent: React.FC = () => {
   const renderProviderMenu = (platform: IProvider) => (
     <Menu
       onClickMenuItem={(key) => {
+        if (key === 'clear-health') confirmClearProviderHealth(platform);
         if (key === 'delete') confirmDeleteProvider(platform);
       }}
     >
+      <Menu.Item key='clear-health'>
+        <span data-testid={`menu-clear-health-${platform.id}`}>{t('settings.providerRow.clearHealth')}</span>
+      </Menu.Item>
       <Menu.Item key='delete'>
         <span data-testid={`menu-delete-provider-${platform.id}`} className='text-danger-6'>
           {t('common.delete')}

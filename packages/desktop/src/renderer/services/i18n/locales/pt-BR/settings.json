@@ -903,7 +903,11 @@
     "healthFailing_other": "{{count}} com falha",
     "deleteConfirmTitle": "Excluir provedor",
     "deleteConfirmBody": "{{provider}} · {{counts}}",
-    "deleteConfirmDetail": "Exclui o provedor, suas chaves de API e todos os modelos que ele configura. As conversas existentes mantêm o modelo com que foram iniciadas."
+    "deleteConfirmDetail": "Exclui o provedor, suas chaves de API e todos os modelos que ele configura. As conversas existentes mantêm o modelo com que foram iniciadas.",
+    "clearHealth": "Limpar status de integridade",
+    "clearHealthConfirmTitle": "Limpar status de integridade",
+    "clearHealthConfirmBody": "Descarta os resultados de integridade registrados para {{provider}}. Execute uma verificação para medi-los novamente.",
+    "healthCleared": "Status de integridade de {{provider}} limpo."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Configurado · inferência indisponível.",
