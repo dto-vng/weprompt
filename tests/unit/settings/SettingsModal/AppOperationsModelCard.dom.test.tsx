@@ -753,6 +753,66 @@ describe('AppOperationsModelCard', () => {
     });
   });
 
+  // The provider and model rows below the card tag the assignment rather than
+  // re-deriving it: `docs/prds/settings/app-operations-model.md` forbids the desktop
+  // app from reproducing the Auto ranking policy, and three eligibility predicates
+  // in this codebase already disagree. The card owns the only fetch, so it publishes.
+  describe('assignment publishing', () => {
+    it('publishes the resolved pair with no pin in Auto mode', async () => {
+      getMock.mockResolvedValueOnce(autoReady);
+      const onAssignmentChange = vi.fn();
+      renderCard({ onAssignmentChange });
+
+      await waitFor(() => expect(onAssignmentChange).toHaveBeenCalledTimes(1));
+      expect(onAssignmentChange).toHaveBeenCalledWith({
+        resolved: { provider_id: 'provider-a', model_id: 'model-a' },
+        pinned: undefined,
+      });
+    });
+
+    it('publishes the Fixed setting as the pin, alongside what actually resolved', async () => {
+      getMock.mockResolvedValueOnce(fixedReady);
+      const onAssignmentChange = vi.fn();
+      renderCard({ onAssignmentChange });
+
+      await waitFor(() => expect(onAssignmentChange).toHaveBeenCalledTimes(1));
+      expect(onAssignmentChange).toHaveBeenCalledWith({
+        resolved: { provider_id: 'provider-a', model_id: 'model-a' },
+        pinned: { provider_id: 'provider-a', model_id: 'model-a' },
+      });
+    });
+
+    it('does not republish on a re-render that did not change the assignment', async () => {
+      getMock.mockResolvedValueOnce(autoReady);
+      const onAssignmentChange = vi.fn();
+      const { rerender } = renderCard({ onAssignmentChange });
+
+      await waitFor(() => expect(onAssignmentChange).toHaveBeenCalledTimes(1));
+      rerender(
+        <AppOperationsModelCard
+          providers={providers}
+          providersLoading={false}
+          persistedProvidersRevision={0}
+          onAddModel={vi.fn()}
+          onAssignmentChange={onAssignmentChange}
+        />
+      );
+
+      expect(onAssignmentChange).toHaveBeenCalledTimes(1);
+    });
+
+    it('publishes nothing at all when the backend 404s the endpoint', async () => {
+      getMock.mockRejectedValueOnce(
+        new BackendHttpError({ method: 'GET', path: '/api/app-operations/model', status: 404, body: {} })
+      );
+      const onAssignmentChange = vi.fn();
+      renderCard({ onAssignmentChange });
+
+      await screen.findByText('settings.appOperationsModel.backendUpdateRequired');
+      expect(onAssignmentChange).not.toHaveBeenCalled();
+    });
+  });
+
   describe('state 9 — load error', () => {
     it('gives a generic load failure a home in the panel with a retry', async () => {
       getMock.mockRejectedValueOnce(new Error('hidden error')).mockResolvedValueOnce(autoReady);

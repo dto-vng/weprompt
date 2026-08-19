@@ -36,7 +36,7 @@ import {
   SettingTwo,
   Write,
 } from '@icon-park/react';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import AddModelModal from '@/renderer/pages/settings/components/AddModelModal';
 import AddPlatformModal from '@/renderer/pages/settings/components/AddPlatformModal';
@@ -45,7 +45,7 @@ import EditModeModal from '@/renderer/pages/settings/components/EditModeModal';
 import AionScrollArea from '@/renderer/components/base/AionScrollArea';
 import TalkToButlerButton from '@/renderer/components/base/TalkToButlerButton';
 import { useProvidersQuery } from '@/renderer/hooks/agent/useModelProviderList';
-import AppOperationsModelCard from '../../AppOperationsModelCard';
+import AppOperationsModelCard, { type AppOperationsAssignment } from '../../AppOperationsModelCard';
 import { useSettingsViewMode } from '../../settingsViewContext';
 import SettingsPageHeader from '@/renderer/pages/settings/components/SettingsPageHeader';
 import { consumePendingDeepLink } from '@/renderer/hooks/system/useDeepLink';
@@ -130,6 +130,16 @@ const ModelModalContent: React.FC = () => {
   const [message, messageContext] = Message.useMessage();
   const markProviderCatalogChanged = (): void => setProviderRefreshToken((value) => value + 1);
   const [persistedProvidersRevision, setPersistedProvidersRevision] = useState(0);
+  /**
+   * Published by AppOperationsModelCard, which owns the only fetch of the setting.
+   * Stays empty until it publishes — including permanently on builds whose backend
+   * 404s the endpoint, where no row carries the tag and no delete warns about a pin.
+   */
+  const [appOperations, setAppOperations] = useState<AppOperationsAssignment>({});
+  const handleAppOperationsAssignment = useCallback(
+    (assignment: AppOperationsAssignment) => setAppOperations(assignment),
+    []
+  );
 
   const signalProviderPersisted = (): void => {
     setPersistedProvidersRevision((revision) => revision + 1);
@@ -257,6 +267,10 @@ const ModelModalContent: React.FC = () => {
    * unmounts the Dropdown popup, so the Popconfirm would never resolve.
    */
   const confirmDeleteProvider = (platform: IProvider) => {
+    // The Fixed setting's own pair, not resolved_model: a pin that is already
+    // unavailable still has to warn, and an Auto resolution must not. Deletion is
+    // the last moment the provider's human-readable name still exists.
+    const pinnedHere = appOperations.pinned?.provider_id === platform.id;
     Modal.confirm({
       title: t('settings.providerRow.deleteConfirmTitle'),
       content: (
@@ -268,6 +282,7 @@ const ModelModalContent: React.FC = () => {
             })}
           </span>
           <span className='text-t-secondary'>{t('settings.providerRow.deleteConfirmDetail')}</span>
+          {pinnedHere && <span className='text-danger-6'>{t('settings.providerRow.deleteAppOperationsWarning')}</span>}
         </div>
       ),
       okText: t('common.delete'),
@@ -491,6 +506,7 @@ const ModelModalContent: React.FC = () => {
       providersLoading={data === undefined}
       persistedProvidersRevision={persistedProvidersRevision}
       onAddModel={() => addPlatformModalCtrl.open()}
+      onAssignmentChange={handleAppOperationsAssignment}
     />
   );
 
@@ -692,6 +708,17 @@ const ModelModalContent: React.FC = () => {
                         const showOpenAiApiMode = supportsOpenAiApiMode(platform.platform, modelProtocol);
                         const model_health = platform.model_health?.[model];
                         const healthStatus = model_health?.status || 'unknown';
+                        const servesAppOperations =
+                          appOperations.resolved?.provider_id === platform.id &&
+                          appOperations.resolved?.model_id === model;
+                        // `!== undefined`, not truthiness: `result.elapsed_ms || Date.now() - startTime`
+                        // can legitimately record a latency of 0, which a falsy guard would hide.
+                        const latencyLabel =
+                          model_health?.latency !== undefined
+                            ? t('settings.modelRow.latency', { latency: model_health.latency })
+                            : healthStatus === 'unknown'
+                              ? t('settings.modelRow.neverChecked')
+                              : undefined;
 
                         return (
                           <div key={model}>
@@ -712,7 +739,7 @@ const ModelModalContent: React.FC = () => {
                                                 : t('settings.providerHealth.configuredInferenceUnavailable')}
                                           </span>
                                         </div>
-                                        {model_health?.latency && (
+                                        {model_health?.latency !== undefined && (
                                           <div className='text-12px mt-4px'>
                                             {t('settings.latency')}: {model_health.latency}ms
                                           </div>
@@ -729,12 +756,25 @@ const ModelModalContent: React.FC = () => {
                                     }
                                   >
                                     <div
-                                      className={`h-8px w-8px shrink-0 rounded-full ${healthStatus === 'healthy' ? 'bg-green-500' : 'bg-red-500'}`}
+                                      className={`h-8px w-8px shrink-0 rounded-full ${healthStatus === 'healthy' ? 'bg-success' : 'bg-danger'}`}
                                     />
                                   </Tooltip>
                                 )}
 
                                 <span className='min-w-0 flex-1 truncate text-14px text-t-primary'>{model}</span>
+
+                                {/* A plain span, not an Arco Tag: `.arco-tag` sets its own
+                                    background at the same specificity as a utility class, so a
+                                    utility background on a Tag is order-dependent. Reuses the
+                                    card's own label key so both surfaces read identically. */}
+                                {servesAppOperations && (
+                                  <span
+                                    data-testid={`model-app-operations-${platform.id}-${model}`}
+                                    className='shrink-0 rounded-5px border border-solid border-primary-3 bg-primary-light-1 px-6px py-1px font-mono text-10px uppercase tracking-[0.06em] text-primary-6'
+                                  >
+                                    {t('settings.appOperationsModel.panelLabel')}
+                                  </span>
+                                )}
 
                                 {/* New API 协议标签（点击循环切换）/ New API protocol badge (click to cycle) */}
                                 {isNewApiProvider && (
@@ -783,6 +823,19 @@ const ModelModalContent: React.FC = () => {
                                         ? t('settings.openAiApiModeChatCompletions')
                                         : t('settings.openAiApiModeAuto')}
                                   </Tag>
+                                )}
+
+                                {/* The model name keeps its flex-1, which already pushes this to
+                                    the right edge — the design's ml-auto would cost that truncation. */}
+                                {latencyLabel !== undefined && (
+                                  <span
+                                    data-testid={`model-latency-${platform.id}-${model}`}
+                                    className={`shrink-0 whitespace-nowrap text-12px ${
+                                      model_health?.latency !== undefined ? 'text-t-secondary' : 'text-t-tertiary'
+                                    }`}
+                                  >
+                                    {latencyLabel}
+                                  </span>
                                 )}
 
                                 {/* 模型启用开关 / Model enable switch */}

@@ -873,6 +873,10 @@
   "includePrereleaseUpdates": "プレリリース/dev ビルドを含める",
   "saveModelConfigFailed": "モデル設定の保存に失敗しました",
   "healthCheck": "ヘルスチェック",
+  "modelRow": {
+    "latency": "{{latency}} ms",
+    "neverChecked": "未チェック"
+  },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
     "modelCount": "{{count}} モデル",
@@ -889,7 +893,8 @@
     "clearHealth": "ヘルス状態をクリア",
     "clearHealthConfirmTitle": "ヘルス状態をクリア",
     "clearHealthConfirmBody": "{{provider}} に記録されたヘルスチェック結果を破棄します。もう一度測定するにはヘルスチェックを実行してください。",
-    "healthCleared": "{{provider}} のヘルス状態をクリアしました。"
+    "healthCleared": "{{provider}} のヘルス状態をクリアしました。",
+    "deleteAppOperationsWarning": "このプロバイダーはアプリ操作に固定されています。削除すると、別のモデルを選ぶまでその設定は利用できなくなります。"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "設定済み · 推論を利用できません。",

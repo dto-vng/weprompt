@@ -885,6 +885,10 @@
   "includePrereleaseUpdates": "Incluir versões de pré-lançamento/dev",
   "saveModelConfigFailed": "Falha ao salvar a configuração do modelo",
   "healthCheck": "Verificação de Saúde",
+  "modelRow": {
+    "latency": "{{latency}} ms",
+    "neverChecked": "Nunca verificado"
+  },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
     "modelCount": "{{count}} modelos",
@@ -907,7 +911,8 @@
     "clearHealth": "Limpar status de integridade",
     "clearHealthConfirmTitle": "Limpar status de integridade",
     "clearHealthConfirmBody": "Descarta os resultados de integridade registrados para {{provider}}. Execute uma verificação para medi-los novamente.",
-    "healthCleared": "Status de integridade de {{provider}} limpo."
+    "healthCleared": "Status de integridade de {{provider}} limpo.",
+    "deleteAppOperationsWarning": "Este provedor está fixado para as operações do aplicativo. Excluí-lo deixa essa configuração indisponível até você escolher outro modelo."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Configurado · inferência indisponível.",

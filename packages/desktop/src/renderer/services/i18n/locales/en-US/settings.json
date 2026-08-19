@@ -885,6 +885,10 @@
   "includePrereleaseUpdates": "Include prerelease/dev builds",
   "saveModelConfigFailed": "Failed to save model configuration",
   "healthCheck": "Health Check",
+  "modelRow": {
+    "latency": "{{latency}} ms",
+    "neverChecked": "Never checked"
+  },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
     "modelCount": "{{count}} models",
@@ -904,7 +908,8 @@
     "clearHealth": "Clear health status",
     "clearHealthConfirmTitle": "Clear health status",
     "clearHealthConfirmBody": "Discards the recorded health results for {{provider}}. Run a health check to measure them again.",
-    "healthCleared": "Health status cleared for {{provider}}."
+    "healthCleared": "Health status cleared for {{provider}}.",
+    "deleteAppOperationsWarning": "This provider is pinned for app operations. Deleting it leaves that setting unavailable until you choose another model."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Configured · inference unavailable.",

@@ -824,6 +824,10 @@
   "includePrereleaseUpdates": "Включити попередні/dev збірки",
   "saveModelConfigFailed": "Не вдалося зберегти конфігурацію моделі",
   "healthCheck": "Перевірка здоров'я",
+  "modelRow": {
+    "latency": "{{latency}} мс",
+    "neverChecked": "Жодного разу не перевірялася"
+  },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
     "modelCount": "{{count}} моделей",
@@ -849,7 +853,8 @@
     "clearHealth": "Очистити стан",
     "clearHealthConfirmTitle": "Очистити стан",
     "clearHealthConfirmBody": "Записані результати перевірок для «{{provider}}» буде видалено. Запустіть перевірку, щоб виміряти їх знову.",
-    "healthCleared": "Стан провайдера «{{provider}}» очищено."
+    "healthCleared": "Стан провайдера «{{provider}}» очищено.",
+    "deleteAppOperationsWarning": "Цього провайдера закріплено за операціями застосунку. Після видалення це налаштування буде недоступним, доки ви не оберете іншу модель."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Налаштовано · інференс недоступний.",

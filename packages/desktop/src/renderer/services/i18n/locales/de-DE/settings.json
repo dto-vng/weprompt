@@ -877,6 +877,10 @@
   "includePrereleaseUpdates": "Vorveröffentlichungs-/Entwicklungs-Builds einschließen",
   "saveModelConfigFailed": "Modellkonfiguration speichern fehlgeschlagen",
   "healthCheck": "Gesundheitsprüfung",
+  "modelRow": {
+    "latency": "{{latency}} ms",
+    "neverChecked": "Nie geprüft"
+  },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
     "modelCount": "{{count}} Modelle",
@@ -896,7 +900,8 @@
     "clearHealth": "Statusverlauf löschen",
     "clearHealthConfirmTitle": "Statusverlauf löschen",
     "clearHealthConfirmBody": "Verwirft die aufgezeichneten Prüfergebnisse für {{provider}}. Führen Sie eine Prüfung aus, um sie erneut zu messen.",
-    "healthCleared": "Statusverlauf für {{provider}} gelöscht."
+    "healthCleared": "Statusverlauf für {{provider}} gelöscht.",
+    "deleteAppOperationsWarning": "Dieser Anbieter ist für App-Vorgänge festgelegt. Nach dem Löschen bleibt diese Einstellung nicht verfügbar, bis Sie ein anderes Modell wählen."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Konfiguriert · Inferenz nicht verfügbar.",

@@ -875,6 +875,10 @@
   "includePrereleaseUpdates": "Incluir versiones previas/de desarrollo",
   "saveModelConfigFailed": "Error al guardar la configuración del modelo",
   "healthCheck": "Verificación de salud",
+  "modelRow": {
+    "latency": "{{latency}} ms",
+    "neverChecked": "Nunca comprobado"
+  },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
     "modelCount": "{{count}} modelos",
@@ -897,7 +901,8 @@
     "clearHealth": "Borrar estado de comprobación",
     "clearHealthConfirmTitle": "Borrar estado de comprobación",
     "clearHealthConfirmBody": "Descarta los resultados de comprobación registrados de {{provider}}. Ejecuta una comprobación para volver a medirlos.",
-    "healthCleared": "Estado de comprobación de {{provider}} borrado."
+    "healthCleared": "Estado de comprobación de {{provider}} borrado.",
+    "deleteAppOperationsWarning": "Este proveedor está fijado para las operaciones de la aplicación. Al eliminarlo, ese ajuste quedará no disponible hasta que elijas otro modelo."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Configurado · inferencia no disponible.",

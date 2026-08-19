@@ -873,6 +873,10 @@
   "includePrereleaseUpdates": "Ön sürüm/geliştirici sürümlerini dahil et",
   "saveModelConfigFailed": "Model yapılandırması kaydedilemedi",
   "healthCheck": "Sağlık Kontrolü",
+  "modelRow": {
+    "latency": "{{latency}} ms",
+    "neverChecked": "Hiç kontrol edilmedi"
+  },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
     "modelCount": "{{count}} model",
@@ -892,7 +896,8 @@
     "clearHealth": "Sağlık durumunu temizle",
     "clearHealthConfirmTitle": "Sağlık durumunu temizle",
     "clearHealthConfirmBody": "{{provider}} için kaydedilen sağlık sonuçlarını siler. Yeniden ölçmek için bir sağlık kontrolü çalıştırın.",
-    "healthCleared": "{{provider}} için sağlık durumu temizlendi."
+    "healthCleared": "{{provider}} için sağlık durumu temizlendi.",
+    "deleteAppOperationsWarning": "Bu sağlayıcı uygulama işlemleri için sabitlenmiş. Silerseniz, başka bir model seçene kadar bu ayar kullanılamaz."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Yapılandırıldı · çıkarım kullanılamıyor.",

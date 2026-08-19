@@ -885,6 +885,10 @@
   "includePrereleaseUpdates": "包含预发布/dev 版本",
   "saveModelConfigFailed": "保存模型配置失败",
   "healthCheck": "健康检测",
+  "modelRow": {
+    "latency": "{{latency}} 毫秒",
+    "neverChecked": "从未检测"
+  },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
     "modelCount": "{{count}} 个模型",
@@ -901,7 +905,8 @@
     "clearHealth": "清除健康状态",
     "clearHealthConfirmTitle": "清除健康状态",
     "clearHealthConfirmBody": "将丢弃 {{provider}} 已记录的健康检测结果。重新运行健康检测即可再次测量。",
-    "healthCleared": "已清除 {{provider}} 的健康状态。"
+    "healthCleared": "已清除 {{provider}} 的健康状态。",
+    "deleteAppOperationsWarning": "该供应商已被固定用于应用操作。删除后，该设置将不可用，直到你选择另一个模型。"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "已配置 · 推理暂不可用。",

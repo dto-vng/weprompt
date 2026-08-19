@@ -32,6 +32,10 @@ const {
     current: undefined as
       | {
           onAddModel: () => void;
+          onAssignmentChange?: (assignment: {
+            resolved?: { provider_id: string; model_id: string };
+            pinned?: { provider_id: string; model_id: string };
+          }) => void;
           persistedProvidersRevision: number;
           providers: IProvider[];
           providersLoading: boolean;
@@ -563,6 +567,113 @@ describe('ModelModalContent', () => {
 
       await waitFor(() => expect(updateProviderMock).toHaveBeenCalledWith({ id: 'provider-a', model_health: {} }));
       expect(updateProviderMock).toHaveBeenCalledTimes(1);
+    });
+
+    // The pin is disclosed at the destructive moment because that is the last point
+    // where the provider's human-readable name still exists; the card can only show
+    // the raw id afterwards. The aftermath itself is deliberately not auto-repaired.
+    describe('app operations pin disclosure', () => {
+      const publish = async (pinned?: { provider_id: string; model_id: string }): Promise<void> => {
+        await act(async () => {
+          appOperationsCardProps.current?.onAssignmentChange?.({ pinned });
+        });
+      };
+
+      const openDeleteConfirm = async (): Promise<ConfirmOptions> => {
+        await openProviderMenu();
+        const menuItem = await screen.findByTestId('menu-delete-provider-provider-a');
+        await act(async () => {
+          menuItem.click();
+        });
+        await waitFor(() => expect(modalConfirmMock).toHaveBeenCalled());
+        return modalConfirmMock.mock.calls.at(-1)?.[0] as ConfirmOptions;
+      };
+
+      beforeEach(() => {
+        providersQueryData.current = [provider];
+      });
+
+      it('warns when the provider being deleted is the pinned one', async () => {
+        render(<ModelModalContent />);
+        await screen.findByTestId('provider-counts-provider-a');
+        await publish({ provider_id: 'provider-a', model_id: 'model-a' });
+
+        const body = render(<>{(await openDeleteConfirm()).content}</>);
+        expect(body.getByText('settings.providerRow.deleteAppOperationsWarning')).toBeInTheDocument();
+      });
+
+      it('stays silent when a different provider holds the pin', async () => {
+        render(<ModelModalContent />);
+        await screen.findByTestId('provider-counts-provider-a');
+        await publish({ provider_id: 'provider-b', model_id: 'model-b' });
+
+        const body = render(<>{(await openDeleteConfirm()).content}</>);
+        expect(body.queryByText('settings.providerRow.deleteAppOperationsWarning')).not.toBeInTheDocument();
+      });
+
+      it('stays silent in Auto mode, where nothing is pinned', async () => {
+        render(<ModelModalContent />);
+        await screen.findByTestId('provider-counts-provider-a');
+        await publish(undefined);
+
+        const body = render(<>{(await openDeleteConfirm()).content}</>);
+        expect(body.queryByText('settings.providerRow.deleteAppOperationsWarning')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('model row', () => {
+    const expandProvider = async (): Promise<void> => {
+      const header = await screen.findByText(provider.name);
+      await act(async () => {
+        header.click();
+      });
+    };
+
+    it('shows the measured latency inline instead of only in a tooltip', async () => {
+      providersQueryData.current = [{ ...provider, model_health: { 'model-a': { status: 'healthy', latency: 412 } } }];
+      render(<ModelModalContent />);
+      await expandProvider();
+
+      const latency = await screen.findByTestId('model-latency-provider-a-model-a');
+      expect(latency).toHaveTextContent('settings.modelRow.latency');
+    });
+
+    it('still shows a latency of zero, which a falsy guard would hide', async () => {
+      providersQueryData.current = [{ ...provider, model_health: { 'model-a': { status: 'healthy', latency: 0 } } }];
+      render(<ModelModalContent />);
+      await expandProvider();
+
+      const latency = await screen.findByTestId('model-latency-provider-a-model-a');
+      expect(latency).toHaveTextContent('settings.modelRow.latency');
+    });
+
+    it('says the model was never checked when no health has been recorded', async () => {
+      providersQueryData.current = [provider];
+      render(<ModelModalContent />);
+      await expandProvider();
+
+      const latency = await screen.findByTestId('model-latency-provider-a-model-a');
+      expect(latency).toHaveTextContent('settings.modelRow.neverChecked');
+    });
+
+    it('tags only the resolved model, and nothing before the card publishes', async () => {
+      providersQueryData.current = [{ ...provider, models: ['model-a', 'model-b'] }];
+      render(<ModelModalContent />);
+      await expandProvider();
+
+      expect(screen.queryByTestId('model-app-operations-provider-a-model-a')).not.toBeInTheDocument();
+
+      await act(async () => {
+        appOperationsCardProps.current?.onAssignmentChange?.({
+          resolved: { provider_id: 'provider-a', model_id: 'model-a' },
+        });
+      });
+
+      expect(await screen.findByTestId('model-app-operations-provider-a-model-a')).toHaveTextContent(
+        'settings.appOperationsModel.panelLabel'
+      );
+      expect(screen.queryByTestId('model-app-operations-provider-a-model-b')).not.toBeInTheDocument();
     });
   });
 

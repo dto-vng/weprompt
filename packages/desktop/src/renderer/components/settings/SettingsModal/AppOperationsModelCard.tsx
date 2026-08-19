@@ -31,6 +31,7 @@ import { appOperationsModel } from '@/common/adapter/ipcBridge';
 import type { IProvider } from '@/common/config/storage';
 import type {
   AppOperationsModelReasonCode,
+  AppOperationsModelRef,
   AppOperationsModelResponse,
   AppOperationsModelSetting,
 } from '@/common/types/appOperations';
@@ -39,11 +40,26 @@ import { getProviderLogo } from '@/renderer/utils/model/modelPlatforms';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+/**
+ * What this card knows about the current assignment, published for the provider
+ * and model rows below it. The card owns the only fetch of the setting, so the
+ * rows consume this rather than re-deriving an eligibility policy the desktop app
+ * is explicitly not allowed to reproduce.
+ */
+export type AppOperationsAssignment = {
+  /** The pair the backend says is actually serving app operations. Undefined when nothing resolves. */
+  resolved?: AppOperationsModelRef;
+  /** The pair a Fixed setting pins, whether or not it currently resolves. Undefined in Auto mode. */
+  pinned?: AppOperationsModelRef;
+};
+
 export type AppOperationsModelCardProps = {
   providers: IProvider[];
   providersLoading: boolean;
   persistedProvidersRevision: number;
   onAddModel: () => void;
+  /** Optional. Called only when the assignment actually changes. */
+  onAssignmentChange?: (assignment: AppOperationsAssignment) => void;
 };
 
 type ModelOption = {
@@ -98,6 +114,16 @@ const isFixedSetting = (
 ): setting is Extract<AppOperationsModelSetting, { mode: 'fixed' }> => setting?.mode === 'fixed';
 
 const modelOptionValue = (providerId: string, modelId: string): string => JSON.stringify([providerId, modelId]);
+
+const assignmentSignature = (resolved?: AppOperationsModelRef, pinned?: AppOperationsModelRef): string =>
+  JSON.stringify([resolved ?? null, pinned ?? null]);
+
+/**
+ * Seeds the publish guard so the render before the first load resolves does not
+ * emit an empty assignment. A load that 404s therefore publishes nothing at all,
+ * and a genuinely emptied assignment after a real one still publishes.
+ */
+const EMPTY_ASSIGNMENT_SIGNATURE = assignmentSignature();
 
 const STATUS_KEYS: Record<PanelStatus, string> = {
   loading: 'settings.appOperationsModel.status.loading',
@@ -268,6 +294,7 @@ export default function AppOperationsModelCard({
   providersLoading,
   persistedProvidersRevision,
   onAddModel,
+  onAssignmentChange,
 }: AppOperationsModelCardProps): React.ReactElement | null {
   const { t } = useTranslation();
   const [message, messageContext] = Message.useMessage();
@@ -362,6 +389,25 @@ export default function AppOperationsModelCard({
     providerRefreshQueuedRef.current = false;
     void load();
   }, [load, pending, persistedProvidersRevision, phase]);
+
+  /**
+   * Publish the assignment upward so the model rows can tag it. This card owns
+   * the only fetch, so row and card render from one value and cannot disagree.
+   * The signature guard is load-bearing: the parent re-renders this card on every
+   * publish, and an unguarded call would loop.
+   */
+  const publishedAssignmentRef = useRef<string>(EMPTY_ASSIGNMENT_SIGNATURE);
+  useEffect(() => {
+    if (!onAssignmentChange) return;
+    const resolved = response?.resolved_model;
+    const pinned = isFixedSetting(response?.setting)
+      ? { provider_id: response.setting.provider_id, model_id: response.setting.model_id }
+      : undefined;
+    const signature = assignmentSignature(resolved, pinned);
+    if (publishedAssignmentRef.current === signature) return;
+    publishedAssignmentRef.current = signature;
+    onAssignmentChange({ resolved, pinned });
+  }, [onAssignmentChange, response]);
 
   const canMutate = phase === 'ready' && pending === 'idle' && response !== undefined;
   const canSelectFixed = canMutate && !providersLoading;

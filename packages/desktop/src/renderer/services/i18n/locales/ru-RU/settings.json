@@ -865,6 +865,10 @@
   "includePrereleaseUpdates": "Включить предварительные/dev сборки",
   "saveModelConfigFailed": "Не удалось сохранить конфигурацию модели",
   "healthCheck": "Проверка здоровья",
+  "modelRow": {
+    "latency": "{{latency}} мс",
+    "neverChecked": "Ни разу не проверялась"
+  },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
     "modelCount": "{{count}} моделей",
@@ -890,7 +894,8 @@
     "clearHealth": "Очистить состояние",
     "clearHealthConfirmTitle": "Очистить состояние",
     "clearHealthConfirmBody": "Записанные результаты проверок для «{{provider}}» будут удалены. Запустите проверку, чтобы измерить их заново.",
-    "healthCleared": "Состояние провайдера «{{provider}}» очищено."
+    "healthCleared": "Состояние провайдера «{{provider}}» очищено.",
+    "deleteAppOperationsWarning": "Этот провайдер закреплён за операциями приложения. После удаления эта настройка останется недоступной, пока вы не выберете другую модель."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Настроено · инференс недоступен.",
