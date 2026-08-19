@@ -636,6 +636,35 @@ persist:workspace-pane-browser` keeps logins across restarts and separate from t
   and raising `MIN_ARTIFACT_PANEL_PX` to ~430 (permanently takes ~90px from the chat on narrow
   windows). Chosen from measurements rather than taste.
 
+## Integration notes for merging Stream C into sprint4
+
+Raised by the `sprint4` session on 2026-08-19 and verified here before recording.
+
+**1. C-16 depends on C-04, and they are separate commits.** `bg-chat-surface` does not exist in
+`sprint4`'s `uno.config.ts` (confirmed: `git show sprint4:uno.config.ts | grep -c bg-chat-surface`
+→ 0). The utility is added by **`a6ab18ad4`** (C-04, the content plane) and first consumed by
+**`99996f919`** (C-16, the settings header). Merging the branch whole is safe. **Cherry-picking C-16
+without C-04 would compile the sticky header to no background at all** — and that background is not
+decorative: it exists solely to mask content scrolling under the sticky header. If these ever have to
+land separately, C-04 goes first.
+
+**2. A card now renders inside that sticky header.** The `sprint4` session has since added an App
+Operations panel there, on `bg-fill-0` with a 1px border, in a restructured two-column header. C-16
+moves the sticky plane to a near-white surface, so a near-white card on a near-white plane may lose
+its edge. Purely visual, no textual conflict — the two changes are orthogonal (theirs is layout,
+ours is the background colour, and they did not touch the `sticky &&` line). Worth an eye at merge.
+
+**3. The green gate is a snapshot, not a guarantee.** The `sprint4` session reports a load-sensitive
+flake family on the sprint3 line (`renderService.integration`, `jobManager`,
+`PresentationSourceGrantStore`, `pdfExtract`), reproduced under deliberate CPU saturation. Stream C's
+`just push` run was green across 8274 tests, but a red re-run on a busy machine is not automatically a
+Stream C regression.
+
+**4. `sprint4` is a moving target.** It was `bc7decfc6` when this branch was cut and `a969ddc19` when
+last read, with a workflow actively committing. The `merge-tree` check (exit 0, zero conflicts) should
+be re-run immediately before any actual merge rather than trusted from this document.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
