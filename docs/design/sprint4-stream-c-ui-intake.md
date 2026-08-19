@@ -535,6 +535,27 @@ live verification in the running app.
   capability already existed locally.
 
 
+### C-25 — The Project flyout is redundant now the pane exists
+
+- **Raised by the reporter** once the pane carried Files, Changes, Preview and Browser: the flyout
+  offered `Files / Context / Changes`, so two of its three entries were a second door to the same
+  panels.
+- **Decision: remove the flyout, and drop Context rather than moving it.** The reporter's reasoning —
+  users can read `Context.md` directly — checks out and understates the case: **`/context` already
+  exposes `open`, `compact`, `pin` and `handoff`**, so the panel was the only *UI* for capabilities
+  that remain fully reachable. Nothing is lost. (A Context tab was briefly built before this was
+  settled, then reverted.)
+- **Two constraints made this more than a deletion:**
+  1. **The Workspace component must still render.** The pane's Files and Changes tabs are portals out
+     of that instance, and its drag-import and paste handlers wrap the chat. Only the flyout's own
+     markup is suppressed.
+  2. **The suppression is scoped.** It is gated on `paneActiveView !== null`, true only when
+     ChatLayout mounted the tabbed pane. Teams uses the `panel` presentation and provides no pane
+     context, so its flyout is untouched.
+- **Verified live:** flyout trigger absent, Workspace controller still present, four tabs still
+  render, and the Files tab lists 9 rows — proving the portal survived the removal.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |
