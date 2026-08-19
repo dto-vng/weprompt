@@ -354,9 +354,6 @@
   "modelNotFoundAfterUrlChange": "Modell {{model}} wurde unter der neuen Adresse nicht gefunden; wähle es erneut aus, wenn es nicht funktioniert.",
   "apiKey": "API-Schlüssel",
   "deleteModelConfirm": "Bist du sicher, dass du dieses Modell löschen möchtest?",
-  "deleteAllModelConfirm": "Bist du sicher, dass du alle Modelle löschen möchtest?",
-  "modelCount": "Modell",
-  "apiKeyCount": "API-Schlüssel",
   "pleaseEnterBaseUrlAndApiKey": "Bitte Basis-URL und API-Schlüssel eingeben",
   "pleaseEnterApiKey": "Bitte API-Schlüssel eingeben",
   "pleaseEnterBaseUrl": "Bitte Basis-URL eingeben",
@@ -879,7 +876,10 @@
   "healthCheck": "Gesundheitsprüfung",
   "modelRow": {
     "latency": "{{latency}} ms",
-    "neverChecked": "Nie geprüft"
+    "neverChecked": "Nie geprüft",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "Modell entfernen",
+    "deleteAppOperationsWarning": "Dieses Modell ist für App-Vorgänge festgelegt. Nach dem Löschen bleibt diese Einstellung nicht verfügbar, bis Sie ein anderes Modell wählen."
   },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
@@ -901,7 +901,8 @@
     "clearHealthConfirmTitle": "Statusverlauf löschen",
     "clearHealthConfirmBody": "Verwirft die aufgezeichneten Prüfergebnisse für {{provider}}. Führen Sie eine Prüfung aus, um sie erneut zu messen.",
     "healthCleared": "Statusverlauf für {{provider}} gelöscht.",
-    "deleteAppOperationsWarning": "Dieser Anbieter ist für App-Vorgänge festgelegt. Nach dem Löschen bleibt diese Einstellung nicht verfügbar, bis Sie ein anderes Modell wählen."
+    "deleteAppOperationsWarning": "Dieser Anbieter ist für App-Vorgänge festgelegt. Nach dem Löschen bleibt diese Einstellung nicht verfügbar, bis Sie ein anderes Modell wählen.",
+    "actionLabel": "{{action}} — {{provider}}"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Konfiguriert · Inferenz nicht verfügbar.",

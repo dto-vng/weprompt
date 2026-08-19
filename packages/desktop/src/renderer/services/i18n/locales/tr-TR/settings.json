@@ -362,9 +362,6 @@
   "modelNotFoundAfterUrlChange": "{{model}} modeli yeni adreste bulunamadı; çalışmazsa yeniden seçin.",
   "apiKey": "API Anahtarı",
   "deleteModelConfirm": "Bu modeli silmek istediğinizden emin misiniz?",
-  "deleteAllModelConfirm": "Tüm modelleri silmek istediğinizden emin misiniz?",
-  "modelCount": "Model",
-  "apiKeyCount": "API Anahtarı",
   "pleaseEnterBaseUrlAndApiKey": "Lütfen temel URL ve API anahtarını girin",
   "pleaseEnterApiKey": "Lütfen API Anahtarını girin",
   "pleaseEnterBaseUrl": "Lütfen Temel URL girin",
@@ -875,7 +872,10 @@
   "healthCheck": "Sağlık Kontrolü",
   "modelRow": {
     "latency": "{{latency}} ms",
-    "neverChecked": "Hiç kontrol edilmedi"
+    "neverChecked": "Hiç kontrol edilmedi",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "Modeli kaldır",
+    "deleteAppOperationsWarning": "Bu model uygulama işlemleri için sabitlenmiş. Silerseniz, başka bir model seçene kadar bu ayar kullanılamaz."
   },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
@@ -897,7 +897,8 @@
     "clearHealthConfirmTitle": "Sağlık durumunu temizle",
     "clearHealthConfirmBody": "{{provider}} için kaydedilen sağlık sonuçlarını siler. Yeniden ölçmek için bir sağlık kontrolü çalıştırın.",
     "healthCleared": "{{provider}} için sağlık durumu temizlendi.",
-    "deleteAppOperationsWarning": "Bu sağlayıcı uygulama işlemleri için sabitlenmiş. Silerseniz, başka bir model seçene kadar bu ayar kullanılamaz."
+    "deleteAppOperationsWarning": "Bu sağlayıcı uygulama işlemleri için sabitlenmiş. Silerseniz, başka bir model seçene kadar bu ayar kullanılamaz.",
+    "actionLabel": "{{action}} — {{provider}}"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Yapılandırıldı · çıkarım kullanılamıyor.",

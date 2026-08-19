@@ -362,9 +362,6 @@
   "modelNotFoundAfterUrlChange": "模型 {{model}} 在新位址未找到，如不可用請重新選擇。",
   "apiKey": "API Key",
   "deleteModelConfirm": "是否刪除該模型？",
-  "deleteAllModelConfirm": "是否刪除所有模型？",
-  "modelCount": "模型",
-  "apiKeyCount": "API Key",
   "pleaseEnterBaseUrlAndApiKey": "請輸入base url和api key",
   "pleaseEnterApiKey": "請輸入 API Key",
   "pleaseEnterBaseUrl": "請輸入 Base URL",
@@ -887,7 +884,10 @@
   "healthCheck": "健康檢測",
   "modelRow": {
     "latency": "{{latency}} 毫秒",
-    "neverChecked": "從未檢測"
+    "neverChecked": "從未檢測",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "刪除模型",
+    "deleteAppOperationsWarning": "此模型已被固定用於應用程式操作。刪除後，該設定將無法使用，直到你選擇另一個模型。"
   },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
@@ -906,7 +906,8 @@
     "clearHealthConfirmTitle": "清除健康狀態",
     "clearHealthConfirmBody": "將捨棄 {{provider}} 已記錄的健康檢測結果。重新執行健康檢測即可再次量測。",
     "healthCleared": "已清除 {{provider}} 的健康狀態。",
-    "deleteAppOperationsWarning": "此供應商已被固定用於應用程式操作。刪除後，該設定將無法使用，直到你選擇另一個模型。"
+    "deleteAppOperationsWarning": "此供應商已被固定用於應用程式操作。刪除後，該設定將無法使用，直到你選擇另一個模型。",
+    "actionLabel": "{{action}} — {{provider}}"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "已設定 · 推論暫時無法使用。",

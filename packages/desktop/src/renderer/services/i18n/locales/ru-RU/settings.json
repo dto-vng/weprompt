@@ -359,9 +359,6 @@
   "modelNotFoundAfterUrlChange": "Модель {{model}} не найдена по новому адресу; выберите её заново, если не работает.",
   "apiKey": "API-ключ",
   "deleteModelConfirm": "Вы уверены, что хотите удалить эту модель?",
-  "deleteAllModelConfirm": "Вы уверены, что хотите удалить все модели?",
-  "modelCount": "Модель",
-  "apiKeyCount": "API-ключ",
   "pleaseEnterBaseUrlAndApiKey": "Введите базовый URL и API-ключ",
   "pleaseEnterApiKey": "Введите API-ключ",
   "pleaseEnterBaseUrl": "Введите базовый URL",
@@ -867,7 +864,10 @@
   "healthCheck": "Проверка здоровья",
   "modelRow": {
     "latency": "{{latency}} мс",
-    "neverChecked": "Ни разу не проверялась"
+    "neverChecked": "Ни разу не проверялась",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "Удалить модель",
+    "deleteAppOperationsWarning": "Эта модель закреплена за операциями приложения. После удаления эта настройка останется недоступной, пока вы не выберете другую модель."
   },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
@@ -895,7 +895,8 @@
     "clearHealthConfirmTitle": "Очистить состояние",
     "clearHealthConfirmBody": "Записанные результаты проверок для «{{provider}}» будут удалены. Запустите проверку, чтобы измерить их заново.",
     "healthCleared": "Состояние провайдера «{{provider}}» очищено.",
-    "deleteAppOperationsWarning": "Этот провайдер закреплён за операциями приложения. После удаления эта настройка останется недоступной, пока вы не выберете другую модель."
+    "deleteAppOperationsWarning": "Этот провайдер закреплён за операциями приложения. После удаления эта настройка останется недоступной, пока вы не выберете другую модель.",
+    "actionLabel": "{{action}} — {{provider}}"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Настроено · инференс недоступен.",

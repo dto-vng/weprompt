@@ -767,6 +767,7 @@ describe('AppOperationsModelCard', () => {
       expect(onAssignmentChange).toHaveBeenCalledWith({
         resolved: { provider_id: 'provider-a', model_id: 'model-a' },
         pinned: undefined,
+        keptUnavailable: false,
       });
     });
 
@@ -779,7 +780,29 @@ describe('AppOperationsModelCard', () => {
       expect(onAssignmentChange).toHaveBeenCalledWith({
         resolved: { provider_id: 'provider-a', model_id: 'model-a' },
         pinned: { provider_id: 'provider-a', model_id: 'model-a' },
+        keptUnavailable: false,
       });
+    });
+
+    // The identity band falls back to the pin when nothing resolves, so a row that
+    // only saw `resolved` went blank in exactly the state the card names a model.
+    it('publishes the kept pin, flagged, when the Fixed pair no longer resolves', async () => {
+      getMock.mockResolvedValueOnce({
+        setting: { mode: 'fixed', provider_id: 'provider-a', model_id: 'model-a' },
+        health: 'unavailable',
+        reason_code: 'model_disabled',
+      });
+      const onAssignmentChange = vi.fn();
+      renderCard({ onAssignmentChange });
+
+      await waitFor(() => expect(onAssignmentChange).toHaveBeenCalledTimes(1));
+      expect(onAssignmentChange).toHaveBeenCalledWith({
+        resolved: undefined,
+        pinned: { provider_id: 'provider-a', model_id: 'model-a' },
+        keptUnavailable: true,
+      });
+      // The band the row has to agree with is on screen in the same state.
+      expect(screen.getByTestId('app-operations-model')).toHaveTextContent('model-a');
     });
 
     it('does not republish on a re-render that did not change the assignment', async () => {

@@ -124,6 +124,8 @@ const ModelModalContent: React.FC = () => {
   const viewMode = useSettingsViewMode();
   const isPageMode = viewMode === 'page';
   const [collapseKey, setCollapseKey] = useState<Record<string, boolean>>({});
+  /** Controlled so the ⋯ trigger can report aria-expanded; only one menu is ever open. */
+  const [openProviderMenuId, setOpenProviderMenuId] = useState<string | undefined>(undefined);
   const [healthCheckLoading, setHealthCheckLoading] = useState<Record<string, boolean>>({});
   const [providerRefreshToken, setProviderRefreshToken] = useState(0);
   const { data, mutate } = useProvidersQuery();
@@ -215,6 +217,24 @@ const ModelModalContent: React.FC = () => {
       keys: t('settings.providerRow.apiKeyCount', { count: getApiKeyCount(platform.api_key) }),
     });
 
+  /** "2 · 1" — the same template with bare numerals, for the narrow row. */
+  const providerCountsCompactLabel = (platform: IProvider): string =>
+    t('settings.providerRow.counts', {
+      models: (platform.models ?? []).length,
+      keys: getApiKeyCount(platform.api_key),
+    });
+
+  /**
+   * Every row repeats the same three action icons, so a bare "Add Model" is heard
+   * N times with nothing distinguishing the rows. The target is folded into the
+   * accessible name; the visible tooltip keeps the short verb.
+   */
+  const providerActionLabel = (action: string, platform: IProvider): string =>
+    t('settings.providerRow.actionLabel', { action, provider: platform.name });
+
+  const modelActionLabel = (action: string, model: string): string =>
+    t('settings.modelRow.actionLabel', { action, model });
+
   /**
    * Per-provider replacement for the global "Clear status" button removed in
    * 06a2f7eea, which wiped model_health for EVERY provider with no confirmation.
@@ -228,10 +248,20 @@ const ModelModalContent: React.FC = () => {
 
     ipcBridge.mode.updateProvider
       .invoke({ id: platform.id, model_health: {} })
-      .then(() => {
+      .then(async () => {
         signalProviderPersisted();
-        void mutate();
         markProviderCatalogChanged();
+        // Every other write in this file sends a POPULATED map, so an empty one is
+        // the single place that depends on the backend treating `model_health` as a
+        // replacement rather than a merge — a contract nothing in this repo pins.
+        // The refetch is therefore the authority: success is claimed only once the
+        // server agrees the health is gone, never on the optimistic paint alone.
+        const refreshed = await mutate();
+        const remaining = refreshed?.find((item: IProvider) => item.id === platform.id)?.model_health;
+        if (remaining && Object.keys(remaining).length > 0) {
+          message.error(t('settings.saveModelConfigFailed'));
+          return;
+        }
         Message.success({
           content: t('settings.providerRow.healthCleared', { provider: platform.name }),
           duration: 2000,
@@ -297,10 +327,20 @@ const ModelModalContent: React.FC = () => {
   const renderProviderMenu = (platform: IProvider) => (
     <Menu
       onClickMenuItem={(key) => {
+        if (key === 'add-model') addModelModalCtrl.open({ data: platform });
+        if (key === 'edit-provider') editModalCtrl.open({ data: platform });
         if (key === 'clear-health') confirmClearProviderHealth(platform);
         if (key === 'delete') confirmDeleteProvider(platform);
       }}
     >
+      {/* Hidden wherever the row still shows the icons, so the menu never offers a
+          second copy of a button that is one pixel to its left. */}
+      <Menu.Item key='add-model' className='md:!hidden'>
+        <span data-testid={`menu-add-model-${platform.id}`}>{t('settings.addModel')}</span>
+      </Menu.Item>
+      <Menu.Item key='edit-provider' className='md:!hidden'>
+        <span data-testid={`menu-edit-provider-${platform.id}`}>{t('settings.editModel')}</span>
+      </Menu.Item>
       <Menu.Item key='clear-health'>
         <span data-testid={`menu-clear-health-${platform.id}`}>{t('settings.providerRow.clearHealth')}</span>
       </Menu.Item>
@@ -613,11 +653,23 @@ const ModelModalContent: React.FC = () => {
                             >
                               {platform.name}
                             </span>
+                            {/* One phrase above md, bare numerals below it — the design's
+                                narrow row. Two spans rather than one because only CSS knows
+                                the width; exactly one is ever displayed, so this is not the
+                                always-on duplicate the previous markup shipped.
+                                No font-mono on the phrase: it is translated prose, and CJK
+                                drops out of the mono stack glyph by glyph. */}
                             <span
                               data-testid={`provider-counts-${platform.id}`}
-                              className='shrink-0 whitespace-nowrap font-mono text-11px text-t-secondary'
+                              className='hidden shrink-0 whitespace-nowrap text-11px text-t-tertiary md:inline'
                             >
                               {providerCountsLabel(platform)}
+                            </span>
+                            <span
+                              data-testid={`provider-counts-compact-${platform.id}`}
+                              className='shrink-0 whitespace-nowrap font-mono text-11px text-t-tertiary md:hidden'
+                            >
+                              {providerCountsCompactLabel(platform)}
                             </span>
                           </div>
                           <div
@@ -662,22 +714,25 @@ const ModelModalContent: React.FC = () => {
                               onChange={() => toggleProviderEnabled(platform)}
                             />
                             {/* Add and edit stay as icons; the destructive action moves
-                                into the overflow menu so it is never the middle button. */}
+                                into the overflow menu so it is never the middle button.
+                                Below md the two icons drop out and the menu carries them
+                                instead — the design's narrow row leaves only the ⋯, which
+                                is only honest if the ⋯ can still reach them. */}
                             <div className='flex items-center gap-4px'>
                               <Tooltip content={t('settings.addModel')}>
                                 <Button
-                                  aria-label={t('settings.addModel')}
+                                  aria-label={providerActionLabel(t('settings.addModel'), platform)}
                                   size='mini'
-                                  className='model-provider-action-btn !w-28px !h-28px !min-w-28px text-t-secondary hover:text-t-primary'
+                                  className='model-provider-action-btn !hidden !w-28px !h-28px !min-w-28px text-t-secondary hover:text-t-primary md:!inline-flex'
                                   icon={<Plus size='14' />}
                                   onClick={() => addModelModalCtrl.open({ data: platform })}
                                 />
                               </Tooltip>
                               <Tooltip content={t('settings.editModel')}>
                                 <Button
-                                  aria-label={t('settings.editModel')}
+                                  aria-label={providerActionLabel(t('settings.editModel'), platform)}
                                   size='mini'
-                                  className='model-provider-action-btn !w-28px !h-28px !min-w-28px text-t-secondary hover:text-t-primary'
+                                  className='model-provider-action-btn !hidden !w-28px !h-28px !min-w-28px text-t-secondary hover:text-t-primary md:!inline-flex'
                                   icon={<Write size='14' />}
                                   onClick={() => editModalCtrl.open({ data: platform })}
                                 />
@@ -687,13 +742,22 @@ const ModelModalContent: React.FC = () => {
                                 trigger='click'
                                 position='br'
                                 getPopupContainer={() => document.body}
+                                popupVisible={openProviderMenuId === platform.id}
+                                onVisibleChange={(visible) => setOpenProviderMenuId(visible ? platform.id : undefined)}
+                                // Arco's Trigger defaults escToClose to false, so without this a
+                                // keyboard user who opens the menu cannot close it.
+                                triggerProps={{ escToClose: true }}
                               >
-                                <Button
-                                  aria-label={t('common.more')}
-                                  size='mini'
-                                  className='model-provider-action-btn !w-28px !h-28px !min-w-28px text-t-secondary hover:text-t-primary'
-                                  icon={<MoreOne theme='outline' size='14' fill='currentColor' />}
-                                />
+                                <Tooltip content={t('common.more')}>
+                                  <Button
+                                    aria-label={providerActionLabel(t('common.more'), platform)}
+                                    aria-haspopup='menu'
+                                    aria-expanded={openProviderMenuId === platform.id}
+                                    size='mini'
+                                    className='model-provider-action-btn !w-28px !h-28px !min-w-28px text-t-secondary hover:text-t-primary'
+                                    icon={<MoreOne theme='outline' size='14' fill='currentColor' />}
+                                  />
+                                </Tooltip>
                               </Dropdown>
                             </div>
                           </div>
@@ -708,9 +772,25 @@ const ModelModalContent: React.FC = () => {
                         const showOpenAiApiMode = supportsOpenAiApiMode(platform.platform, modelProtocol);
                         const model_health = platform.model_health?.[model];
                         const healthStatus = model_health?.status || 'unknown';
-                        const servesAppOperations =
+                        // The card's identity band falls back to the pin when nothing
+                        // resolves, so a row that only matched `resolved` went silent in
+                        // exactly the state where the user has to find the model —
+                        // a Fixed pin the backend kept but cannot serve.
+                        const isResolvedForAppOperations =
                           appOperations.resolved?.provider_id === platform.id &&
                           appOperations.resolved?.model_id === model;
+                        const isPinnedForAppOperations =
+                          appOperations.pinned?.provider_id === platform.id && appOperations.pinned?.model_id === model;
+                        const servesAppOperations = isResolvedForAppOperations || isPinnedForAppOperations;
+                        const appOperationsKept = !isResolvedForAppOperations && appOperations.keptUnavailable === true;
+                        const healthLabel =
+                          healthStatus === 'unknown'
+                            ? t('settings.modelRow.neverChecked')
+                            : healthStatus === 'healthy'
+                              ? t('common.success')
+                              : model_health?.failure_class === 'setup'
+                                ? t('settings.providerHealth.setupNeedsAttention')
+                                : t('settings.providerHealth.configuredInferenceUnavailable');
                         // `!== undefined`, not truthiness: `result.elapsed_ms || Date.now() - startTime`
                         // can legitimately record a latency of 0, which a falsy guard would hide.
                         const latencyLabel =
@@ -724,132 +804,167 @@ const ModelModalContent: React.FC = () => {
                           <div key={model}>
                             <div className='flex items-center justify-between gap-8px px-8px py-12px transition-colors hover:bg-[var(--fill-0)]'>
                               <div className='flex min-w-0 flex-1 items-center gap-8px'>
-                                {/* 健康状态指示器 / Health status indicator */}
-                                {healthStatus !== 'unknown' && (
-                                  <Tooltip
-                                    content={
-                                      <div>
-                                        <div className='flex items-center gap-4px'>
-                                          <span>{healthStatus === 'healthy' ? '✅' : '❌'}</span>
-                                          <span>
-                                            {healthStatus === 'healthy'
-                                              ? t('common.success')
-                                              : model_health?.failure_class === 'setup'
-                                                ? t('settings.providerHealth.setupNeedsAttention')
-                                                : t('settings.providerHealth.configuredInferenceUnavailable')}
-                                          </span>
-                                        </div>
-                                        {model_health?.latency !== undefined && (
-                                          <div className='text-12px mt-4px'>
-                                            {t('settings.latency')}: {model_health.latency}ms
-                                          </div>
-                                        )}
-                                        {model_health?.error && (
-                                          <div className='text-12px mt-4px'>{model_health.error}</div>
-                                        )}
-                                        {model_health?.last_check && (
-                                          <div className='text-12px mt-4px'>
-                                            {t('mcp.lastCheck')}: {new Date(model_health.last_check).toLocaleString()}
-                                          </div>
-                                        )}
-                                      </div>
-                                    }
-                                  >
-                                    <div
-                                      className={`h-8px w-8px shrink-0 rounded-full ${healthStatus === 'healthy' ? 'bg-success' : 'bg-danger'}`}
-                                    />
-                                  </Tooltip>
-                                )}
-
-                                <span className='min-w-0 flex-1 truncate text-14px text-t-primary'>{model}</span>
-
-                                {/* A plain span, not an Arco Tag: `.arco-tag` sets its own
-                                    background at the same specificity as a utility class, so a
-                                    utility background on a Tag is order-dependent. Reuses the
-                                    card's own label key so both surfaces read identically. */}
-                                {servesAppOperations && (
-                                  <span
-                                    data-testid={`model-app-operations-${platform.id}-${model}`}
-                                    className='shrink-0 rounded-5px border border-solid border-primary-3 bg-primary-light-1 px-6px py-1px font-mono text-10px uppercase tracking-[0.06em] text-primary-6'
-                                  >
-                                    {t('settings.appOperationsModel.panelLabel')}
-                                  </span>
-                                )}
-
-                                {/* New API 协议标签（点击循环切换）/ New API protocol badge (click to cycle) */}
-                                {isNewApiProvider && (
-                                  <Tag
-                                    size='small'
-                                    color={getProtocolColor(modelProtocol)}
-                                    className='shrink-0 cursor-pointer select-none'
-                                    onClick={() => {
-                                      const nextProtocol = getNextProtocol(modelProtocol);
-                                      const newProtocols = { ...platform.model_protocols };
-                                      newProtocols[model] = nextProtocol;
-                                      updatePlatform({ ...platform, model_protocols: newProtocols }, () => {});
-                                    }}
-                                  >
-                                    {getProtocolLabel(modelProtocol)}
-                                  </Tag>
-                                )}
-
+                                {/* 健康状态指示器 / Health status indicator.
+                                    Rendered for `unknown` too, in grey: the design draws the dot
+                                    in all three states, and a dot that disappears reads as "fine".
+                                    `role='img'` + `aria-label` because the Arco Tooltip is not a
+                                    text alternative — it never wires aria-describedby, and this
+                                    element is not focusable, so hue alone would carry the status. */}
                                 <Tooltip
                                   content={
-                                    imageInput === 'supported'
-                                      ? t('settings.imageInputSupported')
-                                      : imageInput === 'unsupported'
-                                        ? t('settings.imageInputUnsupported')
-                                        : t('settings.imageInputAuto')
+                                    <div>
+                                      <div className='flex items-center gap-4px'>
+                                        <span>
+                                          {healthStatus === 'healthy' ? '✅' : healthStatus === 'unknown' ? '•' : '❌'}
+                                        </span>
+                                        <span>{healthLabel}</span>
+                                      </div>
+                                      {model_health?.latency !== undefined && (
+                                        <div className='text-12px mt-4px'>
+                                          {t('settings.latency')}: {model_health.latency}ms
+                                        </div>
+                                      )}
+                                      {model_health?.error && (
+                                        <div className='text-12px mt-4px'>{model_health.error}</div>
+                                      )}
+                                      {model_health?.last_check && (
+                                        <div className='text-12px mt-4px'>
+                                          {t('mcp.lastCheck')}: {new Date(model_health.last_check).toLocaleString()}
+                                        </div>
+                                      )}
+                                    </div>
                                   }
                                 >
-                                  <span
-                                    className={`inline-flex h-20px w-20px shrink-0 items-center justify-center ${
-                                      imageInput === 'supported' ? 'text-success-6' : 'text-t-secondary'
+                                  <div
+                                    role='img'
+                                    aria-label={healthLabel}
+                                    data-testid={`model-health-dot-${platform.id}-${model}`}
+                                    className={`h-8px w-8px shrink-0 rounded-full ${
+                                      healthStatus === 'healthy'
+                                        ? 'bg-success'
+                                        : healthStatus === 'unknown'
+                                          ? 'bg-6'
+                                          : 'bg-danger'
                                     }`}
-                                  >
-                                    {imageInput !== 'unsupported' ? (
-                                      <PreviewOpen theme='outline' size='15' />
-                                    ) : (
-                                      <PreviewClose theme='outline' size='15' />
-                                    )}
-                                  </span>
+                                  />
                                 </Tooltip>
 
-                                {showOpenAiApiMode && (
-                                  <Tag size='small' className='hidden shrink-0 md:inline-flex'>
-                                    {modelSettings?.openai_api_mode === 'responses'
-                                      ? t('settings.openAiApiModeResponses')
-                                      : modelSettings?.openai_api_mode === 'chat_completions'
-                                        ? t('settings.openAiApiModeChatCompletions')
-                                        : t('settings.openAiApiModeAuto')}
-                                  </Tag>
-                                )}
+                                {/* Model id and its assignment tag read as one phrase, so they
+                                    share a shrinkable group. `flex-1` deliberately does NOT sit on
+                                    the id: it would absorb the free space and throw the tag into
+                                    the right-hand cluster, away from the name it qualifies. */}
+                                <div className='flex min-w-0 items-center gap-8px'>
+                                  <span className='min-w-0 truncate text-14px text-t-primary'>{model}</span>
 
-                                {/* The model name keeps its flex-1, which already pushes this to
-                                    the right edge — the design's ml-auto would cost that truncation. */}
-                                {latencyLabel !== undefined && (
-                                  <span
-                                    data-testid={`model-latency-${platform.id}-${model}`}
-                                    className={`shrink-0 whitespace-nowrap text-12px ${
-                                      model_health?.latency !== undefined ? 'text-t-secondary' : 'text-t-tertiary'
-                                    }`}
+                                  {/* A plain span, not an Arco Tag: `.arco-tag` sets its own
+                                      background at the same specificity as a utility class, so a
+                                      utility background on a Tag is order-dependent. Navy, not the
+                                      brand orange every toggle in this row already uses — and the
+                                      same navy as the card's chip one row above, which is the whole
+                                      point of showing the assignment twice. */}
+                                  {servesAppOperations && (
+                                    <span
+                                      data-testid={`model-app-operations-${platform.id}-${model}`}
+                                      className={`shrink-0 rounded-5px border border-solid px-7px py-2px font-mono text-10px uppercase tracking-[0.06em] ${
+                                        appOperationsKept
+                                          ? 'border-arco-2 bg-fill-1 text-t-secondary'
+                                          : 'border-aou-3 bg-aou-2 text-aou-7'
+                                      }`}
+                                    >
+                                      {t('settings.appOperationsModel.panelLabel')}
+                                    </span>
+                                  )}
+
+                                  {/* The card's own word for a pin it kept rather than silently
+                                      swapping away from, so "kept" is text and not a hue. */}
+                                  {servesAppOperations && appOperationsKept && (
+                                    <span
+                                      data-testid={`model-app-operations-kept-${platform.id}-${model}`}
+                                      className='shrink-0 rounded-4px border border-solid border-danger-3 bg-danger-1 px-6px py-1px font-mono text-[9.5px] uppercase tracking-wide text-danger-6'
+                                    >
+                                      {t('settings.appOperationsModel.kept')}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Everything from here hugs the right edge. `ml-auto` on the
+                                    group, not on the model id, is what splits the row — the design's
+                                    own split, and it keeps the id truncating instead of the tag. */}
+                                <div className='ml-auto flex shrink-0 items-center gap-8px'>
+                                  {/* New API 协议标签（点击循环切换）/ New API protocol badge (click to cycle) */}
+                                  {isNewApiProvider && (
+                                    <Tag
+                                      size='small'
+                                      color={getProtocolColor(modelProtocol)}
+                                      className='shrink-0 cursor-pointer select-none'
+                                      onClick={() => {
+                                        const nextProtocol = getNextProtocol(modelProtocol);
+                                        const newProtocols = { ...platform.model_protocols };
+                                        newProtocols[model] = nextProtocol;
+                                        updatePlatform({ ...platform, model_protocols: newProtocols }, () => {});
+                                      }}
+                                    >
+                                      {getProtocolLabel(modelProtocol)}
+                                    </Tag>
+                                  )}
+
+                                  <Tooltip
+                                    content={
+                                      imageInput === 'supported'
+                                        ? t('settings.imageInputSupported')
+                                        : imageInput === 'unsupported'
+                                          ? t('settings.imageInputUnsupported')
+                                          : t('settings.imageInputAuto')
+                                    }
                                   >
-                                    {latencyLabel}
-                                  </span>
-                                )}
+                                    <span
+                                      className={`inline-flex h-20px w-20px shrink-0 items-center justify-center ${
+                                        imageInput === 'supported' ? 'text-success-6' : 'text-t-secondary'
+                                      }`}
+                                    >
+                                      {imageInput !== 'unsupported' ? (
+                                        <PreviewOpen theme='outline' size='15' />
+                                      ) : (
+                                        <PreviewClose theme='outline' size='15' />
+                                      )}
+                                    </span>
+                                  </Tooltip>
 
-                                {/* 模型启用开关 / Model enable switch */}
-                                <Switch
-                                  className='shrink-0'
-                                  size='small'
-                                  checked={isModelEnabled(platform, model)}
-                                  onChange={(checked) => toggleModelEnabled(platform, model, checked)}
-                                />
+                                  {showOpenAiApiMode && (
+                                    <Tag size='small' className='hidden shrink-0 md:inline-flex'>
+                                      {modelSettings?.openai_api_mode === 'responses'
+                                        ? t('settings.openAiApiModeResponses')
+                                        : modelSettings?.openai_api_mode === 'chat_completions'
+                                          ? t('settings.openAiApiModeChatCompletions')
+                                          : t('settings.openAiApiModeAuto')}
+                                    </Tag>
+                                  )}
+
+                                  {latencyLabel !== undefined && (
+                                    <span
+                                      data-testid={`model-latency-${platform.id}-${model}`}
+                                      className={`shrink-0 whitespace-nowrap text-12px ${
+                                        model_health?.latency !== undefined ? 'text-t-secondary' : 'text-t-tertiary'
+                                      }`}
+                                    >
+                                      {latencyLabel}
+                                    </span>
+                                  )}
+
+                                  {/* 模型启用开关 / Model enable switch */}
+                                  <Switch
+                                    className='shrink-0'
+                                    size='small'
+                                    checked={isModelEnabled(platform, model)}
+                                    onChange={(checked) => toggleModelEnabled(platform, model, checked)}
+                                  />
+                                </div>
                               </div>
 
                               <div className='flex items-center gap-6px shrink-0'>
                                 <Tooltip content={t('settings.configureModel')}>
                                   <Button
+                                    aria-label={modelActionLabel(t('settings.configureModel'), model)}
                                     size='mini'
                                     className='!w-28px !h-28px !min-w-28px !bg-[var(--color-bg-1)] text-t-secondary hover:text-t-primary hover:!bg-[var(--fill-0)]'
                                     icon={<SettingTwo theme='outline' size='16' />}
@@ -860,7 +975,7 @@ const ModelModalContent: React.FC = () => {
                                 {/* 心跳检测按钮 / Health check button */}
                                 <Tooltip content={t('settings.healthCheck')}>
                                   <Button
-                                    aria-label={t('settings.healthCheck')}
+                                    aria-label={modelActionLabel(t('settings.healthCheck'), model)}
                                     size='mini'
                                     className='!w-28px !h-28px !min-w-28px !bg-[var(--color-bg-1)] text-t-secondary hover:text-t-primary hover:!bg-[var(--fill-0)]'
                                     icon={<Heartbeat theme='outline' size='16' />}
@@ -870,7 +985,22 @@ const ModelModalContent: React.FC = () => {
                                 </Tooltip>
 
                                 <Popconfirm
-                                  title={t('settings.deleteModelConfirm')}
+                                  title={
+                                    /* Symmetric with the provider delete: the row that now
+                                       advertises the assignment must also say when deleting it
+                                       is what breaks the assignment. Keyed on the pin, not on
+                                       `resolved` — an already-unavailable pin still has to warn. */
+                                    isPinnedForAppOperations ? (
+                                      <div className='flex max-w-260px flex-col gap-6px'>
+                                        <span>{t('settings.deleteModelConfirm')}</span>
+                                        <span className='text-danger-6'>
+                                          {t('settings.modelRow.deleteAppOperationsWarning')}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      t('settings.deleteModelConfirm')
+                                    )
+                                  }
                                   onOk={() => {
                                     const newModels = platform.models.filter((item: string) => item !== model);
                                     // 同时清理模型相关状态，避免删除后重加模型时复用脏状态
@@ -901,6 +1031,7 @@ const ModelModalContent: React.FC = () => {
                                   }}
                                 >
                                   <Button
+                                    aria-label={modelActionLabel(t('settings.modelRow.removeModel'), model)}
                                     size='mini'
                                     className='!w-28px !h-28px !min-w-28px !bg-[var(--color-bg-1)] text-t-secondary hover:text-t-primary hover:!bg-[var(--fill-0)]'
                                     icon={<DeleteFour theme='outline' size='18' strokeWidth={2} />}

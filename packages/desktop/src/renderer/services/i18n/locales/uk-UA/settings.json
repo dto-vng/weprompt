@@ -362,9 +362,6 @@
   "modelNotFoundAfterUrlChange": "Модель {{model}} не знайдено за новою адресою; виберіть її знову, якщо не працює.",
   "apiKey": "API-ключ",
   "deleteModelConfirm": "Ви впевнені, що хочете видалити цю модель?",
-  "deleteAllModelConfirm": "Ви впевнені, що хочете видалити всі моделі?",
-  "modelCount": "Модель",
-  "apiKeyCount": "API-ключ",
   "pleaseEnterBaseUrlAndApiKey": "Будь ласка, введіть base url та API-ключ",
   "pleaseEnterApiKey": "Будь ласка, введіть API-ключ",
   "pleaseEnterBaseUrl": "Будь ласка, введіть Base URL",
@@ -826,7 +823,10 @@
   "healthCheck": "Перевірка здоров'я",
   "modelRow": {
     "latency": "{{latency}} мс",
-    "neverChecked": "Жодного разу не перевірялася"
+    "neverChecked": "Жодного разу не перевірялася",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "Видалити модель",
+    "deleteAppOperationsWarning": "Цю модель закріплено за операціями застосунку. Після видалення це налаштування буде недоступним, доки ви не оберете іншу модель."
   },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
@@ -854,7 +854,8 @@
     "clearHealthConfirmTitle": "Очистити стан",
     "clearHealthConfirmBody": "Записані результати перевірок для «{{provider}}» буде видалено. Запустіть перевірку, щоб виміряти їх знову.",
     "healthCleared": "Стан провайдера «{{provider}}» очищено.",
-    "deleteAppOperationsWarning": "Цього провайдера закріплено за операціями застосунку. Після видалення це налаштування буде недоступним, доки ви не оберете іншу модель."
+    "deleteAppOperationsWarning": "Цього провайдера закріплено за операціями застосунку. Після видалення це налаштування буде недоступним, доки ви не оберете іншу модель.",
+    "actionLabel": "{{action}} — {{provider}}"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Налаштовано · інференс недоступний.",

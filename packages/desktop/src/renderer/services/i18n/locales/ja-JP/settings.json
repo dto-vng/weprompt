@@ -362,9 +362,6 @@
   "modelNotFoundAfterUrlChange": "モデル {{model}} は新しいアドレスで見つかりませんでした。利用できない場合は選択し直してください。",
   "apiKey": "API キー",
   "deleteModelConfirm": "このモデルを削除してもよろしいですか？",
-  "deleteAllModelConfirm": "すべてのモデルを削除してもよろしいですか？",
-  "modelCount": "モデル",
-  "apiKeyCount": "API キー",
   "pleaseEnterBaseUrlAndApiKey": "ベースURLとAPIキーを入力してください",
   "pleaseEnterApiKey": "APIキーを入力してください",
   "pleaseEnterBaseUrl": "ベースURLを入力してください",
@@ -875,7 +872,10 @@
   "healthCheck": "ヘルスチェック",
   "modelRow": {
     "latency": "{{latency}} ms",
-    "neverChecked": "未チェック"
+    "neverChecked": "未チェック",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "モデルを削除",
+    "deleteAppOperationsWarning": "このモデルはアプリ操作に固定されています。削除すると、別のモデルを選ぶまでその設定は利用できなくなります。"
   },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
@@ -894,7 +894,8 @@
     "clearHealthConfirmTitle": "ヘルス状態をクリア",
     "clearHealthConfirmBody": "{{provider}} に記録されたヘルスチェック結果を破棄します。もう一度測定するにはヘルスチェックを実行してください。",
     "healthCleared": "{{provider}} のヘルス状態をクリアしました。",
-    "deleteAppOperationsWarning": "このプロバイダーはアプリ操作に固定されています。削除すると、別のモデルを選ぶまでその設定は利用できなくなります。"
+    "deleteAppOperationsWarning": "このプロバイダーはアプリ操作に固定されています。削除すると、別のモデルを選ぶまでその設定は利用できなくなります。",
+    "actionLabel": "{{action}} — {{provider}}"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "設定済み · 推論を利用できません。",

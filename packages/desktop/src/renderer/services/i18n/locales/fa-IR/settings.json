@@ -362,9 +362,6 @@
   "modelNotFoundAfterUrlChange": "مدل {{model}} در آدرس جدید پیدا نشد؛ اگر کار نکرد، دوباره آن را انتخاب کنید.",
   "apiKey": "کلید API",
   "deleteModelConfirm": "آیا مطمئن هستید که می‌خواهید این مدل را حذف کنید؟",
-  "deleteAllModelConfirm": "آیا مطمئن هستید که می‌خواهید همه مدل‌ها را حذف کنید؟",
-  "modelCount": "مدل",
-  "apiKeyCount": "کلید API",
   "pleaseEnterBaseUrlAndApiKey": "لطفاً آدرس پایه و کلید API را وارد کنید",
   "pleaseEnterApiKey": "لطفاً کلید API را وارد کنید",
   "pleaseEnterBaseUrl": "لطفاً آدرس پایه را وارد کنید",
@@ -887,7 +884,10 @@
   "healthCheck": "بررسی سلامت",
   "modelRow": {
     "latency": "{{latency}} میلی‌ثانیه",
-    "neverChecked": "هرگز بررسی نشده"
+    "neverChecked": "هرگز بررسی نشده",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "حذف مدل",
+    "deleteAppOperationsWarning": "این مدل برای عملیات برنامه تثبیت شده است. با حذف آن، این تنظیم تا زمانی که مدل دیگری انتخاب کنید در دسترس نخواهد بود."
   },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
@@ -909,7 +909,8 @@
     "clearHealthConfirmTitle": "پاک کردن وضعیت سلامت",
     "clearHealthConfirmBody": "نتایج ثبت‌شدهٔ بررسی سلامت برای {{provider}} حذف می‌شود. برای اندازه‌گیری دوباره، بررسی سلامت را اجرا کنید.",
     "healthCleared": "وضعیت سلامت {{provider}} پاک شد.",
-    "deleteAppOperationsWarning": "این ارائه‌دهنده برای عملیات برنامه تثبیت شده است. با حذف آن، این تنظیم تا زمانی که مدل دیگری انتخاب کنید در دسترس نخواهد بود."
+    "deleteAppOperationsWarning": "این ارائه‌دهنده برای عملیات برنامه تثبیت شده است. با حذف آن، این تنظیم تا زمانی که مدل دیگری انتخاب کنید در دسترس نخواهد بود.",
+    "actionLabel": "{{action}} — {{provider}}"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "پیکربندی شده · استنتاج در دسترس نیست.",

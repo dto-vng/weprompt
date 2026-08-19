@@ -362,9 +362,6 @@
   "modelNotFoundAfterUrlChange": "O modelo {{model}} não foi encontrado no novo endereço; selecione-o novamente se não funcionar.",
   "apiKey": "Chave de API",
   "deleteModelConfirm": "Tem certeza de que deseja excluir este modelo?",
-  "deleteAllModelConfirm": "Tem certeza de que deseja excluir todos os modelos?",
-  "modelCount": "Modelo",
-  "apiKeyCount": "Chave de API",
   "pleaseEnterBaseUrlAndApiKey": "Por favor, insira a URL base e a chave da API",
   "pleaseEnterApiKey": "Por favor, insira a Chave de API",
   "pleaseEnterBaseUrl": "Por favor, insira a URL Base",
@@ -887,7 +884,10 @@
   "healthCheck": "Verificação de Saúde",
   "modelRow": {
     "latency": "{{latency}} ms",
-    "neverChecked": "Nunca verificado"
+    "neverChecked": "Nunca verificado",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "Remover modelo",
+    "deleteAppOperationsWarning": "Este modelo está fixado para as operações do aplicativo. Excluí-lo deixa essa configuração indisponível até você escolher outro modelo."
   },
   "providerRow": {
     "counts": "{{models}} · {{keys}}",
@@ -912,7 +912,8 @@
     "clearHealthConfirmTitle": "Limpar status de integridade",
     "clearHealthConfirmBody": "Descarta os resultados de integridade registrados para {{provider}}. Execute uma verificação para medi-los novamente.",
     "healthCleared": "Status de integridade de {{provider}} limpo.",
-    "deleteAppOperationsWarning": "Este provedor está fixado para as operações do aplicativo. Excluí-lo deixa essa configuração indisponível até você escolher outro modelo."
+    "deleteAppOperationsWarning": "Este provedor está fixado para as operações do aplicativo. Excluí-lo deixa essa configuração indisponível até você escolher outro modelo.",
+    "actionLabel": "{{action}} — {{provider}}"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Configurado · inferência indisponível.",

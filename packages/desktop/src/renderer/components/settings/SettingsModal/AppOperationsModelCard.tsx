@@ -51,6 +51,12 @@ export type AppOperationsAssignment = {
   resolved?: AppOperationsModelRef;
   /** The pair a Fixed setting pins, whether or not it currently resolves. Undefined in Auto mode. */
   pinned?: AppOperationsModelRef;
+  /**
+   * True exactly when this card renders `pinned` as a kept-but-unavailable identity.
+   * Published rather than re-derived so the row's tag cannot disagree with the band
+   * above it: the health that decides it is never sent to the rows in any other form.
+   */
+  keptUnavailable?: boolean;
 };
 
 export type AppOperationsModelCardProps = {
@@ -115,8 +121,11 @@ const isFixedSetting = (
 
 const modelOptionValue = (providerId: string, modelId: string): string => JSON.stringify([providerId, modelId]);
 
-const assignmentSignature = (resolved?: AppOperationsModelRef, pinned?: AppOperationsModelRef): string =>
-  JSON.stringify([resolved ?? null, pinned ?? null]);
+const assignmentSignature = (
+  resolved?: AppOperationsModelRef,
+  pinned?: AppOperationsModelRef,
+  keptUnavailable?: boolean
+): string => JSON.stringify([resolved ?? null, pinned ?? null, keptUnavailable === true]);
 
 /**
  * Seeds the publish guard so the render before the first load resolves does not
@@ -403,10 +412,13 @@ export default function AppOperationsModelCard({
     const pinned = isFixedSetting(response?.setting)
       ? { provider_id: response.setting.provider_id, model_id: response.setting.model_id }
       : undefined;
-    const signature = assignmentSignature(resolved, pinned);
+    // Same expression as `keptUnavailable` below, evaluated here because this
+    // effect must not depend on render-order state.
+    const keptUnavailable = isFixedSetting(response?.setting) && response?.health === 'unavailable';
+    const signature = assignmentSignature(resolved, pinned, keptUnavailable);
     if (publishedAssignmentRef.current === signature) return;
     publishedAssignmentRef.current = signature;
-    onAssignmentChange({ resolved, pinned });
+    onAssignmentChange({ resolved, pinned, keptUnavailable });
   }, [onAssignmentChange, response]);
 
   const canMutate = phase === 'ready' && pending === 'idle' && response !== undefined;
