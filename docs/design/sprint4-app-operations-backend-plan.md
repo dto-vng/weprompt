@@ -133,3 +133,53 @@ commits and the memory feature; that divergence is accepted, not resolved, by th
    the evidence. The original author is this machine.
 3. **Does `028_project_bind` / `029_mimo` need to reach the release line separately?** They are unrelated
    to this screen but currently exist only on the fork.
+
+---
+
+## Live smoke of the ported binary — 2026-08-18
+
+Ported `feat/app-operations-port` @ `b3f437ce7` (v0.1.54 + migration 028), debug build, run against a
+scratch data dir. `~/.aionui-dev` was never a target — only a read-only copy source.
+
+### API contract: 6/6 pass
+
+| Check | Result |
+| ----- | ------ |
+| `GET /api/app-operations/model` | 200 `{"setting":{"mode":"auto"},"health":"setup_required","reason_code":"no_eligible_model"}` |
+| `PUT` with empty ids | **422** "Fixed App Operations provider and model ids must not be empty" — the branch the port had no test for |
+| `PUT` with absent provider | **422** "App Operations provider does not exist" |
+| `PUT {"mode":"auto"}` | 200, persisted across a process restart |
+| `POST /api/app-operations/model/check` | 200 — the route lives in `aionui-ai-agent`, not `aionui-system` |
+| no bearer token | **401** — the D-01 loopback token is enforced |
+
+### Migration 028 against a populated database: NOT verified, and why
+
+The seeded 41-conversation database was **discarded before migrations ran**.
+`crates/aionui-db/src/database.rs:151-153` → `backup_plaintext_and_reencrypt`: on meeting a plaintext
+database the backend creates a **fresh encrypted one** and preserves the old as `.plaintext-backup.<ts>`.
+It does not carry data across. The tell was `setup_required` returned by a database holding three keyed
+providers.
+
+This also settles the 2026-08-18 dev-profile incident, whose own doc marked the cause
+"Hypothesis (not proven)" and got it wrong. It was not 0.1.51 failing to decrypt a 0.1.53 database. **Any
+encryption-capable binary meeting a plaintext database starts fresh.**
+
+### Migration version collision — decision needed before the port lands
+
+| version | dev profile / feature branch | ported release line |
+| ------- | ---------------------------- | ------------------- |
+| 028 | `project_bind` | **`app_operations_model`** |
+| 029 | `mimo_code_builtin_acp_agent` | — |
+| 030 | `app_operations_model` | — |
+| 031-034 | memory | — |
+
+The dev profile has 1-34 applied. `DB_MIGRATOR = sqlx::migrate!()` (`database.rs:28`) carries **no
+`set_ignore_missing`**, so such a profile meeting the ported set fails twice over: version 28 is applied
+under `project_bind`'s checksum while the local 028 is `app_operations_model`, and 29-34 are applied but
+absent locally. **Inferred** from sqlx semantics plus the measured version list — not executed. Executing
+it needs a source-branch binary to produce an encrypted 34-migration database.
+
+**Recommendation: keep 028.** Renumbering app-operations to 030 rescues nobody — branch-built profiles
+would still carry 031-034 as applied-but-missing. The consequence to record: whoever later ports
+`project_bind` / `mimo` to the release line must know **028 is taken** and take 029/030. Neither is
+released, so this is free to decide now and expensive to discover at merge time.

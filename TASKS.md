@@ -69,6 +69,13 @@
   - Same defect class as BUG-046, unfixed and out of that commit's scope: `payloadSchemas.ts:228, 249-250, 562, 571, 595, 608-643`, `PresentationRunService.ts:205`, `PresentationSourceGrantService.ts:302`, `presentation-template/bridge.ts:444`, `preload/main.ts:46`.
   - Each is a candidate for the same silent failure. Reachability must be established the way EPIC-002's was — by running it — because a green suite is exactly what hid BUG-046.
 
+- [ ] **[BUG-053][P2][Test infrastructure] `bun run lint:fix` breaks the build on a clean tree** — found 2026-08-18 while landing the provider-row work
+  - Reproduction: `git status` clean, then `bun run lint:fix`. It rewrites **9 files nobody touched** and `bunx tsc --noEmit` then reports **6 errors**.
+  - Cause: oxlint's `prefer-set-has` autofix converts array literals to `new Set([...])` **without updating the `readonly T[]` type annotation**, in `presentationRunJournal.ts:113`, `presentationRunStateMachine.ts:1076` and `presentationRunStore.ts:425`. Each yields a `TS2740` at the declaration and a `TS2339` on the later `.has(...)`.
+  - Why it matters: AGENTS.md tells contributors to run `bun run lint:fix` **as they edit**. Following the documented workflow on a clean checkout produces a red typecheck in files the contributor never opened. Two separate sessions today reverted this drift as cosmetic noise before anyone checked whether it compiled.
+  - Workaround in use: stage explicit paths only (`git add <paths>`, never `git add -A`) and lint/format your own files rather than the tree.
+  - Fix options: correct the three annotations to `ReadonlySet<T>` so the autofix is sound, or disable `prefer-set-has` where the value is typed as a readonly array.
+
 ## Carryover after Sprint 2 code freeze
 
 - [ ] **[BUG-042][P2][Test infrastructure] 25 updater tests fail under `CI=true` because production deliberately disables updates in CI** — found 2026-08-10 by the first CI run in this repo's history; **root cause established by controlled experiment the same day**
