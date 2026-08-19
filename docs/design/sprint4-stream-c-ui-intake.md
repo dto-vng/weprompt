@@ -1121,9 +1121,15 @@ Consequences, both directions:
 
 - A **red** gate under contention is not evidence of a defect. Re-run the offenders
   isolated before concluding anything.
-- A **green** gate under contention is not proof either. The Stream C gate at
-  `0f2bd0da3` was green, but what else was running is unreconstructable, so it is
-  weaker evidence than first reported. The merged-tree gate is the one that counts.
+- A **green** gate under contention is *stronger* evidence than a green on a quiet
+  host, not weaker. Contention can only cause timing failures, it cannot mask them,
+  so passing while starved means the assertions had margin. The Stream C gate at
+  `0f2bd0da3` was green under unknown load; that is a reason for more confidence in
+  it, not less. (An earlier revision of this note claimed the opposite. It was wrong
+  — it treated the evidence as symmetric when the mechanism is not.)
+- The one narrow exception: a race that only manifests when the host is *fast* can be
+  accidentally serialised by slowness, so a green under load does not cover
+  fast-path-only races. That class is rare and is not what the BUG-046 family is.
 - Judge a gate by **exit code and `uptime` together**, and announce full-suite runs
   to the other sessions first — three concurrent runners produce only phantoms.
 
