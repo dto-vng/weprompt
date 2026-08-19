@@ -27,7 +27,9 @@ describe('markdown chips and links stay distinguishable', () => {
   });
 
   it('the shadow copy uses the token — it is the one chat actually gets', () => {
-    expect(SHADOW).toMatch(/\.markdown-shadow-body code:not\(pre code\)\s*\{[^}]*background:\s*var\(--md-inline-code-bg\)/s);
+    expect(SHADOW).toMatch(
+      /\.markdown-shadow-body code:not\(pre code\)\s*\{[^}]*background:\s*var\(--md-inline-code-bg\)/s
+    );
   });
 
   it('markdown.css agrees, so the duplicate pair cannot drift', () => {

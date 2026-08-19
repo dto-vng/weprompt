@@ -311,32 +311,32 @@ const ChatLayout: React.FC<{
       }}
     >
       <WorkspaceFilesPaneProvider activeView={artifactPaneView} containers={panePortalTargets}>
-      <div ref={containerRef} className='flex flex-1 relative w-full overflow-hidden'>
-        {workspaceEnabled && workspacePresentation === 'project-menu' && (
-          <div className='workspace-project-controller'>{props.sider}</div>
-        )}
-        {/* Chat region — header + content. Never unmounts when the artifact pane toggles. */}
-        <div
-          data-testid='chat-layout-chat-pane'
-          className='flex flex-col relative min-w-0'
-          style={{
-            flexGrow: artifactVisible ? 0 : 1,
-            flexShrink: artifactVisible ? 0 : 1,
-            flexBasis: artifactVisible ? `${chatFlex}%` : 0,
-          }}
-          onClick={() => {
-            if (window.innerWidth < 768 && !artifactCollapsed) setArtifactCollapsed(true);
-          }}
-        >
-          <div className='shrink-0 !bg-1'>{headerBlock}</div>
-          <ArcoLayout.Content
-            className='flex flex-col flex-1 overflow-hidden'
-            style={{ background: 'var(--bg-chat-surface)' }}
+        <div ref={containerRef} className='flex flex-1 relative w-full overflow-hidden'>
+          {workspaceEnabled && workspacePresentation === 'project-menu' && (
+            <div className='workspace-project-controller'>{props.sider}</div>
+          )}
+          {/* Chat region — header + content. Never unmounts when the artifact pane toggles. */}
+          <div
+            data-testid='chat-layout-chat-pane'
+            className='flex flex-col relative min-w-0'
+            style={{
+              flexGrow: artifactVisible ? 0 : 1,
+              flexShrink: artifactVisible ? 0 : 1,
+              flexBasis: artifactVisible ? `${chatFlex}%` : 0,
+            }}
+            onClick={() => {
+              if (window.innerWidth < 768 && !artifactCollapsed) setArtifactCollapsed(true);
+            }}
           >
-            {props.children}
-          </ArcoLayout.Content>
-        </div>
-        {/*
+            <div className='shrink-0 !bg-1'>{headerBlock}</div>
+            <ArcoLayout.Content
+              className='flex flex-col flex-1 overflow-hidden'
+              style={{ background: 'var(--bg-chat-surface)' }}
+            >
+              {props.children}
+            </ArcoLayout.Content>
+          </div>
+          {/*
           Artifact pane — the single region right of chat. Its content and mount
           behavior are presentation dependent:
           - `panel` (team) keeps the workspace file tree behind the
@@ -348,176 +348,178 @@ const ChatLayout: React.FC<{
             pane. It is removed from the DOM while collapsed (its file events come
             from the always-mounted project-menu controller above, not the pane).
         */}
-        {isWorkspacePanePresentation && workspaceEnabled && !isMobile && (
-          <div
-            data-testid='artifact-pane'
-            className='relative flex flex-col min-w-0 layout-sider'
-            style={{
-              background: 'var(--bg-artifact-surface)',
-              flexGrow: artifactCollapsed ? 0 : 1,
-              flexShrink: 0,
-              flexBasis: artifactCollapsed ? '0px' : 0,
-              width: artifactCollapsed ? '0px' : undefined,
-              overflow: 'hidden',
-              borderLeft: artifactCollapsed ? 'none' : '1px solid var(--bg-3)',
-            }}
-          >
-            {!artifactCollapsed &&
-              createArtifactDragHandle({ className: 'absolute left-0 top-0 bottom-0 z-30', linePlacement: 'start' })}
-            <WorkspacePanelHeader
-              showToggle={!isMacRuntime && !isWindowsRuntime}
-              collapsed={artifactCollapsed}
-              onToggle={() => dispatchWorkspaceToggleEvent()}
-              togglePlacement='right'
-              workspacePath={workspacePath}
-              isTemporaryWorkspace={isTemporaryWorkspace}
+          {isWorkspacePanePresentation && workspaceEnabled && !isMobile && (
+            <div
+              data-testid='artifact-pane'
+              className='relative flex flex-col min-w-0 layout-sider'
+              style={{
+                background: 'var(--bg-artifact-surface)',
+                flexGrow: artifactCollapsed ? 0 : 1,
+                flexShrink: 0,
+                flexBasis: artifactCollapsed ? '0px' : 0,
+                width: artifactCollapsed ? '0px' : undefined,
+                overflow: 'hidden',
+                borderLeft: artifactCollapsed ? 'none' : '1px solid var(--bg-3)',
+              }}
             >
-              {props.siderTitle}
-            </WorkspacePanelHeader>
-            <div className='flex-1 min-h-0 overflow-hidden'>{props.sider}</div>
-          </div>
-        )}
-        {!isWorkspacePanePresentation && artifactVisible && (
-          <div
-            data-testid='artifact-pane'
-            className='relative flex flex-col min-w-0 layout-sider'
-            style={{
-              background: 'var(--bg-artifact-surface)',
-              flexGrow: 1,
-              flexShrink: 1,
-              flexBasis: 0,
-              overflow: 'hidden',
-              borderLeft: '1px solid var(--bg-3)',
-            }}
-          >
-            {createArtifactDragHandle({ className: 'absolute left-0 top-0 bottom-0 z-30', linePlacement: 'start' })}
-            {/*
+              {!artifactCollapsed &&
+                createArtifactDragHandle({ className: 'absolute left-0 top-0 bottom-0 z-30', linePlacement: 'start' })}
+              <WorkspacePanelHeader
+                showToggle={!isMacRuntime && !isWindowsRuntime}
+                collapsed={artifactCollapsed}
+                onToggle={() => dispatchWorkspaceToggleEvent()}
+                togglePlacement='right'
+                workspacePath={workspacePath}
+                isTemporaryWorkspace={isTemporaryWorkspace}
+              >
+                {props.siderTitle}
+              </WorkspacePanelHeader>
+              <div className='flex-1 min-h-0 overflow-hidden'>{props.sider}</div>
+            </div>
+          )}
+          {!isWorkspacePanePresentation && artifactVisible && (
+            <div
+              data-testid='artifact-pane'
+              className='relative flex flex-col min-w-0 layout-sider'
+              style={{
+                background: 'var(--bg-artifact-surface)',
+                flexGrow: 1,
+                flexShrink: 1,
+                flexBasis: 0,
+                overflow: 'hidden',
+                borderLeft: '1px solid var(--bg-3)',
+              }}
+            >
+              {createArtifactDragHandle({ className: 'absolute left-0 top-0 bottom-0 z-30', linePlacement: 'start' })}
+              {/*
               C-01: the pane carries both the workspace file tree and the artifact preview.
               Both stay mounted and are toggled with `hidden`, so switching tabs neither
               discards preview state nor remounts the tree. The tree itself is portalled in
               by the single Workspace instance (see filesPaneContext) rather than built here,
               which is why this is an empty container.
             */}
-            <div className='shrink-0 flex items-center justify-between gap-8px px-10px pt-8px'>
-              <div className='flex items-center gap-2px' role='tablist'>
-              {PANE_TAB_ORDER.filter((view) => view !== 'context' || backend === 'aionrs').map((view) => (
-                <Tooltip key={view} content={t(PANE_TAB_LABEL_KEYS[view])} position='bottom'>
-                  <Button
-                    type='text'
-                    size='small'
-                    role='tab'
-                    aria-selected={artifactPaneView === view}
-                    aria-label={t(PANE_TAB_LABEL_KEYS[view])}
-                    data-testid={`artifact-pane-tab-${view}`}
-                    // Active state is the primary orange, with NO fill. A cream pill here added a
-                    // fourth shade to a stack that already had too many; colour alone carries it,
-                    // matching how the file tab below signals active with an orange rule.
-                    className={classNames(
-                      '!rounded-6px !bg-transparent',
-                      artifactPaneView === view ? '!text-primary' : '!text-t-secondary'
-                    )}
-                    icon={PANE_TAB_ICONS[view]}
-                    onClick={() => setArtifactPaneView(view)}
-                  />
-                </Tooltip>
-              ))}
-              </div>
-              {/*
+              <div className='shrink-0 flex items-center justify-between gap-8px px-10px pt-8px'>
+                <div className='flex items-center gap-2px' role='tablist'>
+                  {PANE_TAB_ORDER.filter((view) => view !== 'context' || backend === 'aionrs').map((view) => (
+                    <Tooltip key={view} content={t(PANE_TAB_LABEL_KEYS[view])} position='bottom'>
+                      <Button
+                        type='text'
+                        size='small'
+                        role='tab'
+                        aria-selected={artifactPaneView === view}
+                        aria-label={t(PANE_TAB_LABEL_KEYS[view])}
+                        data-testid={`artifact-pane-tab-${view}`}
+                        // Active state is the primary orange, with NO fill. A cream pill here added a
+                        // fourth shade to a stack that already had too many; colour alone carries it,
+                        // matching how the file tab below signals active with an orange rule.
+                        className={classNames(
+                          '!rounded-6px !bg-transparent',
+                          artifactPaneView === view ? '!text-primary' : '!text-t-secondary'
+                        )}
+                        icon={PANE_TAB_ICONS[view]}
+                        onClick={() => setArtifactPaneView(view)}
+                      />
+                    </Tooltip>
+                  ))}
+                </div>
+                {/*
                 Same VS Code / Terminal / File Explorer control the `panel` presentation gets via
                 WorkspacePanelHeader. It was missing here only because this pane has no header —
                 the component already existed.
               */}
-              <div className='flex items-center gap-4px'>
-                {workspacePath && <WorkspaceOpenButton workspacePath={workspacePath} isTemporary={isTemporaryWorkspace} />}
-                {/*
+                <div className='flex items-center gap-4px'>
+                  {workspacePath && (
+                    <WorkspaceOpenButton workspacePath={workspacePath} isTemporary={isTemporaryWorkspace} />
+                  )}
+                  {/*
                   A close affordance on the panel itself. The header toggle can also close it, but
                   it lives out in the chat header — far from the thing it acts on, and easy to miss.
                   Uses the unguarded collapse: this is an explicit user action, unlike
                   PreviewPanel's request, which is only honoured while Preview is visible.
                 */}
-                <Button
-                  type='text'
-                  size='small'
-                  aria-label={t('common.chrome.collapseProjectPanel')}
-                  data-testid='artifact-pane-collapse'
-                  className='!rounded-6px !text-t-secondary hover:!text-t-primary'
-                  icon={<ExpandRight size={15} />}
-                  onClick={collapseArtifactPane}
-                />
+                  <Button
+                    type='text'
+                    size='small'
+                    aria-label={t('common.chrome.collapseProjectPanel')}
+                    data-testid='artifact-pane-collapse'
+                    className='!rounded-6px !text-t-secondary hover:!text-t-primary'
+                    icon={<ExpandRight size={15} />}
+                    onClick={collapseArtifactPane}
+                  />
+                </div>
               </div>
-            </div>
-            <div
-              className='flex-1 min-h-0 overflow-hidden'
-              data-testid='artifact-pane-files'
-              hidden={artifactPaneView !== 'files'}
-            >
-              <div ref={setFilesPaneEl} className='workspace-pane-section h-full overflow-hidden' />
-            </div>
-            <div
-              className='flex-1 min-h-0 overflow-hidden'
-              data-testid='artifact-pane-changes'
-              hidden={artifactPaneView !== 'changes'}
-            >
-              <div ref={setChangesPaneEl} className='workspace-pane-section h-full overflow-hidden' />
-            </div>
-            <div
-              className='flex-1 min-h-0 overflow-hidden'
-              data-testid='artifact-pane-context'
-              hidden={artifactPaneView !== 'context'}
-            >
-              <div ref={setContextPaneEl} className='workspace-pane-section h-full overflow-hidden' />
-            </div>
-            <div className='flex-1 min-h-0 overflow-hidden' hidden={artifactPaneView !== 'preview'}>
-              <PreviewPanel fullBleed onRequestCollapse={collapseArtifactPaneFromPreview} />
-            </div>
-            {/*
+              <div
+                className='flex-1 min-h-0 overflow-hidden'
+                data-testid='artifact-pane-files'
+                hidden={artifactPaneView !== 'files'}
+              >
+                <div ref={setFilesPaneEl} className='workspace-pane-section h-full overflow-hidden' />
+              </div>
+              <div
+                className='flex-1 min-h-0 overflow-hidden'
+                data-testid='artifact-pane-changes'
+                hidden={artifactPaneView !== 'changes'}
+              >
+                <div ref={setChangesPaneEl} className='workspace-pane-section h-full overflow-hidden' />
+              </div>
+              <div
+                className='flex-1 min-h-0 overflow-hidden'
+                data-testid='artifact-pane-context'
+                hidden={artifactPaneView !== 'context'}
+              >
+                <div ref={setContextPaneEl} className='workspace-pane-section h-full overflow-hidden' />
+              </div>
+              <div className='flex-1 min-h-0 overflow-hidden' hidden={artifactPaneView !== 'preview'}>
+                <PreviewPanel fullBleed onRequestCollapse={collapseArtifactPaneFromPreview} />
+              </div>
+              {/*
               Mounted only once the user first opens it, then kept alive so navigation history and
               any session survive tab switches. A persistent partition keeps logins across restarts
               and separate from the extension webviews.
             */}
-            {browserEverOpened && (
-              <div
-                className='flex-1 min-h-0 overflow-hidden'
-                data-testid='artifact-pane-browser'
-                hidden={artifactPaneView !== 'browser'}
-              >
-                <WebviewHost
-                  url={BROWSER_START_URL}
-                  id='workspace-pane-browser'
-                  showNavBar
-                  partition='persist:workspace-pane-browser'
-                  className='h-full'
-                />
-              </div>
-            )}
-          </div>
-        )}
+              {browserEverOpened && (
+                <div
+                  className='flex-1 min-h-0 overflow-hidden'
+                  data-testid='artifact-pane-browser'
+                  hidden={artifactPaneView !== 'browser'}
+                >
+                  <WebviewHost
+                    url={BROWSER_START_URL}
+                    id='workspace-pane-browser'
+                    showNavBar
+                    partition='persist:workspace-pane-browser'
+                    className='h-full'
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* Mobile artifact overlay: backdrop + fixed drawer + floating collapse handle */}
-        {workspaceEnabled && layout?.isMobile && (
-          <MobileWorkspaceOverlay
-            rightSiderCollapsed={artifactCollapsed}
-            setRightSiderCollapsed={setArtifactCollapsed}
-            workspaceWidthPx={mobileWorkspaceWidthPx}
-            mobileWorkspaceHandleRight={mobileWorkspaceHandleRight}
-            siderTitle={props.siderTitle}
-            sider={
-              isWorkspacePanePresentation ? (
-                props.sider
-              ) : (
-                <PreviewPanel fullBleed onRequestCollapse={collapseArtifactPane} />
-              )
-            }
-            workspacePath={workspacePath}
-            isTemporaryWorkspace={isTemporaryWorkspace}
-          />
-        )}
+          {/* Mobile artifact overlay: backdrop + fixed drawer + floating collapse handle */}
+          {workspaceEnabled && layout?.isMobile && (
+            <MobileWorkspaceOverlay
+              rightSiderCollapsed={artifactCollapsed}
+              setRightSiderCollapsed={setArtifactCollapsed}
+              workspaceWidthPx={mobileWorkspaceWidthPx}
+              mobileWorkspaceHandleRight={mobileWorkspaceHandleRight}
+              siderTitle={props.siderTitle}
+              sider={
+                isWorkspacePanePresentation ? (
+                  props.sider
+                ) : (
+                  <PreviewPanel fullBleed onRequestCollapse={collapseArtifactPane} />
+                )
+              }
+              workspacePath={workspacePath}
+              isTemporaryWorkspace={isTemporaryWorkspace}
+            />
+          )}
 
-        {/* Desktop expand button when the artifact pane is collapsed */}
-        {!isMacRuntime && !isWindowsRuntime && workspaceEnabled && artifactCollapsed && !layout?.isMobile && (
-          <DesktopWorkspaceToggle />
-        )}
-      </div>
+          {/* Desktop expand button when the artifact pane is collapsed */}
+          {!isMacRuntime && !isWindowsRuntime && workspaceEnabled && artifactCollapsed && !layout?.isMobile && (
+            <DesktopWorkspaceToggle />
+          )}
+        </div>
       </WorkspaceFilesPaneProvider>
     </ArcoLayout>
   );

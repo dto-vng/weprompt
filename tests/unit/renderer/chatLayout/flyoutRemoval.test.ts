@@ -37,7 +37,9 @@ describe('project flyout is removed where the pane replaces it', () => {
     // then went looking for Context and found nothing — the command does everything the panel
     // does, but only if you already know it exists. Restored as a tab.
     expect(CHAT_LAYOUT).toMatch(/artifact-pane-context/);
-    expect(CHAT_LAYOUT).toMatch(/const PANE_TAB_ORDER = \['files', 'changes', 'context', 'preview', 'browser'\] as const;/);
+    expect(CHAT_LAYOUT).toMatch(
+      /const PANE_TAB_ORDER = \['files', 'changes', 'context', 'preview', 'browser'\] as const;/
+    );
   });
 
   it('hides the Context tab on backends that have no context panel', () => {

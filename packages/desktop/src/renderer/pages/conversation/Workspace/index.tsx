@@ -205,8 +205,7 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   // alone, which meant the pane's Changes tab could never have had anything to show —
   // and the refresh effect below is gated on the same flag, so it would not have
   // refreshed for the pane either.
-  const isChangesPanelActive =
-    (projectMenuOpen && activeProjectPanel === 'changes') || paneActiveView === 'changes';
+  const isChangesPanelActive = (projectMenuOpen && activeProjectPanel === 'changes') || paneActiveView === 'changes';
 
   // Get workspace display name using shared utility
   const workspaceDisplayName = useMemo(

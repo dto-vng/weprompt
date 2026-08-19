@@ -3,8 +3,14 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SRC = resolve(__dirname, '../../../../packages/desktop/src/renderer');
-const TABS_CSS = readFileSync(resolve(SRC, 'pages/conversation/Preview/components/PreviewPanel/PreviewTabs.module.css'), 'utf8');
-const TOOLBAR = readFileSync(resolve(SRC, 'pages/conversation/Preview/components/PreviewPanel/PreviewToolbar.tsx'), 'utf8');
+const TABS_CSS = readFileSync(
+  resolve(SRC, 'pages/conversation/Preview/components/PreviewPanel/PreviewTabs.module.css'),
+  'utf8'
+);
+const TOOLBAR = readFileSync(
+  resolve(SRC, 'pages/conversation/Preview/components/PreviewPanel/PreviewToolbar.tsx'),
+  'utf8'
+);
 const CHAT_LAYOUT = readFileSync(resolve(SRC, 'pages/conversation/components/ChatLayout/index.tsx'), 'utf8');
 
 // C-23 — the pane stacked four surfaces: a near-white tab row, a cream file-tab strip, a cream

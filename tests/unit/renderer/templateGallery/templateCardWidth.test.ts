@@ -3,7 +3,10 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SRC = readFileSync(
-  resolve(__dirname, '../../../../packages/desktop/src/renderer/components/chat/TemplateGallery/TemplateGalleryColumns.tsx'),
+  resolve(
+    __dirname,
+    '../../../../packages/desktop/src/renderer/components/chat/TemplateGallery/TemplateGalleryColumns.tsx'
+  ),
   'utf8'
 );
 
@@ -43,7 +46,10 @@ describe('template card width is independent of its name', () => {
 describe('template install button lays its icon out with a gap', () => {
   it('makes the Arco button a flex container', () => {
     const src = readFileSync(
-      resolve(__dirname, '../../../../packages/desktop/src/renderer/components/chat/TemplateGallery/TemplateMessageCard.tsx'),
+      resolve(
+        __dirname,
+        '../../../../packages/desktop/src/renderer/components/chat/TemplateGallery/TemplateMessageCard.tsx'
+      ),
       'utf8'
     );
     expect(src).toMatch(/className='w-fit flex items-center gap-8px'/);

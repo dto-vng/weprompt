@@ -73,7 +73,9 @@ describe('C-01 files pane wiring', () => {
     // VS Code / Terminal / File Explorer. WorkspaceOpenButton already existed and is rendered
     // by WorkspacePanelHeader, which only mounts in the `panel` presentation — so this pane
     // was missing it purely because it has no header.
-    expect(CHAT_LAYOUT).toMatch(/<WorkspaceOpenButton workspacePath=\{workspacePath\} isTemporary=\{isTemporaryWorkspace\} \/>/);
+    expect(CHAT_LAYOUT).toMatch(
+      /<WorkspaceOpenButton workspacePath=\{workspacePath\} isTemporary=\{isTemporaryWorkspace\} \/>/
+    );
   });
 
   it('provides the pane container to the Workspace', () => {
@@ -88,7 +90,9 @@ describe('C-01 files pane wiring', () => {
     // This gate read flyout state alone, so a pane tab could never have had content — and
     // the changes refresh effect is gated on the same flag. Verified live: the pane's
     // Changes tab listed 2 real git changes.
-    expect(WORKSPACE).toMatch(/\(projectMenuOpen && activeProjectPanel === 'changes'\) \|\| paneActiveView === 'changes'/);
+    expect(WORKSPACE).toMatch(
+      /\(projectMenuOpen && activeProjectPanel === 'changes'\) \|\| paneActiveView === 'changes'/
+    );
     expect(WORKSPACE).toMatch(/createPortal\(changesPanel, paneContainers\.changes\)/);
   });
 
