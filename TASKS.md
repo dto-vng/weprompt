@@ -69,6 +69,14 @@
   - Same defect class as BUG-046, unfixed and out of that commit's scope: `payloadSchemas.ts:228, 249-250, 562, 571, 595, 608-643`, `PresentationRunService.ts:205`, `PresentationSourceGrantService.ts:302`, `presentation-template/bridge.ts:444`, `preload/main.ts:46`.
   - Each is a candidate for the same silent failure. Reachability must be established the way EPIC-002's was — by running it — because a green suite is exactly what hid BUG-046.
 
+- [ ] **[BUG-054][P3][Test infrastructure] A vitest worker teardown race reds the push gate with zero failing tests** — found 2026-08-19 by a `just push` gate run
+  - Symptom: `bun run test` exits **1** while reporting **8368 passed, 19 skipped, 0 failed**. The failure is an unhandled rejection outside the assertions: `EnvironmentTeardownError: [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending`, attributed to `tests/unit/renderer/team/TeamSiderSection.dom.test.tsx`.
+  - **A new member of the gate-poisoner family, and the first that is not a test.** BUG-046's members are timing-sensitive tests; this one is the harness closing a worker's RPC channel while a console log is still in flight. Nothing asserts, nothing fails, and the gate still blocks the push.
+  - Shape matches the family: it did **not** reproduce on an immediate full re-run (exit 0, same commit, same tree), and the file passes 5/5 in isolation. It is intermittent, not a defect in the file it names — the message itself says the error "doesn't mean the error was thrown inside the file itself".
+  - **Load is a poor explanation here.** It fired at 1-minute load **1.85**, the quietest this host reached all day, where every other poisoner sighting was at 11-25. That points at a genuine race in vitest's teardown rather than at contention.
+  - **Reading the run by grepping for `Tests`/`FAIL` misses it entirely** — the `Errors 1 error` line matches neither, so a filtered read reports green on a run that exited 1. Judge these runs by exit code. This already caused one false "green" claim before the gate caught the same run.
+  - Not reproduced deliberately, so no fix is proposed. If it recurs, the lead is whichever test logs to the console last before that worker tears down.
+
 - [x] **[BUG-053][P2][Test infrastructure] `bun run lint:fix` breaks the build on a clean tree** — found 2026-08-18, **fixed 2026-08-19**
   - Reproduction: `git status` clean, then `bun run lint:fix`. It rewrites **9 files nobody touched** and `bunx tsc --noEmit` then reports **6 errors**.
   - Cause: oxlint's `prefer-set-has` autofix converts array literals to `new Set([...])` **without updating the `readonly T[]` type annotation**, in `presentationRunJournal.ts:113`, `presentationRunStateMachine.ts:1076` and `presentationRunStore.ts:425`. Each yields a `TS2740` at the declaration and a `TS2339` on the later `.has(...)`.
