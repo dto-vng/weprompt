@@ -512,10 +512,15 @@ describe('AppOperationsModelCard', () => {
       expect(within(actions).getAllByRole('button')).toHaveLength(1);
     });
 
-    it('describes the compaction fallback truthfully as a rules-based summary, not trimming', () => {
+    it('describes the fallback truthfully as rule-based, and never as trimming', () => {
       const impact = enUsSettings.appOperationsModel.setupRequiredImpact;
 
-      expect(impact).toMatch(/rules-based/i);
+      // The design's own wording said compaction "falls back to trimming". It does not —
+      // it builds a summary from rules. The guard survives the plain-language rewrite by
+      // pinning the claim rather than the phrasing: it must still say a rule does the work
+      // in place of a model, and must never say anything is trimmed.
+      expect(impact).toMatch(/rule/i);
+      expect(impact).toMatch(/instead of a model|not a model/i);
       expect(impact).not.toMatch(/trim/i);
     });
 
