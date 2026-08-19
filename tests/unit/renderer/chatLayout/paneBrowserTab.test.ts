@@ -16,11 +16,11 @@ const CONTEXT = readFileSync(resolve(SRC, 'pages/conversation/Workspace/filesPan
 // drive the component's submit path, which is a harness limit rather than evidence of a defect.
 describe('artifact pane browser tab', () => {
   it('adds browser to the pane view union', () => {
-    expect(CONTEXT).toMatch(/'files' \| 'changes' \| 'preview' \| 'browser'/);
+    expect(CONTEXT).toMatch(/'files' \| 'changes' \| 'context' \| 'preview' \| 'browser'/);
   });
 
   it('renders a fourth tab with a translated label', () => {
-    expect(CHAT_LAYOUT).toMatch(/\['files', 'changes', 'preview', 'browser'\] as const/);
+    expect(CHAT_LAYOUT).toMatch(/PANE_TAB_ORDER = \['files', 'changes', 'context', 'preview', 'browser'\] as const/);
     expect(CHAT_LAYOUT).toMatch(/browser: 'conversation\.workspace\.changes\.browserTab'/);
   });
 

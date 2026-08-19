@@ -32,7 +32,7 @@ describe('C-01 files pane wiring', () => {
     // The testid is built from a template literal, so assert the template and the two
     // values it can take rather than the resolved strings.
     expect(CHAT_LAYOUT).toMatch(/artifact-pane-tab-\$\{view\}/);
-    expect(CHAT_LAYOUT).toMatch(/\['files', 'changes', 'preview', 'browser'\] as const/);
+    expect(CHAT_LAYOUT).toMatch(/PANE_TAB_ORDER = \['files', 'changes', 'context', 'preview', 'browser'\] as const/);
     // `hidden` keeps both mounted; unmounting would discard preview state on every toggle.
     expect(CHAT_LAYOUT).toMatch(/hidden=\{artifactPaneView !== 'files'\}/);
     expect(CHAT_LAYOUT).toMatch(/hidden=\{artifactPaneView !== 'changes'\}/);

@@ -25,6 +25,6 @@ describe('workspace section scroll behaves in the artifact pane', () => {
 
   it('marks the pane portal containers so that override applies', () => {
     const marked = CHAT_LAYOUT.match(/workspace-pane-section/g)?.length ?? 0;
-    expect(marked).toBe(2); // files + changes slots
+    expect(marked).toBe(3); // files + changes + context slots
   });
 });
