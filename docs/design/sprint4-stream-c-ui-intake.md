@@ -567,6 +567,23 @@ live verification in the running app.
   render, and the Files tab lists 9 rows — proving the portal survived the removal.
 
 
+### C-26 — The pane's left edge is too thick and crowds the Context panel
+
+- **Surface:** the right pane's left edge, reported against the Context tab.
+- **Measured:** two rules in the same colour stacked on top of each other — the pane's own
+  `border-left: 1px rgb(229,220,201)`, plus the split handle painting a **2px** bar in
+  `rgb(229,220,201)` at `opacity-90`, inside a 12px `absolute left-0` strip that overlaps the
+  content. Together they read as a single ~3px rule pressed against the panel.
+- **Fixed:** the grip is transparent at rest and appears only on hover/active — what a splitter
+  should do. Its hover colour is now the primary accent rather than the navy `--aou-6`, which C-22
+  had already removed from this same pane.
+- **Verified:** handle background `rgba(0,0,0,0)` at rest, leaving only the 1px border; screenshot
+  confirms a single hairline with the Context content clear of it.
+- **Shared component, deliberately.** `useResizableSplit` also drives the main sidebar's handle, so
+  both splitters now behave the same way. That is the intended outcome rather than a side effect —
+  the alternative would be two resize affordances that look different for no reason.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |
