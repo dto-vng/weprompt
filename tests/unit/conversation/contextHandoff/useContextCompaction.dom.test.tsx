@@ -763,65 +763,72 @@ describe('automatic context compaction policy', () => {
     expect(runCompaction).not.toHaveBeenCalled();
   });
 
-  it.each([undefined, 'left'] as const)(
-    'starts invisible compaction for correlated assistant text with position %s',
-    async (position) => {
-      let completedListener: ((event: IConversationTurnCompletedEvent) => void) | undefined;
-      let responseListener: ((event: IResponseMessage) => void) | undefined;
-      const thresholdConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
-        ...conversation,
-        extra: {
-          ...conversation.extra,
-          context_handoff: {
-            ...conversation.extra.context_handoff,
-            turns_since_compaction: 7,
-          },
+  // The third case is the shape the running backend actually sends: `status: finished`
+  // with no top-level `state`, the settled condition described only in `runtime`. It was
+  // previously pinned as "does not count", which made auto-compaction unreachable on that
+  // backend — the counter never advanced, so neither the 8-turn rule nor budget escalation
+  // could fire. It counts now, and still only with stream evidence of assistant text, so
+  // the error and stopped cases below stay excluded.
+  it.each([
+    { label: 'position undefined, explicit ai_waiting_input', position: undefined, state: 'ai_waiting_input' },
+    { label: 'position left, explicit ai_waiting_input', position: 'left' as const, state: 'ai_waiting_input' },
+    { label: 'no top-level state, settled runtime', position: 'left' as const, state: undefined },
+  ])('starts invisible compaction for correlated assistant text — $label', async ({ position, state }) => {
+    let completedListener: ((event: IConversationTurnCompletedEvent) => void) | undefined;
+    let responseListener: ((event: IResponseMessage) => void) | undefined;
+    const thresholdConversation: Extract<TChatConversation, { type: 'aionrs' }> = {
+      ...conversation,
+      extra: {
+        ...conversation.extra,
+        context_handoff: {
+          ...conversation.extra.context_handoff,
+          turns_since_compaction: 7,
         },
-      };
-      const runCompaction = vi.fn(async () => ({
-        fileName: 'Context.md',
-        filePath: '/workspace/Context.md',
-        markdown: '# Context',
-        snapshot,
-        source: 'llm' as const,
-        throughTurnId: 'turn-1',
-      }));
-      const dependencies = {
-        subscribeTurnCompleted: vi.fn((next: (event: IConversationTurnCompletedEvent) => void) => {
-          completedListener = next;
-          return vi.fn();
-        }),
-        subscribeResponseStream: vi.fn((next: (event: IResponseMessage) => void) => {
-          responseListener = next;
-          return vi.fn();
-        }),
-        getConversation: vi.fn(async () => thresholdConversation),
-        updateConversation: vi.fn(async () => true),
-        runCompaction,
-        cancelAppOperation: vi.fn(async () => {}),
-        now: () => 100,
-      };
+      },
+    };
+    const runCompaction = vi.fn(async () => ({
+      fileName: 'Context.md',
+      filePath: '/workspace/Context.md',
+      markdown: '# Context',
+      snapshot,
+      source: 'llm' as const,
+      throughTurnId: 'turn-1',
+    }));
+    const dependencies = {
+      subscribeTurnCompleted: vi.fn((next: (event: IConversationTurnCompletedEvent) => void) => {
+        completedListener = next;
+        return vi.fn();
+      }),
+      subscribeResponseStream: vi.fn((next: (event: IResponseMessage) => void) => {
+        responseListener = next;
+        return vi.fn();
+      }),
+      getConversation: vi.fn(async () => thresholdConversation),
+      updateConversation: vi.fn(async () => true),
+      runCompaction,
+      cancelAppOperation: vi.fn(async () => {}),
+      now: () => 100,
+    };
 
-      renderHook(() =>
-        useContextCompaction({
-          conversationId: 'conversation-1',
-          workspace: '/workspace',
-          enabled: true,
-          dependencies,
-        })
-      );
+    renderHook(() =>
+      useContextCompaction({
+        conversationId: 'conversation-1',
+        workspace: '/workspace',
+        enabled: true,
+        dependencies,
+      })
+    );
 
-      act(() => {
-        responseListener?.(responseMessage('turn-1', position ? { position } : {}));
-        responseListener?.(responseMessage('turn-1', { type: 'finish', data: {} }));
-        completedListener?.(sparseCompletedTurn('turn-1', { state: 'ai_waiting_input' }));
-      });
+    act(() => {
+      responseListener?.(responseMessage('turn-1', position ? { position } : {}));
+      responseListener?.(responseMessage('turn-1', { type: 'finish', data: {} }));
+      completedListener?.(sparseCompletedTurn('turn-1', state === undefined ? {} : { state }));
+    });
 
-      await waitFor(() =>
-        expect(runCompaction).toHaveBeenCalledWith(expect.objectContaining({ trigger: 'auto', targetTurnId: 'turn-1' }))
-      );
-    }
-  );
+    await waitFor(() =>
+      expect(runCompaction).toHaveBeenCalledWith(expect.objectContaining({ trigger: 'auto', targetTurnId: 'turn-1' }))
+    );
+  });
 
   it.each([
     {
@@ -869,12 +876,6 @@ describe('automatic context compaction policy', () => {
       content: responseMessage('turn-rejected', { position: 'left' }),
       finish: responseMessage('turn-rejected', { type: 'finish', data: {} }),
       completion: sparseCompletedTurn('turn-rejected', { state: 'stopped' }),
-    },
-    {
-      label: 'sparse legacy completion',
-      content: responseMessage('turn-rejected', { position: 'left' }),
-      finish: responseMessage('turn-rejected', { type: 'finish', data: {} }),
-      completion: sparseCompletedTurn('turn-rejected'),
     },
   ])('does not count $label', async ({ content, finish, completion }) => {
     let completedListener: ((event: IConversationTurnCompletedEvent) => void) | undefined;

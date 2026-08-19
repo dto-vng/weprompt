@@ -665,6 +665,31 @@ describe('configured model list', () => {
   });
 });
 
+describe('excludeFromPrimary keeps media generators out of text model lists', () => {
+  const provider = { id: 'p1', name: 'p', platform: 'openai', models: [] } as unknown as IProvider;
+
+  // A video generator cannot serve a text turn, so offering one as a primary or
+  // app-operations model produces a request that always fails — and for context
+  // compaction it fails silently, falling back to the rules summary with nothing on
+  // screen explaining why. Image generators were already excluded; video ones were not.
+  it.each(['bytedance/seedance-2.0', 'bytedance/seedance-2.0-fast', 'google/gemini-3-pro-image', 'dall-e-3'])(
+    'excludes the media generator %s',
+    (modelName) => {
+      expect(hasSpecificModelCapability(provider, modelName, 'excludeFromPrimary')).toBe(true);
+    }
+  );
+
+  // The exclusion names specific generators rather than matching /video/, which would
+  // also catch video-understanding models — those read video and reply with text, so
+  // they belong in the list.
+  it.each(['llava-video-7b', 'kimi-k2.6', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m3', 'openai/gpt-5'])(
+    'still offers the text-capable model %s',
+    (modelName) => {
+      expect(hasSpecificModelCapability(provider, modelName, 'excludeFromPrimary')).not.toBe(true);
+    }
+  );
+});
+
 describe('name-based capability inference (BUG-045 fail-open guard)', () => {
   const provider = { id: 'p1', name: 'p', platform: 'openai', models: [] } as unknown as IProvider;
 

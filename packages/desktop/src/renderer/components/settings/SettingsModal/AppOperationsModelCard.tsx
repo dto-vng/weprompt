@@ -36,6 +36,7 @@ import type {
   AppOperationsModelSetting,
 } from '@/common/types/appOperations';
 import AionSelect from '@/renderer/components/base/AionSelect';
+import { hasSpecificModelCapability } from '@/common/utils/modelCapabilities';
 import { getProviderLogo } from '@/renderer/utils/model/modelPlatforms';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -324,6 +325,12 @@ export default function AppOperationsModelCard({
         if (provider.enabled === false || !providerHasAuth(provider) || !providerSupportsText(provider)) return [];
         return provider.models.flatMap((modelId) => {
           if (provider.model_enabled?.[modelId] === false) return [];
+          // Every other model picker in the app filters on this — useModelProviderList,
+          // the guid model list, the Studio storyboard planner. This one did not, so it
+          // offered image and video models for a text-only task. Picking one produced no
+          // error: compaction failed on every run and fell back to the rules summary,
+          // with nothing on screen saying why.
+          if (hasSpecificModelCapability(provider, modelId, 'excludeFromPrimary') === true) return [];
           return [
             {
               value: modelOptionValue(provider.id, modelId),
