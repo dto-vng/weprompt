@@ -137,7 +137,11 @@
   --aou-4: #2e3f82;
   --aou-5: #374ea2;
   --aou-6: #4e63c0;
-  --aou-7: #6e82d6;
+  /* #6e82d6 gave only 4.14:1 on --aou-2, under WCAG AA's 4.5 for small text, and every
+     consumer of --aou-7 pairs it with --aou-2: the app-operations pill and tag, the
+     Checking status line, and the slash-command highlight. Lightened to 4.61:1 — the
+     smallest step that clears AA with margin while staying distinct from --aou-8. */
+  --aou-7: #788bd9;
   --aou-8: #8fa0e0;
   --aou-9: #b8c2ee;
   --aou-10: #e8ecfb;
