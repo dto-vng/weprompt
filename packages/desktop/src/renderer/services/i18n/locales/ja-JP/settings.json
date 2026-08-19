@@ -882,7 +882,10 @@
     "healthChecked": "{{total}} 件中 {{checked}} 件チェック済み",
     "healthNotChecked": "未チェック",
     "healthFailing": "{{count}} 件失敗",
-    "healthFailing_other": "{{count}} 件失敗"
+    "healthFailing_other": "{{count}} 件失敗",
+    "deleteConfirmTitle": "プロバイダーを削除",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "プロバイダーと、その API キーおよび設定済みのすべてのモデルを削除します。既存のチャットは開始時のモデルをそのまま使用します。"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "設定済み · 推論を利用できません。",

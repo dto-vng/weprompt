@@ -900,7 +900,10 @@
     "healthFailing": "{{count}} com falha",
     "healthFailing_one": "{{count}} com falha",
     "healthFailing_many": "{{count}} com falha",
-    "healthFailing_other": "{{count}} com falha"
+    "healthFailing_other": "{{count}} com falha",
+    "deleteConfirmTitle": "Excluir provedor",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "Exclui o provedor, suas chaves de API e todos os modelos que ele configura. As conversas existentes mantêm o modelo com que foram iniciadas."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Configurado · inferência indisponível.",

@@ -890,7 +890,10 @@
     "healthFailing": "{{count}} con errores",
     "healthFailing_one": "{{count}} con error",
     "healthFailing_many": "{{count}} con errores",
-    "healthFailing_other": "{{count}} con errores"
+    "healthFailing_other": "{{count}} con errores",
+    "deleteConfirmTitle": "Eliminar proveedor",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "Elimina el proveedor, sus claves de API y todos los modelos que configura. Los chats existentes conservan el modelo con el que se iniciaron."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Configurado · inferencia no disponible.",

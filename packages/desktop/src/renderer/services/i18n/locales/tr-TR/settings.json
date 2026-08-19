@@ -885,7 +885,10 @@
     "healthNotChecked": "Kontrol edilmedi",
     "healthFailing": "{{count}} başarısız",
     "healthFailing_one": "{{count}} başarısız",
-    "healthFailing_other": "{{count}} başarısız"
+    "healthFailing_other": "{{count}} başarısız",
+    "deleteConfirmTitle": "Sağlayıcıyı sil",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "Sağlayıcıyı, API anahtarlarını ve yapılandırdığı tüm modelleri siler. Mevcut sohbetler başlatıldıkları modeli korur."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Yapılandırıldı · çıkarım kullanılamıyor.",

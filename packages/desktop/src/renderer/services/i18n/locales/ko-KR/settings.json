@@ -882,7 +882,10 @@
     "healthChecked": "{{total}}개 중 {{checked}}개 확인됨",
     "healthNotChecked": "확인 안 됨",
     "healthFailing": "{{count}}개 실패",
-    "healthFailing_other": "{{count}}개 실패"
+    "healthFailing_other": "{{count}}개 실패",
+    "deleteConfirmTitle": "제공자 삭제",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "제공자와 해당 API 키 및 구성된 모든 모델을 삭제합니다. 기존 대화는 시작할 때 사용한 모델을 그대로 유지합니다."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "구성됨 · 추론을 사용할 수 없습니다.",

@@ -65,7 +65,7 @@ vi.mock('@icon-park/react', () => ({
   Info: () => <span>info</span>,
   LinkCloud: () => <span aria-hidden='true'>link</span>,
   Loading: () => <span aria-hidden='true'>loading</span>,
-  Minus: () => <span>remove-provider</span>,
+  MoreOne: () => <span>provider-more</span>,
   Plus: () => <span>add-model</span>,
   PreviewClose: () => <span aria-label='vision-disabled'>vision-disabled</span>,
   PreviewOpen: () => <span aria-hidden='true'>vision</span>,

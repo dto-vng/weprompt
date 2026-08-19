@@ -883,7 +883,10 @@
     "healthFailing_one": "{{count}} с ошибкой",
     "healthFailing_few": "{{count}} с ошибками",
     "healthFailing_many": "{{count}} с ошибками",
-    "healthFailing_other": "{{count}} с ошибками"
+    "healthFailing_other": "{{count}} с ошибками",
+    "deleteConfirmTitle": "Удалить провайдера",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "Удаляет провайдера, его API-ключи и все настроенные им модели. Существующие чаты сохранят модель, с которой были начаты."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Настроено · инференс недоступен.",

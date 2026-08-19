@@ -897,7 +897,10 @@
     "healthNotChecked": "Not checked",
     "healthFailing": "{{count}} failing",
     "healthFailing_one": "{{count}} failing",
-    "healthFailing_other": "{{count}} failing"
+    "healthFailing_other": "{{count}} failing",
+    "deleteConfirmTitle": "Delete provider",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "Deletes the provider, its API keys and every model it configures. Existing chats keep the model they were started with."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Configured · inference unavailable.",

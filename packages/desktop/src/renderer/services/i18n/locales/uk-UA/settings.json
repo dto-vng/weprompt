@@ -842,7 +842,10 @@
     "healthFailing_one": "{{count}} з помилкою",
     "healthFailing_few": "{{count}} з помилками",
     "healthFailing_many": "{{count}} з помилками",
-    "healthFailing_other": "{{count}} з помилками"
+    "healthFailing_other": "{{count}} з помилками",
+    "deleteConfirmTitle": "Видалити провайдера",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "Видаляє провайдера, його API-ключі та всі налаштовані ним моделі. Наявні чати збережуть модель, з якою їх було розпочато."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Налаштовано · інференс недоступний.",

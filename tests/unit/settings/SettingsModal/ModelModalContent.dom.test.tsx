@@ -16,9 +16,11 @@ const {
   checkProviderHealthMock,
   createProviderMock,
   creativeStudioEnabled,
+  deleteProviderMock,
   listProvidersMock,
   messageErrorMock,
   messageSuccessMock,
+  modalConfirmMock,
   providersQueryData,
   updateProviderMock,
 } = vi.hoisted(() => ({
@@ -39,9 +41,11 @@ const {
   checkProviderHealthMock: vi.fn(),
   createProviderMock: vi.fn(),
   creativeStudioEnabled: { current: true },
+  deleteProviderMock: vi.fn(),
   listProvidersMock: vi.fn(),
   messageErrorMock: vi.fn(),
   messageSuccessMock: vi.fn(),
+  modalConfirmMock: vi.fn(),
   providersQueryData: {
     current: undefined as IProvider[] | undefined,
   },
@@ -69,7 +73,7 @@ vi.mock('@/common', () => ({
     },
     mode: {
       createProvider: { invoke: createProviderMock },
-      deleteProvider: { invoke: vi.fn() },
+      deleteProvider: { invoke: deleteProviderMock },
       listProviders: { invoke: listProvidersMock },
       updateProvider: { invoke: updateProviderMock },
     },
@@ -128,10 +132,22 @@ vi.mock('@/renderer/components/settings/SettingsModal/contents/ModelModalContent
   StudioMediaModelsSection: () => <section aria-label='Studio media models' />,
 }));
 
+// Arco's imperative Modal.confirm and Message mount through the legacy
+// ReactDOM.render that React 19 removed; the app restores them by importing
+// `@arco-design/web-react/es/_util/react-19-adapter` in main.tsx, which no test
+// loads. Both are stubbed here, matching tests/unit/pages/project/ProjectHeader.
+// Dropdown and Menu are left REAL so the overflow trigger is genuinely exercised
+// against the action cluster's click/mousedown stopPropagation.
 vi.mock('@arco-design/web-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@arco-design/web-react')>();
+  const ActualModal = actual.Modal;
   return {
     ...actual,
+    // Spreading a function yields a non-callable object, so Object.assign keeps
+    // <Modal> renderable while replacing only the imperative `confirm`.
+    Modal: Object.assign((props: React.ComponentProps<typeof ActualModal>) => <ActualModal {...props} />, ActualModal, {
+      confirm: (options: unknown) => modalConfirmMock(options),
+    }),
     Message: {
       ...actual.Message,
       error: messageErrorMock,
@@ -166,6 +182,14 @@ const clickModelHealthCheck = async (): Promise<void> => {
   });
 };
 
+/** The subset of Arco's Modal.confirm options this suite reads back. */
+type ConfirmOptions = {
+  title?: React.ReactNode;
+  content?: React.ReactNode;
+  okButtonProps?: { status?: string };
+  onOk?: () => void | Promise<void>;
+};
+
 const failedHealthResponse = (overrides: Record<string, unknown>) => ({
   provider_id: provider.id,
   platform: provider.platform,
@@ -184,6 +208,7 @@ describe('ModelModalContent', () => {
     checkProviderHealthMock.mockReset();
     createProviderMock.mockResolvedValue(undefined);
     creativeStudioEnabled.current = true;
+    deleteProviderMock.mockResolvedValue(undefined);
     listProvidersMock.mockResolvedValue([provider]);
     updateProviderMock.mockResolvedValue(undefined);
     providersQueryData.current = [];
@@ -446,6 +471,70 @@ describe('ModelModalContent', () => {
 
       await screen.findByTestId('provider-counts-provider-a');
       expect(screen.queryByTestId('provider-health-provider-a')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('provider row actions', () => {
+    /** The action cluster stops click and mousedown, so the trigger is worth exercising for real. */
+    const openProviderMenu = async (): Promise<void> => {
+      const more = await screen.findByRole('button', { name: 'common.more' });
+      await act(async () => {
+        more.click();
+      });
+    };
+
+    it('exposes add, edit and overflow as the three named provider actions, in that order', async () => {
+      providersQueryData.current = [provider];
+      render(<ModelModalContent />);
+
+      await screen.findByTestId('provider-counts-provider-a');
+      const cluster = screen.getByRole('button', { name: 'settings.addModel' }).parentElement;
+      expect(cluster).not.toBeNull();
+      const names = Array.from(cluster?.querySelectorAll('button') ?? []).map((button) =>
+        button.getAttribute('aria-label')
+      );
+      expect(names).toEqual(['settings.addModel', 'settings.editModel', 'common.more']);
+    });
+
+    it('offers delete only from the overflow menu, never as a bare row button', async () => {
+      providersQueryData.current = [provider];
+      render(<ModelModalContent />);
+
+      await screen.findByTestId('provider-counts-provider-a');
+      expect(screen.queryByTestId('menu-delete-provider-provider-a')).not.toBeInTheDocument();
+
+      await openProviderMenu();
+
+      expect(await screen.findByTestId('menu-delete-provider-provider-a')).toBeInTheDocument();
+    });
+
+    it('confirms before deleting the provider, then deletes exactly that provider', async () => {
+      providersQueryData.current = [provider];
+      render(<ModelModalContent />);
+
+      await screen.findByTestId('provider-counts-provider-a');
+      await openProviderMenu();
+      const menuItem = await screen.findByTestId('menu-delete-provider-provider-a');
+      await act(async () => {
+        menuItem.click();
+      });
+
+      // The menu click must not delete on its own — the confirm is the gate.
+      expect(deleteProviderMock).not.toHaveBeenCalled();
+      await waitFor(() => expect(modalConfirmMock).toHaveBeenCalledTimes(1));
+
+      const options = modalConfirmMock.mock.calls[0][0] as ConfirmOptions;
+      expect(options.title).toBe('settings.providerRow.deleteConfirmTitle');
+      expect(options.okButtonProps?.status).toBe('danger');
+      const body = render(<>{options.content}</>);
+      expect(body.getByText('settings.providerRow.deleteConfirmBody')).toBeInTheDocument();
+      expect(body.getByText('settings.providerRow.deleteConfirmDetail')).toBeInTheDocument();
+
+      await act(async () => {
+        await options.onOk?.();
+      });
+
+      await waitFor(() => expect(deleteProviderMock).toHaveBeenCalledWith({ id: 'provider-a' }));
     });
   });
 

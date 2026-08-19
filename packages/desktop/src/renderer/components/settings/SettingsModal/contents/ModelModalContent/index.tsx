@@ -12,12 +12,24 @@ import {
   type ProviderHealthCheckResponse,
 } from '@/common/types/provider/providerApi';
 import { supportsOpenAiApiMode } from '@/common/utils/modelCapabilities';
-import { Button, Divider, Message, Popconfirm, Collapse, Tag, Switch, Tooltip } from '@arco-design/web-react';
+import {
+  Button,
+  Divider,
+  Dropdown,
+  Menu,
+  Message,
+  Modal,
+  Popconfirm,
+  Collapse,
+  Tag,
+  Switch,
+  Tooltip,
+} from '@arco-design/web-react';
 import {
   DeleteFour,
   Heartbeat,
   Info,
-  Minus,
+  MoreOne,
   Plus,
   PreviewClose,
   PreviewOpen,
@@ -192,6 +204,49 @@ const ModelModalContent: React.FC = () => {
       models: t('settings.providerRow.modelCount', { count: (platform.models ?? []).length }),
       keys: t('settings.providerRow.apiKeyCount', { count: getApiKeyCount(platform.api_key) }),
     });
+
+  /**
+   * Deleting a provider destroys its API keys, every model it configures and all
+   * per-model state, so the confirm names the provider and its scale. It replaces
+   * a Popconfirm, which cannot survive the move into a menu: clicking a Menu.Item
+   * unmounts the Dropdown popup, so the Popconfirm would never resolve.
+   */
+  const confirmDeleteProvider = (platform: IProvider) => {
+    Modal.confirm({
+      title: t('settings.providerRow.deleteConfirmTitle'),
+      content: (
+        <div className='flex flex-col gap-6px text-14px'>
+          <span className='text-t-primary'>
+            {t('settings.providerRow.deleteConfirmBody', {
+              provider: platform.name,
+              counts: providerCountsLabel(platform),
+            })}
+          </span>
+          <span className='text-t-secondary'>{t('settings.providerRow.deleteConfirmDetail')}</span>
+        </div>
+      ),
+      okText: t('common.delete'),
+      cancelText: t('common.cancel'),
+      okButtonProps: { status: 'danger' },
+      alignCenter: true,
+      getPopupContainer: () => document.body,
+      onOk: () => removePlatform(platform.id),
+    });
+  };
+
+  const renderProviderMenu = (platform: IProvider) => (
+    <Menu
+      onClickMenuItem={(key) => {
+        if (key === 'delete') confirmDeleteProvider(platform);
+      }}
+    >
+      <Menu.Item key='delete'>
+        <span data-testid={`menu-delete-provider-${platform.id}`} className='text-danger-6'>
+          {t('common.delete')}
+        </span>
+      </Menu.Item>
+    </Menu>
+  );
 
   // 切换供应商启用状态（全选 ↔ 全不选）
   const toggleProviderEnabled = (platform: IProvider) => {
@@ -541,29 +596,40 @@ const ModelModalContent: React.FC = () => {
                               checked={getProviderState(platform).checked}
                               onChange={() => toggleProviderEnabled(platform)}
                             />
+                            {/* Add and edit stay as icons; the destructive action moves
+                                into the overflow menu so it is never the middle button. */}
                             <div className='flex items-center gap-4px'>
-                              <Button
-                                size='mini'
-                                className='model-provider-action-btn !w-28px !h-28px !min-w-28px text-t-secondary hover:text-t-primary'
-                                icon={<Plus size='14' />}
-                                onClick={() => addModelModalCtrl.open({ data: platform })}
-                              />
-                              <Popconfirm
-                                title={t('settings.deleteAllModelConfirm')}
-                                onOk={() => removePlatform(platform.id)}
-                              >
+                              <Tooltip content={t('settings.addModel')}>
                                 <Button
+                                  aria-label={t('settings.addModel')}
                                   size='mini'
                                   className='model-provider-action-btn !w-28px !h-28px !min-w-28px text-t-secondary hover:text-t-primary'
-                                  icon={<Minus size='14' />}
+                                  icon={<Plus size='14' />}
+                                  onClick={() => addModelModalCtrl.open({ data: platform })}
                                 />
-                              </Popconfirm>
-                              <Button
-                                size='mini'
-                                className='model-provider-action-btn !w-28px !h-28px !min-w-28px text-t-secondary hover:text-t-primary'
-                                icon={<Write size='14' />}
-                                onClick={() => editModalCtrl.open({ data: platform })}
-                              />
+                              </Tooltip>
+                              <Tooltip content={t('settings.editModel')}>
+                                <Button
+                                  aria-label={t('settings.editModel')}
+                                  size='mini'
+                                  className='model-provider-action-btn !w-28px !h-28px !min-w-28px text-t-secondary hover:text-t-primary'
+                                  icon={<Write size='14' />}
+                                  onClick={() => editModalCtrl.open({ data: platform })}
+                                />
+                              </Tooltip>
+                              <Dropdown
+                                droplist={renderProviderMenu(platform)}
+                                trigger='click'
+                                position='br'
+                                getPopupContainer={() => document.body}
+                              >
+                                <Button
+                                  aria-label={t('common.more')}
+                                  size='mini'
+                                  className='model-provider-action-btn !w-28px !h-28px !min-w-28px text-t-secondary hover:text-t-primary'
+                                  icon={<MoreOne theme='outline' size='14' fill='currentColor' />}
+                                />
+                              </Dropdown>
                             </div>
                           </div>
                         </div>

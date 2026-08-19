@@ -889,7 +889,10 @@
     "healthNotChecked": "Nicht geprüft",
     "healthFailing": "{{count}} fehlerhaft",
     "healthFailing_one": "{{count}} fehlerhaft",
-    "healthFailing_other": "{{count}} fehlerhaft"
+    "healthFailing_other": "{{count}} fehlerhaft",
+    "deleteConfirmTitle": "Anbieter löschen",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "Löscht den Anbieter, seine API-Schlüssel und alle von ihm konfigurierten Modelle. Bestehende Chats behalten das Modell, mit dem sie begonnen wurden."
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Konfiguriert · Inferenz nicht verfügbar.",

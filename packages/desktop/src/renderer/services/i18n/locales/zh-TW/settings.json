@@ -894,7 +894,10 @@
     "healthChecked": "已檢測 {{checked}}/{{total}}",
     "healthNotChecked": "未檢測",
     "healthFailing": "{{count}} 個異常",
-    "healthFailing_other": "{{count}} 個異常"
+    "healthFailing_other": "{{count}} 個異常",
+    "deleteConfirmTitle": "刪除供應商",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "將刪除該供應商及其 API 金鑰和所設定的全部模型。既有對話仍會保留建立時使用的模型。"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "已設定 · 推論暫時無法使用。",
