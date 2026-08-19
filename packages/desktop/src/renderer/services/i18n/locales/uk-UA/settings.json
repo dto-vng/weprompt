@@ -855,7 +855,8 @@
     "clearHealthConfirmBody": "Записані результати перевірок для «{{provider}}» буде видалено. Запустіть перевірку, щоб виміряти їх знову.",
     "healthCleared": "Стан провайдера «{{provider}}» очищено.",
     "deleteAppOperationsWarning": "Цього провайдера закріплено за операціями застосунку. Після видалення це налаштування буде недоступним, доки ви не оберете іншу модель.",
-    "actionLabel": "{{action}} — {{provider}}"
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "Увімкнути або вимкнути"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Налаштовано · інференс недоступний.",

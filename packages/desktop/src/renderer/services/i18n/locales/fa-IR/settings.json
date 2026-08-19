@@ -910,7 +910,8 @@
     "clearHealthConfirmBody": "نتایج ثبت‌شدهٔ بررسی سلامت برای {{provider}} حذف می‌شود. برای اندازه‌گیری دوباره، بررسی سلامت را اجرا کنید.",
     "healthCleared": "وضعیت سلامت {{provider}} پاک شد.",
     "deleteAppOperationsWarning": "این ارائه‌دهنده برای عملیات برنامه تثبیت شده است. با حذف آن، این تنظیم تا زمانی که مدل دیگری انتخاب کنید در دسترس نخواهد بود.",
-    "actionLabel": "{{action}} — {{provider}}"
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "فعال یا غیرفعال کردن"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "پیکربندی شده · استنتاج در دسترس نیست.",

@@ -898,7 +898,8 @@
     "clearHealthConfirmBody": "{{provider}} için kaydedilen sağlık sonuçlarını siler. Yeniden ölçmek için bir sağlık kontrolü çalıştırın.",
     "healthCleared": "{{provider}} için sağlık durumu temizlendi.",
     "deleteAppOperationsWarning": "Bu sağlayıcı uygulama işlemleri için sabitlenmiş. Silerseniz, başka bir model seçene kadar bu ayar kullanılamaz.",
-    "actionLabel": "{{action}} — {{provider}}"
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "Etkinleştir veya devre dışı bırak"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Yapılandırıldı · çıkarım kullanılamıyor.",

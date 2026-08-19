@@ -907,7 +907,8 @@
     "clearHealthConfirmBody": "将丢弃 {{provider}} 已记录的健康检测结果。重新运行健康检测即可再次测量。",
     "healthCleared": "已清除 {{provider}} 的健康状态。",
     "deleteAppOperationsWarning": "该供应商已被固定用于应用操作。删除后，该设置将不可用，直到你选择另一个模型。",
-    "actionLabel": "{{action}} — {{provider}}"
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "启用或禁用"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "已配置 · 推理暂不可用。",

@@ -710,6 +710,10 @@ const ModelModalContent: React.FC = () => {
                             {/* 供应商启用开关 / Provider enable switch */}
                             <Switch
                               size='small'
+                              // Arco's Switch is a bare role="switch" button with no text, so it
+                              // reaches a screen reader as "switch, checked" with no subject. Its
+                              // three sibling controls are all named; this one has to be too.
+                              aria-label={providerActionLabel(t('settings.providerRow.toggleEnabled'), platform)}
                               checked={getProviderState(platform).checked}
                               onChange={() => toggleProviderEnabled(platform)}
                             />
@@ -955,6 +959,7 @@ const ModelModalContent: React.FC = () => {
                                   <Switch
                                     className='shrink-0'
                                     size='small'
+                                    aria-label={modelActionLabel(t('settings.providerRow.toggleEnabled'), model)}
                                     checked={isModelEnabled(platform, model)}
                                     onChange={(checked) => toggleModelEnabled(platform, model, checked)}
                                   />

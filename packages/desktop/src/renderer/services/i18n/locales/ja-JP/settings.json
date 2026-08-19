@@ -895,7 +895,8 @@
     "clearHealthConfirmBody": "{{provider}} に記録されたヘルスチェック結果を破棄します。もう一度測定するにはヘルスチェックを実行してください。",
     "healthCleared": "{{provider}} のヘルス状態をクリアしました。",
     "deleteAppOperationsWarning": "このプロバイダーはアプリ操作に固定されています。削除すると、別のモデルを選ぶまでその設定は利用できなくなります。",
-    "actionLabel": "{{action}} — {{provider}}"
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "有効・無効を切り替え"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "設定済み · 推論を利用できません。",

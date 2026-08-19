@@ -902,7 +902,8 @@
     "clearHealthConfirmBody": "Verwirft die aufgezeichneten Prüfergebnisse für {{provider}}. Führen Sie eine Prüfung aus, um sie erneut zu messen.",
     "healthCleared": "Statusverlauf für {{provider}} gelöscht.",
     "deleteAppOperationsWarning": "Dieser Anbieter ist für App-Vorgänge festgelegt. Nach dem Löschen bleibt diese Einstellung nicht verfügbar, bis Sie ein anderes Modell wählen.",
-    "actionLabel": "{{action}} — {{provider}}"
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "Aktivieren oder deaktivieren"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Konfiguriert · Inferenz nicht verfügbar.",

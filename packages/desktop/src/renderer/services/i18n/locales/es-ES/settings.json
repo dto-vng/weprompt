@@ -903,7 +903,8 @@
     "clearHealthConfirmBody": "Descarta los resultados de comprobación registrados de {{provider}}. Ejecuta una comprobación para volver a medirlos.",
     "healthCleared": "Estado de comprobación de {{provider}} borrado.",
     "deleteAppOperationsWarning": "Este proveedor está fijado para las operaciones de la aplicación. Al eliminarlo, ese ajuste quedará no disponible hasta que elijas otro modelo.",
-    "actionLabel": "{{action}} — {{provider}}"
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "Activar o desactivar"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Configurado · inferencia no disponible.",

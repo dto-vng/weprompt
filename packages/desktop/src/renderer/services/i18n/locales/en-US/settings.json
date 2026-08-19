@@ -910,7 +910,8 @@
     "clearHealthConfirmBody": "Discards the recorded health results for {{provider}}. Run a health check to measure them again.",
     "healthCleared": "Health status cleared for {{provider}}.",
     "deleteAppOperationsWarning": "This provider is pinned for app operations. Deleting it leaves that setting unavailable until you choose another model.",
-    "actionLabel": "{{action}} — {{provider}}"
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "Enable or disable"
   },
   "providerHealth": {
     "configuredInferenceUnavailable": "Configured · inference unavailable.",
