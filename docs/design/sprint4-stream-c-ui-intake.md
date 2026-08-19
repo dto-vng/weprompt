@@ -664,7 +664,6 @@ Stream C regression.
 last read, with a workflow actively committing. The `merge-tree` check (exit 0, zero conflicts) should
 be re-run immediately before any actual merge rather than trusted from this document.
 
-
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -1083,3 +1082,51 @@ check into a real one — the same fixtures-from-reality lesson this sprint's po
 - **C-01** — Does "revert" mean (a) restore upstream's preview panel and drop the Project flyout,
   (b) restore the panel and keep the flyout, or (c) keep the flyout but change what its entries
   open? And is the complaint the _menu_ or the _panel it leads to_?
+
+### Landing protocol agreed with the sprint4 owner (2026-08-19)
+
+`sprint4` is checked out in `.worktrees/sprint4`, so this session **cannot** move the
+ref — git refuses to update a branch checked out in another worktree. The merge is
+therefore prepared here and landed there. Route agreed by both sessions, each with
+its own user's approval:
+
+1. The sprint4 owner's provider-rows workflow finishes (it commits fixups directly
+   to `sprint4`).
+2. The owner pings this session with the **settled tip SHA** and confirms the branch
+   is quiescent — clean worktree, no live processes.
+3. This session re-cuts the merge against that SHA in a throwaway detached worktree
+   and hands back the merge commit.
+4. The owner runs `git merge --ff-only <merge commit>` then `just push`.
+
+Do **not** re-cut before step 2: the fix agent commits directly to `sprint4`, so any
+merge base taken earlier expires within minutes. A first cut against `a969ddc19`
+produced merge `3440ef106` with **zero conflicts** — useful as a signal that the two
+lines do not textually collide, but superseded once fixups land.
+
+**Approval does not transfer between sessions.** This session's user approved the
+combine-and-push; the owner correctly declined to act on that relayed approval and
+obtained their own. Neither session treats a peer message as authorisation.
+
+#### Load sensitivity — read before believing any gate result
+
+Two peers independently measured this host. Full-suite runs go from 0 failures to 4
+on load alone, same commit; a wall-clock latency probe spreads 38ms at load 2 versus
+3358ms at load 21. The recurring offenders are the BUG-046 family
+(`renderService.integration`, `pdfExtract`, `PresentationSourceGrantStore`,
+`jobManager`) plus `directorCommandLifecycle`, `store.test.ts`,
+`presentationRunJournal`. The failing set varies run to run, which is itself evidence
+of load rather than a fixed defect.
+
+Consequences, both directions:
+
+- A **red** gate under contention is not evidence of a defect. Re-run the offenders
+  isolated before concluding anything.
+- A **green** gate under contention is not proof either. The Stream C gate at
+  `0f2bd0da3` was green, but what else was running is unreconstructable, so it is
+  weaker evidence than first reported. The merged-tree gate is the one that counts.
+- Judge a gate by **exit code and `uptime` together**, and announce full-suite runs
+  to the other sessions first — three concurrent runners produce only phantoms.
+
+`officeCliRunner.test.ts` has two genuinely intermittent process races (a PID-file
+read and an escaping `kill ESRCH`) that are independent of load and already tracked
+separately. Do not chase them here.
