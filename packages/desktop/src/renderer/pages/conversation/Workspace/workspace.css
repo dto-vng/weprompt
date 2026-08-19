@@ -206,7 +206,13 @@
 
 .workspace-project-files-search {
   display: block;
-  margin: 0 0 6px;
+  /* Inset rather than full-bleed: at 439px inside a 441px container the field read as the
+     heaviest thing in the panel. The symmetric margin keeps it fluid when the pane is
+     resized, and lines its left edge up closer to the section label beneath it.
+     `width: auto` is required — Arco's input wrapper sets width:100% with content-box
+     sizing, so the margin alone just pushed the field into overflow instead of shrinking it. */
+  width: auto;
+  margin: 0 12px 6px;
 }
 
 .workspace-project-files-search .arco-input-inner-wrapper {

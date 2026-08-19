@@ -584,6 +584,21 @@ live verification in the running app.
   the alternative would be two resize affordances that look different for no reason.
 
 
+### C-27 — The file search field is too wide
+
+- **Surface:** the pane's Files tab (and the project-home Files card, which shares the component).
+- **Measured:** 439px inside a 441px container — effectively full-bleed, which made the field the
+  heaviest element in the panel.
+- **Fixed:** inset symmetrically to 415px. Fluid, so it still adapts when the pane is resized.
+- **The margin alone did nothing.** Arco's `.arco-input-group-wrapper` sets `width: 100%` with
+  `box-sizing: content-box`, so adding a margin pushed the field into **overflow** rather than
+  shrinking it — the measured width stayed at 439 while the element started 12px further right.
+  `width: auto` is the half that actually works. Caught by measuring after the first attempt rather
+  than assuming the margin had landed.
+- **Shared surface:** the project-home Files card uses the same component and is narrowed too. Not
+  reported there, but consistency is the point of sharing the component.
+
+
 ## Decisions taken 2026-08-18 (by the reporter, after intake closed)
 
 | id       | Decision                                                                                                                                                                                                                                                                                                       |

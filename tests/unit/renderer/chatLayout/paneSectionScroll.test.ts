@@ -28,3 +28,20 @@ describe('workspace section scroll behaves in the artifact pane', () => {
     expect(marked).toBe(3); // files + changes + context slots
   });
 });
+
+// C-27 — the file search field ran the full width of the panel (439px inside a 441px
+// container), making it the heaviest element there. It is now inset symmetrically.
+//
+// `width: auto` is the load-bearing half: Arco's input wrapper sets width:100% with
+// content-box sizing, so the margin alone pushed the field into overflow rather than
+// shrinking it. Measured after: 415px wide, inset 13px, no overflow.
+describe('file search is inset rather than full-bleed', () => {
+  it('insets the field and overrides the Arco width', () => {
+    const css = readFileSync(
+      resolve(__dirname, '../../../../packages/desktop/src/renderer/pages/conversation/Workspace/workspace.css'),
+      'utf8'
+    );
+    expect(css).toMatch(/\.workspace-project-files-search\s*\{[^}]*width:\s*auto/s);
+    expect(css).toMatch(/\.workspace-project-files-search\s*\{[^}]*margin:\s*0 12px 6px/s);
+  });
+});
