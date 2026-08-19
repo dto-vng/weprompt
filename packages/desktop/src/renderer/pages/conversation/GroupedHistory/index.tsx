@@ -55,12 +55,20 @@ import type { ConversationRowProps, WorkspaceGroupedHistoryProps } from './types
  * so both kinds of sidebar row present their actions identically. `!flex`
  * beats `.arco-btn`'s own `display` so the icon actually centres.
  */
-const PROJECT_ROW_ACTION_CLASS =
-  // 22px, matching the sider section-label '+' buttons. At 20px the 14px icon centres
-  // 3px from the button edge instead of 4px, so the icons landed 1px apart even once
-  // their containers were aligned — the residue of the 5px gap this fixed.
-  '!flex items-center justify-center !w-22px !h-22px !min-w-22px !p-0 !rounded-4px !text-t-secondary hover:!text-t-primary sider-action-btn';
-const PROJECT_DISCLOSURE_CLASS = `${PROJECT_ROW_ACTION_CLASS} focus-visible:[outline:2px_solid_rgb(var(--primary-6))] focus-visible:outline-offset-2`;
+// 22px, matching the sider section-label '+' buttons. At 20px the 14px icon centres
+// 3px from the button edge instead of 4px, so the icons landed 1px apart even once
+// their containers were aligned — the residue of the 5px gap this fixed.
+const PROJECT_ROW_ACTION_BASE =
+  '!flex items-center justify-center !w-22px !h-22px !min-w-22px !p-0 !rounded-4px !text-t-secondary hover:!text-t-primary';
+const PROJECT_ROW_ACTION_CLASS = `${PROJECT_ROW_ACTION_BASE} sider-action-btn`;
+/**
+ * The disclosure chevron deliberately omits `sider-action-btn`. That class paints an
+ * opaque backing so a row's HOVER actions mask the title they overlay; the chevron is
+ * always visible and overlays nothing, so the backing just rendered a filled box next
+ * to the bare section-label '+' buttons it is sized to match. It keeps the hover and
+ * focus treatment, and only loses the resting fill.
+ */
+const PROJECT_DISCLOSURE_CLASS = `${PROJECT_ROW_ACTION_BASE} focus-visible:[outline:2px_solid_rgb(var(--primary-6))] focus-visible:outline-offset-2`;
 
 const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
   onSessionClick,
