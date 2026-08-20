@@ -69,6 +69,16 @@
   - Same defect class as BUG-046, unfixed and out of that commit's scope: `payloadSchemas.ts:228, 249-250, 562, 571, 595, 608-643`, `PresentationRunService.ts:205`, `PresentationSourceGrantService.ts:302`, `presentation-template/bridge.ts:444`, `preload/main.ts:46`.
   - Each is a candidate for the same silent failure. Reachability must be established the way EPIC-002's was — by running it — because a green suite is exactly what hid BUG-046.
 
+- [ ] **[BUG-055][P2][Platform] An exhausted provider account is reported as a rate limit, so the app advises waiting for something waiting cannot fix** — found 2026-08-20 while testing project knowledge search
+  - Reproduction: a Moonshot key whose account has no balance. Any chat turn or app-operations task on that provider fails, and the app shows **"Model provider rate limit reached — The provider is temporarily limiting requests. Wait a moment, reduce request frequency, or switch models."**
+  - What the provider actually said, carried intact in the error's `detail`: `"your account ... is suspended due to insufficient balance, please recharge your account or check your plan and billing details"`, `type: exceeded_current_quota_error`. The remedy the UI prescribes — wait, slow down — never resolves a suspended account.
+  - The envelope compounds it: `code: USER_LLM_PROVIDER_RATE_LIMITED`, `retryable: true`, `resolution: { kind: 'retry' }`. Automatic and human retries both burn attempts against an account that cannot serve any request.
+  - **Two layers, and fixing either alone is not enough.**
+    1. aioncore classifies the upstream `exceeded_current_quota_error` as `Rate limited, retry after 5000ms` before the desktop sees it.
+    2. `packages/desktop/src/common/types/provider/providerApi.ts:150` then maps **both** `rate_limited` and `insufficient_quota` to the single class `rate_limit`, so even a backend that distinguished them would be flattened here.
+  - Cost paid today: every context-compaction run on that provider failed with `provider_rate_limited` and silently fell back to the rules summary. Three retries per attempt, ten minutes apart, consistently — which reads as a burst limit that never recovers and sent the investigation toward load and timing. One look at `detail` would have ended it immediately.
+  - Suggested shape: keep the two conditions apart end to end — quota-exhausted is `setup`-class, not retryable, and its copy should point at billing or at switching provider. At minimum, surface the provider's own message rather than only the classification.
+
 - [ ] **[BUG-054][P3][Test infrastructure] A vitest worker teardown race reds the push gate with zero failing tests** — found 2026-08-19 by a `just push` gate run
   - Symptom: `bun run test` exits **1** while reporting **8368 passed, 19 skipped, 0 failed**. The failure is an unhandled rejection outside the assertions: `EnvironmentTeardownError: [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending`, attributed to `tests/unit/renderer/team/TeamSiderSection.dom.test.tsx`.
   - **A new member of the gate-poisoner family, and the first that is not a test.** BUG-046's members are timing-sensitive tests; this one is the harness closing a worker's RPC channel while a console log is still in flight. Nothing asserts, nothing fails, and the gate still blocks the push.
