@@ -53,7 +53,7 @@ import {
 import { wasLaunchedAtLogin } from '@process/bridge/applicationBridge';
 import { onLanguageChanged } from './process/bridge/native/systemSettingsBridge';
 import i18n, { setInitialLanguage } from '@process/services/i18n';
-import { runSsoGateForApp } from '@process/auth/ssoGate';
+import { runSsoGateForApp, signOutSso } from '@process/auth/ssoGate';
 import type { SsoAccount } from '@process/auth/msalAuthService';
 import { appOperationsBroker } from '@process/services/app-operations';
 import { installOfficePreviewSession } from '@process/services/office-artifact/officePreviewSession';
@@ -400,6 +400,14 @@ ipcMain.on('get-initial-language', (event) => {
 
 ipcMain.on('get-sso-account', (event) => {
   event.returnValue = rendererSsoAccount;
+});
+
+// Sign out of Microsoft SSO, then relaunch so the login gate runs again and the
+// user can sign in from scratch (WP 24045).
+ipcMain.handle('sso:logout', async () => {
+  await signOutSso();
+  app.relaunch();
+  app.quit();
 });
 
 ipcMain.on('get-backend-startup-failed', (event) => {

@@ -51,6 +51,8 @@ export interface ElectronBridgeAPI {
     input: LocalFeedbackDiagnosticExportInput
   ) => Promise<LocalFeedbackDiagnosticExportResult>;
   recoverCorruptedDatabase?: () => Promise<void>;
+  // Sign out of Microsoft SSO and relaunch so the login gate runs again (WP 24045)
+  signOutSso?: () => Promise<void>;
 }
 
 export type BackendStartupFailureReason =

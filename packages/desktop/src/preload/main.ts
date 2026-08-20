@@ -137,6 +137,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Feedback: export a local diagnostic package chosen by the user
   exportLocalFeedbackDiagnostics: (input: unknown) => ipcRenderer.invoke('feedback:export-local', input),
   recoverCorruptedDatabase: () => ipcRenderer.invoke('backend:recover-corrupted-database'),
+  // Sign out of Microsoft SSO and relaunch to the login gate (WP 24045)
+  signOutSso: () => ipcRenderer.invoke('sso:logout'),
 });
 
 // Synchronously fetch the aioncore port and expose it to the renderer

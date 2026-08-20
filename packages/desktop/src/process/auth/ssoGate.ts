@@ -7,10 +7,12 @@
  * `ssoGateCore` (unit-tested); this module supplies the real MSAL service and the
  * window/dialog UI, then exposes `runSsoGateForApp` for `index.ts`.
  */
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { app, BrowserWindow, dialog } from 'electron';
 import i18n from '@process/services/i18n';
 import { loadSsoConfig, type SsoConfig } from './ssoConfig';
-import { MsalAuthService } from './msalAuthService';
+import { MsalAuthService, SSO_TOKEN_CACHE_FILENAME } from './msalAuthService';
 import { runSsoGate, type SsoGateDeps, type SsoGateOutcome } from './ssoGateCore';
 
 export type { SsoGateOutcome } from './ssoGateCore';
@@ -89,4 +91,29 @@ export async function runSsoGateForApp(options?: {
   const config = loadSsoConfig(userDataDir, options?.env, bundledConfigDir);
   if (!config.enabled) return { proceed: true, account: null, skipped: true };
   return runSsoGate(createElectronSsoGateDeps(config, userDataDir));
+}
+
+/**
+ * Sign the current user out of Microsoft SSO: drop the cached MSAL account and
+ * remove the encrypted token cache from disk, so the next startup runs the gate
+ * and asks for a fresh interactive sign-in. Safe to call when SSO is disabled.
+ */
+export async function signOutSso(options?: { userDataDir?: string; env?: NodeJS.ProcessEnv }): Promise<void> {
+  const userDataDir = options?.userDataDir ?? app.getPath('userData');
+  const bundledConfigDir = app.isPackaged ? process.resourcesPath : undefined;
+  const config = loadSsoConfig(userDataDir, options?.env, bundledConfigDir);
+  if (config.enabled) {
+    try {
+      await new MsalAuthService(config, userDataDir).logout();
+    } catch (error) {
+      console.error('[SSO] logout failed:', error);
+    }
+  }
+  // Belt-and-suspenders: delete the persisted cache even if MSAL kept a stale
+  // file, so a fresh sign-in is guaranteed on the next launch.
+  try {
+    rmSync(join(userDataDir, SSO_TOKEN_CACHE_FILENAME), { force: true });
+  } catch {
+    // Missing file / permission — nothing to clean up.
+  }
 }

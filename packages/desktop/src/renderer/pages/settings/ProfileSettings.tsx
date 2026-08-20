@@ -5,7 +5,7 @@
  */
 
 import { useConfig } from '@/renderer/hooks/config/useConfig';
-import { Input, Switch, Typography } from '@arco-design/web-react';
+import { Button, Input, Popconfirm, Switch, Typography } from '@arco-design/web-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import SettingsPageWrapper from './components/SettingsPageWrapper';
@@ -23,17 +23,34 @@ const ProfileSettings: React.FC = () => {
   const ssoName = ssoAccount?.name?.trim() || ssoAccount?.username;
   const showSsoEmail = Boolean(ssoAccount?.name?.trim() && ssoAccount.name.trim() !== ssoAccount.username);
 
+  // Sign out of Microsoft SSO: the main process clears the token cache and relaunches
+  // the app, so the login gate runs again for a fresh sign-in (WP 24045).
+  const handleSignOut = () => {
+    void window.electronAPI?.signOutSso?.();
+  };
+
   return (
     <SettingsPageWrapper>
       <div className='flex flex-col gap-24px'>
         {ssoAccount && (
-          <div className='flex flex-col gap-2px'>
-            <Typography.Text className='!font-medium'>{t('settings.signedInAs', { name: ssoName })}</Typography.Text>
-            {showSsoEmail && (
-              <Typography.Text type='secondary' className='text-12px'>
-                {ssoAccount.username}
-              </Typography.Text>
-            )}
+          <div className='flex items-center justify-between gap-12px'>
+            <div className='flex flex-col gap-2px'>
+              <Typography.Text className='!font-medium'>{t('settings.signedInAs', { name: ssoName })}</Typography.Text>
+              {showSsoEmail && (
+                <Typography.Text type='secondary' className='text-12px'>
+                  {ssoAccount.username}
+                </Typography.Text>
+              )}
+            </div>
+            <Popconfirm
+              focusLock
+              title={t('settings.signOutConfirm')}
+              okText={t('settings.signOut')}
+              cancelText={t('common.cancel')}
+              onOk={handleSignOut}
+            >
+              <Button size='small'>{t('settings.signOut')}</Button>
+            </Popconfirm>
           </div>
         )}
 

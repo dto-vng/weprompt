@@ -8,6 +8,8 @@
   "profileInstructionsPlaceholder": "例如：我在 VNG 的人力资源部门工作。偏好简洁、正式的越南语。在假定使用某个模板前先询问。",
   "profileScopeNote": "适用于你的对话。专用助手遵循各自的规则。",
   "signedInAs": "已登录：{{name}}",
+  "signOut": "退出登录",
+  "signOutConfirm": "确定退出 Microsoft 账户吗？WePrompt 将重启并要求重新登录。",
   "title": "设置",
   "skillsHub": {
     "title": "技能中心",
