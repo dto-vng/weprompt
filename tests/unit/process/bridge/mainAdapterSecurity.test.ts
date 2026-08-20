@@ -177,6 +177,33 @@ describe('main adapter IPC security boundary', () => {
     expect(mocks.bridgeEmitter.emit).not.toHaveBeenCalled();
   });
 
+  /**
+   * BUG-047 added `subscribe.error-*` so a throwing provider rejects its caller
+   * instead of hanging it. A renderer able to send that name inbound could
+   * reject any in-flight provider call it liked, so provider responses must
+   * travel outward only.
+   *
+   * This pins the refusal, not any one check that produces it — and deliberately
+   * says so. **Two** independent checks reject these names, and removing the
+   * explicit prefix guard in `main.ts` leaves this test green: the manifest
+   * lookup requires a `subscribe-` prefix, which neither `subscribe.callback-`
+   * nor `subscribe.error-` has, so `getNativeBridgeProviderKey` returns null and
+   * the request is refused anyway. The prefix guard is defence in depth, kept
+   * because it states the intent where a future inbound name would be added.
+   * Verified by mutation: deleting it does not red this file.
+   */
+  it.each([
+    ['a forged provider success', 'subscribe.callback-webui.startwebui.starta1b2c3d4'],
+    ['a forged provider failure', 'subscribe.error-webui.startwebui.starta1b2c3d4'],
+  ])('rejects %s sent inbound by a renderer', async (_case, name) => {
+    const sender = createRegisteredSender();
+
+    await expect(getInvokeHandler()({ sender }, JSON.stringify({ name, data: { id: 'a1b2c3d4' } }))).rejects.toThrow(
+      /operation is not allowed/i
+    );
+    expect(mocks.bridgeEmitter.emit).not.toHaveBeenCalled();
+  });
+
   it('rejects a renderer attempting to invoke a renderer-owned query', async () => {
     const sender = createRegisteredSender();
 

@@ -73,7 +73,11 @@ function parseBridgeEventData(info: unknown): BridgeEventData {
     };
   }
 
-  if (parsed.name.startsWith('subscribe.callback-')) {
+  // Provider responses travel outward only. A renderer must be able to forge
+  // neither a success (`subscribe.callback-`) nor, since BUG-047 added it, a
+  // failure (`subscribe.error-`) — a forged failure would let it reject any
+  // in-flight call of its choosing.
+  if (parsed.name.startsWith('subscribe.callback-') || parsed.name.startsWith('subscribe.error-')) {
     throw new Error('[adapter] Native IPC request rejected: operation is not allowed');
   }
 
