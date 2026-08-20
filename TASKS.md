@@ -69,6 +69,18 @@
   - Same defect class as BUG-046, unfixed and out of that commit's scope: `payloadSchemas.ts:228, 249-250, 562, 571, 595, 608-643`, `PresentationRunService.ts:205`, `PresentationSourceGrantService.ts:302`, `presentation-template/bridge.ts:444`, `preload/main.ts:46`.
   - Each is a candidate for the same silent failure. Reachability must be established the way EPIC-002's was — by running it — because a green suite is exactly what hid BUG-046.
 
+- [ ] **[BUG-056][P3][Project knowledge] Hybrid retrieval ranks a lexical match above the passage that answers the question** — found 2026-08-20 by a controlled semantic-search test
+  - **Semantic retrieval itself is verified working.** With `baai/bge-m3` configured, a target passage sharing _no_ vocabulary with the query was still retrieved: query `job pay salary compensation` against a document saying "monetary package … 40 and 55 million VND … reviewed once every twelve months" — no shared term, so BM25 alone could not have found it. The model answered correctly and cited it.
+  - **The ranking is what is wrong.** Three documents, one query:
+    1. `distractor.md` — contains _pay_, _job_, _how much_ repeatedly, and explicitly says "we never quote a pay figure"
+    2. `job brief template.pdf` — the role description, no salary
+    3. `target.md` — the passage that actually answers
+       The passage containing the answer ranked **last**; the passage containing the query's words but none of its answer ranked **first**.
+  - Mechanism: `fuseRrf` (`packages/desktop/src/common/knowledge/rrf.ts`) is rank-only, `score = Σ 1/(60 + rank)`, weighting both arms equally. A passage that tops the BM25 list on term frequency alone beats one that tops the semantic list, because neither arm's confidence is expressed in the fused score — only its position.
+  - **Harmless at three documents, not at thirty.** Every passage was returned here, so the model saw the answer regardless and correctly identified the distractor as a distractor. Once the store is large enough that `maxResults` truncates, the answering passage falls below the cut while keyword matches fill the window — and the failure is invisible, because the tool returns a confident-looking set of passages that simply do not contain the answer.
+  - Reproduction is cheap: two markdown files, one sharing the query's words with none of its meaning, one the reverse. Not kept in the repo — they were written into a project's `Knowledge Base/` and removed after the run.
+  - Possible directions, none evaluated: weight the semantic arm above BM25 in the fusion, keep a score-aware fusion rather than rank-only, or return both arms' top-k and let the reader decide.
+
 - [ ] **[BUG-055][P2][Platform] An exhausted provider account is reported as a rate limit, so the app advises waiting for something waiting cannot fix** — found 2026-08-20 while testing project knowledge search
   - Reproduction: a Moonshot key whose account has no balance. Any chat turn or app-operations task on that provider fails, and the app shows **"Model provider rate limit reached — The provider is temporarily limiting requests. Wait a moment, reduce request frequency, or switch models."**
   - What the provider actually said, carried intact in the error's `detail`: `"your account ... is suspended due to insufficient balance, please recharge your account or check your plan and billing details"`, `type: exceeded_current_quota_error`. The remedy the UI prescribes — wait, slow down — never resolves a suspended account.
