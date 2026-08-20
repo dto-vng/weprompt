@@ -102,6 +102,28 @@ jobs:
           echo "AIONUI_BACKEND_LOCAL_BUNDLE_DIR=$BUNDLE" >> "$GITHUB_ENV"
           echo "Bundle ready at $BUNDLE"
 
+      - name: Bundle officecli (offline Office document features)
+        shell: bash
+        env:
+          # Pinned OfficeCli release; digest mirrors prepareBundledOfficecli in
+          # prepare-aioncore.js so this standalone Windows build ships the same
+          # officecli the reusable pipeline does. prepare-managed-resources does
+          # not produce office/, so add it here (fail-closed on digest mismatch).
+          OFFICECLI_VERSION: v1.0.143
+          OFFICECLI_ASSET: officecli-win-x64.exe
+          OFFICECLI_SHA256: d4d4c10fced307e209744cf98a56b003a6e613424fd651b08469274704afd2c6
+        run: |
+          set -euo pipefail
+          OFFICE_DIR="$AIONUI_BACKEND_LOCAL_BUNDLE_DIR/managed-resources/office"
+          mkdir -p "$OFFICE_DIR"
+          URL="https://github.com/iOfficeAI/OfficeCli/releases/download/${OFFICECLI_VERSION}/${OFFICECLI_ASSET}"
+          curl -fSL --retry 5 --retry-delay 3 -o "$OFFICE_DIR/officecli.exe" "$URL"
+          ACTUAL=$(sha256sum "$OFFICE_DIR/officecli.exe" | awk '{print $1}')
+          if [ "$ACTUAL" != "$OFFICECLI_SHA256" ]; then
+            echo "::error::officecli digest mismatch: expected $OFFICECLI_SHA256, got $ACTUAL"; exit 1
+          fi
+          echo "Bundled officecli ${OFFICECLI_VERSION} -> $OFFICE_DIR/officecli.exe ($ACTUAL)"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
