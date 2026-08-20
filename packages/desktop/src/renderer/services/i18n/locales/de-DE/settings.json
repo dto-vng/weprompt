@@ -914,6 +914,9 @@
     "rateLimit": {
       "action": "Warten Sie, bis das Anbieterlimit zurückgesetzt ist, und versuchen Sie es erneut."
     },
+    "quota": {
+      "action": "Das Anbieterkonto hat kein Guthaben bzw. Kontingent mehr. Laden Sie es auf oder wechseln Sie den Anbieter und versuchen Sie es erneut."
+    },
     "setup": {
       "action": "Prüfen Sie die Anmeldedaten und Konfiguration des Anbieters und versuchen Sie es erneut."
     },

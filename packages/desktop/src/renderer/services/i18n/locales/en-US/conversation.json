@@ -369,6 +369,10 @@
         "title": "Model provider rate limit reached",
         "body": "The provider is temporarily limiting requests. Wait a moment, reduce request frequency, or switch models."
       },
+      "USER_LLM_PROVIDER_QUOTA_EXHAUSTED": {
+        "title": "Model provider quota exhausted",
+        "body": "The provider account is out of balance or quota, so waiting will not help. Add credit to the account, check its billing plan, or switch to another model."
+      },
       "USER_LLM_PROVIDER_TIMEOUT": {
         "title": "Model provider request timed out",
         "body": "The provider did not respond in time. Retry later or switch to a more stable provider."

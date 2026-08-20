@@ -13,6 +13,7 @@
  */
 
 import type { IProvider, ModelCapability } from '@/common/config/storage';
+import { isQuotaExhaustedErrorType } from './quotaExhaustion';
 
 export interface CreateProviderRequest {
   /**
@@ -95,7 +96,7 @@ export type ProviderHealthCheckErrorKind =
   | 'api_error'
   | 'unknown';
 
-export type ProviderHealthFailureClass = 'overload' | 'rate_limit' | 'setup' | 'connectivity' | 'provider';
+export type ProviderHealthFailureClass = 'overload' | 'rate_limit' | 'quota' | 'setup' | 'connectivity' | 'provider';
 
 export type NormalizedProviderHealthFailure = {
   failureClass: ProviderHealthFailureClass;
@@ -103,6 +104,7 @@ export type NormalizedProviderHealthFailure = {
   actionKey:
     | 'settings.providerHealth.overload.action'
     | 'settings.providerHealth.rateLimit.action'
+    | 'settings.providerHealth.quota.action'
     | 'settings.providerHealth.setup.action'
     | 'settings.providerHealth.connectivity.action'
     | 'settings.providerHealth.provider.action';
@@ -140,6 +142,9 @@ const MAX_PROVIDER_HEALTH_RETRY_AFTER_MS = 30_000;
 const classifyStructuredProviderType = (value: string): ProviderHealthFailureClass => {
   const normalized = value.trim().toLowerCase();
   if (/overload|server[_-]?busy|capacity|temporarily[_-]?unavailable/.test(normalized)) return 'overload';
+  // Ordered before rate_limit deliberately: that branch's own /quota/ alternative
+  // would otherwise swallow `exceeded_current_quota_error` (BUG-055).
+  if (isQuotaExhaustedErrorType(normalized)) return 'quota';
   if (/rate[_-]?limit|too[_-]?many[_-]?requests|throttl|quota/.test(normalized)) return 'rate_limit';
   if (/auth|credential|api[_-]?key|forbidden|permission|config|aws/.test(normalized)) return 'setup';
   if (/connect|network|dns|timeout|tls|socket/.test(normalized)) return 'connectivity';
@@ -147,7 +152,8 @@ const classifyStructuredProviderType = (value: string): ProviderHealthFailureCla
 };
 
 const classifyNormalizedKind = (value: ProviderHealthCheckErrorKind): ProviderHealthFailureClass | undefined => {
-  if (value === 'rate_limited' || value === 'insufficient_quota') return 'rate_limit';
+  if (value === 'insufficient_quota') return 'quota';
+  if (value === 'rate_limited') return 'rate_limit';
   if (
     value === 'invalid_authorization_header' ||
     value === 'unauthorized' ||
@@ -173,6 +179,7 @@ const classifyHttpStatus = (status: number | undefined): ProviderHealthFailureCl
 const ACTION_KEYS: Record<ProviderHealthFailureClass, NormalizedProviderHealthFailure['actionKey']> = {
   overload: 'settings.providerHealth.overload.action',
   rate_limit: 'settings.providerHealth.rateLimit.action',
+  quota: 'settings.providerHealth.quota.action',
   setup: 'settings.providerHealth.setup.action',
   connectivity: 'settings.providerHealth.connectivity.action',
   provider: 'settings.providerHealth.provider.action',
@@ -223,7 +230,9 @@ export const normalizeProviderHealthCheckFailure = (
   return {
     failureClass,
     statusKey:
-      failureClass === 'setup'
+      // Quota sits with setup, not with the transient classes: both need the user
+      // to change something, and neither clears on its own (BUG-055).
+      failureClass === 'setup' || failureClass === 'quota'
         ? 'settings.providerHealth.setupNeedsAttention'
         : 'settings.providerHealth.configuredInferenceUnavailable',
     actionKey: ACTION_KEYS[failureClass],

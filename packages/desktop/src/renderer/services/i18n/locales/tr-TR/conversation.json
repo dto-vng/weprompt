@@ -351,6 +351,10 @@
         "title": "Model sağlayıcı hız sınırına ulaşıldı",
         "body": "Sağlayıcı geçici olarak istekleri sınırlıyor. Bir süre bekleyin, istek sıklığını azaltın veya model değiştirin."
       },
+      "USER_LLM_PROVIDER_QUOTA_EXHAUSTED": {
+        "title": "Model sağlayıcısının kotası tükendi",
+        "body": "Sağlayıcı hesabının bakiyesi veya kotası tükendiği için beklemek işe yaramaz. Hesaba bakiye yükleyin, faturalandırma planını kontrol edin veya başka bir modele geçin."
+      },
       "USER_LLM_PROVIDER_TIMEOUT": {
         "title": "Model sağlayıcı isteği zaman aşımına uğradı",
         "body": "Sağlayıcı zamanında yanıt vermedi. Daha sonra tekrar deneyin veya daha kararlı bir sağlayıcıya geçin."

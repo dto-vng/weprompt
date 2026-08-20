@@ -450,6 +450,33 @@ describe('PresentationTemplateService', () => {
       }
     });
 
+    /**
+     * BUG-051: the discriminating case the suite was missing. Every other symlink
+     * fixture here points its link OUTSIDE the workspace, so parent-only
+     * canonicalization and a full `realpath(input.filePath)` both refuse it — by
+     * different checks, with the same code. Mutation proved it: swapping in the
+     * full realpath still passed 45/45.
+     *
+     * A link that stays INSIDE the workspace separates them. Parent-only keeps the
+     * final segment as written, so the candidate is still a symlink when the
+     * authorizer lstats it and is refused. A full realpath resolves it to the
+     * regular file behind it, and the refusal disappears — silently, because
+     * containment still holds. This is the fixture that makes the docblock's
+     * "canonicalize the parent, never the final segment" rule load-bearing.
+     */
+    it('refuses a symlinked file even when its target is inside the workspace', async () => {
+      const service = createBoundService();
+      const realPath = path.join(workspaceDir, 'REAL-THEME.md');
+      const linkedPath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(realPath, '# Inside Linked Theme\n#112233', 'utf-8');
+      await symlink(realPath, linkedPath);
+
+      await expect(
+        service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath: linkedPath })
+      ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+      expect(await service.list()).toEqual([]);
+    });
+
     it('refuses a symlink escape from the authorized workspace', async () => {
       const service = createBoundService();
       const outsideDir = await mkdtemp(path.join(tmpdir(), 'ptpl-outside-workspace-'));

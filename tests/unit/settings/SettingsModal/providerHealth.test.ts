@@ -43,6 +43,52 @@ describe('provider health failure contract', () => {
     });
   });
 
+  /**
+   * BUG-055: measured against a suspended Moonshot key. The provider reported
+   * `exceeded_current_quota_error`, and both classifiers folded it into
+   * `rate_limit` — the structured branch because its own pattern already
+   * matched /quota/, the normalized branch because `insufficient_quota` and
+   * `rate_limited` shared a line. The app then told the user to wait out an
+   * account that no amount of waiting restores.
+   */
+  it.each([
+    ['the provider structured type', { provider_error_type: 'exceeded_current_quota_error' }],
+    ['the normalized error kind', { error_kind: 'insufficient_quota' as const }],
+    ['an insufficient_balance type', { provider_error_type: 'insufficient_balance' }],
+  ])('separates an exhausted quota from a rate limit via %s', (_case, overrides) => {
+    expect(normalizeProviderHealthCheckFailure(failedHealthResponse(overrides))).toMatchObject({
+      failureClass: 'quota',
+      actionKey: 'settings.providerHealth.quota.action',
+      // Quota needs the user to act, so it reads like setup rather than like a
+      // provider that is momentarily unavailable.
+      statusKey: 'settings.providerHealth.setupNeedsAttention',
+    });
+  });
+
+  it('never carries retry guidance for an exhausted quota', () => {
+    // `retry_after_ms` is honoured for overload and rate_limit. Waiting out a
+    // suspended account is exactly the advice this bug was filed about.
+    const normalized = normalizeProviderHealthCheckFailure(
+      failedHealthResponse({ provider_error_type: 'exceeded_current_quota_error', retry_after_ms: 5_000 })
+    );
+
+    expect(normalized.retryAfterMs).toBeUndefined();
+  });
+
+  it('still classifies a genuine rate limit as one', () => {
+    // The guard against over-matching: these must not be swept into quota.
+    for (const providerErrorType of ['rate_limit_exceeded', 'too_many_requests', 'requests_throttled']) {
+      expect(
+        normalizeProviderHealthCheckFailure(failedHealthResponse({ provider_error_type: providerErrorType }))
+      ).toMatchObject({
+        failureClass: 'rate_limit',
+      });
+    }
+    expect(normalizeProviderHealthCheckFailure(failedHealthResponse({ error_kind: 'rate_limited' }))).toMatchObject({
+      failureClass: 'rate_limit',
+    });
+  });
+
   it('preserves structured setup failure with its configuration recovery action', () => {
     expect(
       normalizeProviderHealthCheckFailure(

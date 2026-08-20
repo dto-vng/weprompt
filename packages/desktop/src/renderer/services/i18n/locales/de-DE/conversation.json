@@ -369,6 +369,10 @@
         "title": "Rate Limit des Modellanbieters erreicht",
         "body": "Der Anbieter drosselt derzeit Anfragen. Warte einen Moment, reduziere die Anfragehäufigkeit oder wechsle Modelle."
       },
+      "USER_LLM_PROVIDER_QUOTA_EXHAUSTED": {
+        "title": "Kontingent des Modellanbieters aufgebraucht",
+        "body": "Das Anbieterkonto hat kein Guthaben bzw. Kontingent mehr — Warten hilft hier nicht. Laden Sie das Konto auf, prüfen Sie den Abrechnungstarif oder wechseln Sie zu einem anderen Modell."
+      },
       "USER_LLM_PROVIDER_TIMEOUT": {
         "title": "Zeitüberschreitung bei Modellanbieterer Anfrage",
         "body": "Der Anbieter hat nicht rechtzeitig geantwortet. Versuche es später erneut oder wechsle zu einem stabileren Anbieter."

@@ -370,6 +370,10 @@
         "title": "O limite de taxa do provedor de modelo foi atingido",
         "body": "O provedor está limitando as solicitações temporariamente. Aguarde um momento, reduza a frequência das solicitações ou troque de modelo."
       },
+      "USER_LLM_PROVIDER_QUOTA_EXHAUSTED": {
+        "title": "Cota do provedor de modelos esgotada",
+        "body": "A conta do provedor está sem saldo ou cota, então esperar não vai adiantar. Adicione crédito à conta, verifique o plano de cobrança ou mude para outro modelo."
+      },
       "USER_LLM_PROVIDER_TIMEOUT": {
         "title": "A solicitação ao provedor de modelo expirou",
         "body": "O provedor não respondeu a tempo. Tente novamente mais tarde ou troque para um provedor mais estável."

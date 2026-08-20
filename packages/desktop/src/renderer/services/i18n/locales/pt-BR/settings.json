@@ -925,6 +925,9 @@
     "rateLimit": {
       "action": "Aguarde o limite do provedor ser redefinido e tente novamente."
     },
+    "quota": {
+      "action": "A conta do provedor está sem cota ou saldo. Adicione crédito ou troque de provedor e tente novamente."
+    },
     "setup": {
       "action": "Revise as credenciais e a configuração do provedor e tente novamente."
     },

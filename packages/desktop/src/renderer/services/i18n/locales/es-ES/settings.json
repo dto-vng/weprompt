@@ -915,6 +915,9 @@
     "rateLimit": {
       "action": "Espera a que se restablezca el límite del proveedor e inténtalo de nuevo."
     },
+    "quota": {
+      "action": "La cuenta del proveedor se ha quedado sin cuota o saldo. Añade crédito o cambia de proveedor y vuelve a intentarlo."
+    },
     "setup": {
       "action": "Revisa las credenciales y la configuración del proveedor e inténtalo de nuevo."
     },

@@ -19,6 +19,29 @@ export default defineConfig({
   test: {
     globals: true,
     testTimeout: 10000,
+    /**
+     * BUG-054: the push gate went red with `8368 passed, 19 skipped, 0 failed`.
+     * The failure was an `EnvironmentTeardownError: [vitest-worker]: Closing rpc
+     * while "onUserConsoleLog" was pending`, attributed to a test file that
+     * contains no console call, no await and no timer — the message itself warns
+     * that the named file need not be where the error came from.
+     *
+     * Vitest buffers intercepted console output per task and flushes it from a
+     * microtask (`node_modules/vitest/dist/chunks/console.*.js`, `schedule` →
+     * `queueCancelableMicrotask` → `rpc.onUserConsoleLog`). A write that happens
+     * as the environment tears down schedules that microtask against an RPC
+     * channel that is already closing, and the pending call is reported as a
+     * suite-level error. Nothing asserts and nothing fails, but the gate blocks
+     * the push — and it fired at 1-minute load 1.85, so contention does not
+     * explain it either.
+     *
+     * Turning interception off removes the RPC hop by construction: console
+     * writes go straight to the process streams and there is nothing left to be
+     * pending at teardown. The cost is the `stdout | file > test` attribution
+     * header, which buys nothing here — a green full run emits no intercepted
+     * console output at all.
+     */
+    disableConsoleIntercept: true,
     // Use projects to run different environments (Vitest 4+)
     projects: [
       // Node environment tests (existing tests)

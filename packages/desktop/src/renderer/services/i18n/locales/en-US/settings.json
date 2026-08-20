@@ -922,6 +922,9 @@
     "rateLimit": {
       "action": "Wait for the provider limit to reset, then try again."
     },
+    "quota": {
+      "action": "The provider account is out of quota or balance. Add credit or switch provider, then try again."
+    },
     "setup": {
       "action": "Review the provider credentials and configuration, then try again."
     },

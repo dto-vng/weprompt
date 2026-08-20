@@ -278,10 +278,10 @@ export const assistants = {
       `/api/assistants/${encodeURIComponent(id)}${locale ? `?locale=${encodeURIComponent(locale)}` : ''}`
   ),
   create: httpPost<Assistant, CreateAssistantRequest>('/api/assistants'),
-  update: httpPut<Assistant, UpdateAssistantRequest>((p) => `/api/assistants/${p.id}`),
-  delete: httpDelete<void, { id: string }>((p) => `/api/assistants/${p.id}`),
+  update: httpPut<Assistant, UpdateAssistantRequest>((p) => `/api/assistants/${encodeURIComponent(p.id)}`),
+  delete: httpDelete<void, { id: string }>((p) => `/api/assistants/${encodeURIComponent(p.id)}`),
   setState: httpPatch<Assistant, SetAssistantStateRequest>(
-    (p) => `/api/assistants/${p.id}/state`,
+    (p) => `/api/assistants/${encodeURIComponent(p.id)}/state`,
     (p) => {
       const { id: _id, ...body } = p;
       return body;
@@ -317,22 +317,26 @@ export const conversation = {
     fromApiConversation
   ),
   get: withResponseMap(
-    httpGet<TChatConversation, { id: string }>((p) => `/api/conversations/${p.id}`, { silentStatuses: [404] }),
+    httpGet<TChatConversation, { id: string }>((p) => `/api/conversations/${encodeURIComponent(p.id)}`, {
+      silentStatuses: [404],
+    }),
     fromApiConversation
   ),
   getAssociateConversation: withResponseMap(
     httpGet<TChatConversation[], { conversation_id: string }>(
-      (p) => `/api/conversations/${p.conversation_id}/associated`
+      (p) => `/api/conversations/${encodeURIComponent(p.conversation_id)}/associated`
     ),
     (list) => list.map(fromApiConversation)
   ),
   listByCronJob: withResponseMap(
-    httpGet<TChatConversation[], { cron_job_id: string }>((p) => `/api/cron/jobs/${p.cron_job_id}/conversations`),
+    httpGet<TChatConversation[], { cron_job_id: string }>(
+      (p) => `/api/cron/jobs/${encodeURIComponent(p.cron_job_id)}/conversations`
+    ),
     (list) => list.map(fromApiConversation)
   ),
-  remove: httpDelete<boolean, { id: string }>((p) => `/api/conversations/${p.id}`),
+  remove: httpDelete<boolean, { id: string }>((p) => `/api/conversations/${encodeURIComponent(p.id)}`),
   update: httpPatch<boolean, { id: string; updates: Partial<TChatConversation>; merge_extra?: boolean }>(
-    (p) => `/api/conversations/${p.id}`,
+    (p) => `/api/conversations/${encodeURIComponent(p.id)}`,
     (p) => {
       const updates = p.updates as Record<string, unknown>;
       const { model: rawModel, ...rest } = updates;
@@ -344,22 +348,22 @@ export const conversation = {
       };
     }
   ),
-  reset: httpPost<void, IResetConversationParams>((p) => `/api/conversations/${p.id}/reset`),
+  reset: httpPost<void, IResetConversationParams>((p) => `/api/conversations/${encodeURIComponent(p.id)}/reset`),
   ensureRuntime: httpPost<EnsureConversationRuntimeResponse, { conversation_id: string }>(
-    (p) => `/api/conversations/${p.conversation_id}/runtime/ensure`,
+    (p) => `/api/conversations/${encodeURIComponent(p.conversation_id)}/runtime/ensure`,
     () => undefined
   ),
   activeLease: httpPost<void, { conversation_id: string }>(
-    (p) => `/api/conversations/${p.conversation_id}/active-lease`,
+    (p) => `/api/conversations/${encodeURIComponent(p.conversation_id)}/active-lease`,
     () => undefined
   ),
   stop: httpPost<{ runtime: TConversationRuntimeSummary }, { conversation_id: string; turn_id: string }>(
-    (p) => `/api/conversations/${p.conversation_id}/cancel`,
+    (p) => `/api/conversations/${encodeURIComponent(p.conversation_id)}/cancel`,
     (p) => ({ turn_id: p.turn_id })
   ),
   activeCount: httpGet<{ count: number }>('/api/conversations/active-count'),
   sendMessage: httpPost<ISendMessageResult, ISendMessageParams>(
-    (p) => `/api/conversations/${p.conversation_id}/messages`,
+    (p) => `/api/conversations/${encodeURIComponent(p.conversation_id)}/messages`,
     (p) => ({
       content: p.input,
       files: p.files,
@@ -369,7 +373,7 @@ export const conversation = {
     })
   ),
   compactContext: httpPost<ICompactContextResult, ICompactContextParams>(
-    (p) => `/api/conversations/${p.conversation_id}/context/compact`,
+    (p) => `/api/conversations/${encodeURIComponent(p.conversation_id)}/context/compact`,
     (p) => ({
       trigger: p.trigger,
       previous_snapshot: p.previous_snapshot,
@@ -379,24 +383,25 @@ export const conversation = {
     })
   ),
   getSlashCommands: httpGet<AcpSlashCommandApiItem[], { conversation_id: string }>(
-    (p) => `/api/conversations/${p.conversation_id}/slash-commands`
+    (p) => `/api/conversations/${encodeURIComponent(p.conversation_id)}/slash-commands`
   ),
   askSideQuestion: httpPost<ConversationSideQuestionResult, { conversation_id: string; question: string }>(
-    (p) => `/api/conversations/${p.conversation_id}/side-question`,
+    (p) => `/api/conversations/${encodeURIComponent(p.conversation_id)}/side-question`,
     (p) => ({ question: p.question })
   ),
   confirmMessage: httpPost<void, IConfirmMessageParams>(
-    (p) => `/api/conversations/${p.conversation_id}/confirmations/${encodeURIComponent(p.call_id)}/confirm`,
+    (p) =>
+      `/api/conversations/${encodeURIComponent(p.conversation_id)}/confirmations/${encodeURIComponent(p.call_id)}/confirm`,
     (p) => ({ msg_id: p.msg_id, data: p.confirm_key })
   ),
   listArtifacts: httpGet<IConversationArtifact[], { conversation_id: string }>(
-    (p) => `/api/conversations/${p.conversation_id}/artifacts`
+    (p) => `/api/conversations/${encodeURIComponent(p.conversation_id)}/artifacts`
   ),
   updateArtifact: httpPatch<
     IConversationArtifact,
     { conversation_id: string; artifact_id: string; status: IConversationArtifactStatus }
   >(
-    (p) => `/api/conversations/${p.conversation_id}/artifacts/${p.artifact_id}`,
+    (p) => `/api/conversations/${encodeURIComponent(p.conversation_id)}/artifacts/${encodeURIComponent(p.artifact_id)}`,
     (p) => ({ status: p.status })
   ),
   responseStream: wsMappedEmitter<IResponseMessage>('message.stream', normalizeResponseMessage),
@@ -468,7 +473,7 @@ export const conversation = {
     provider: () => {},
     invoke: (async (p: { conversation_id: string; workspace: string; path: string; search?: string }) => {
       const rel = absoluteToRelativePath(p.path, p.workspace);
-      const url = `/api/conversations/${p.conversation_id}/workspace?path=${encodeURIComponent(rel)}${p.search ? `&search=${encodeURIComponent(p.search)}` : ''}`;
+      const url = `/api/conversations/${encodeURIComponent(p.conversation_id)}/workspace?path=${encodeURIComponent(rel)}${p.search ? `&search=${encodeURIComponent(p.search)}` : ''}`;
       const raw = await httpRequest<Array<{ name: string; type: string }>>('GET', url);
       return fromBackendWorkspaceList(raw, p.workspace, rel);
     }) as (p: { conversation_id: string; workspace: string; path: string; search?: string }) => Promise<IDirOrFile[]>,
@@ -484,18 +489,19 @@ export const conversation = {
       void,
       { conversation_id: string; msg_id: string; data: unknown; call_id: string; always_allow?: boolean }
     >(
-      (p) => `/api/conversations/${p.conversation_id}/confirmations/${encodeURIComponent(p.call_id)}/confirm`,
+      (p) =>
+        `/api/conversations/${encodeURIComponent(p.conversation_id)}/confirmations/${encodeURIComponent(p.call_id)}/confirm`,
       (p) => ({ msg_id: p.msg_id, data: p.data, always_allow: p.always_allow ?? false })
     ),
     list: httpGet<IConfirmation<unknown>[], { conversation_id: string }>(
-      (p) => `/api/conversations/${p.conversation_id}/confirmations`
+      (p) => `/api/conversations/${encodeURIComponent(p.conversation_id)}/confirmations`
     ),
     remove: wsEmitter<{ conversation_id: string; id: string }>('confirmation.remove'),
   },
   approval: {
     check: httpGet<{ approved: boolean }, { conversation_id: string; action: string; command_type?: string }>(
       (p) =>
-        `/api/conversations/${p.conversation_id}/approvals/check?action=${encodeURIComponent(p.action)}${p.command_type ? `&command_type=${encodeURIComponent(p.command_type)}` : ''}`
+        `/api/conversations/${encodeURIComponent(p.conversation_id)}/approvals/check?action=${encodeURIComponent(p.action)}${p.command_type ? `&command_type=${encodeURIComponent(p.command_type)}` : ''}`
     ),
   },
 };
@@ -810,7 +816,7 @@ export const fs = {
     '/api/skills/assistant-rule/write'
   ),
   deleteAssistantRule: httpDelete<boolean, { assistant_id: string }>(
-    (p) => `/api/skills/assistant-rule/${p.assistant_id}`
+    (p) => `/api/skills/assistant-rule/${encodeURIComponent(p.assistant_id)}`
   ),
   listAvailableSkills: withResponseMap(
     httpGet<
@@ -899,7 +905,7 @@ export const fs = {
     void
   >('/api/skills/import-history'),
   getSkillImportLimits: httpGet<{ max_file_bytes: number; max_total_bytes: number }, void>('/api/skills/import-limits'),
-  deleteSkill: httpDelete<void, { skill_name: string }>((p) => `/api/skills/${p.skill_name}`),
+  deleteSkill: httpDelete<void, { skill_name: string }>((p) => `/api/skills/${encodeURIComponent(p.skill_name)}`),
   getSkillPaths: httpGet<{ user_skills_dir: string; builtin_skills_dir: string }, void>('/api/skills/paths'),
   getCustomExternalPaths: httpGet<Array<{ name: string; path: string }>, void>('/api/skills/external-paths'),
   addCustomExternalPath: httpPost<void, { name: string; path: string }>('/api/skills/external-paths'),
@@ -1025,15 +1031,15 @@ export const mode = {
   listProviders: httpGet<IProvider[], void>('/api/providers'),
   createProvider: httpPost<IProvider, CreateProviderRequest>('/api/providers'),
   updateProvider: httpPut<IProvider, { id: string } & UpdateProviderRequest>(
-    (p) => `/api/providers/${p.id}`,
+    (p) => `/api/providers/${encodeURIComponent(p.id)}`,
     (p) => {
       const { id: _id, ...body } = p;
       return body;
     }
   ),
-  deleteProvider: httpDelete<void, { id: string }>((p) => `/api/providers/${p.id}`),
+  deleteProvider: httpDelete<void, { id: string }>((p) => `/api/providers/${encodeURIComponent(p.id)}`),
   fetchProviderModels: httpPost<FetchModelsResponse, { id: string; try_fix?: boolean }>(
-    (p) => `/api/providers/${p.id}/models`,
+    (p) => `/api/providers/${encodeURIComponent(p.id)}/models`,
     (p) => ({ try_fix: p.try_fix })
   ),
   /**
@@ -1104,26 +1110,29 @@ export const acpConversation = {
       };
     }
   >(
-    (p) => `/api/agents/custom/${p.id}`,
+    (p) => `/api/agents/custom/${encodeURIComponent(p.id)}`,
     (p) => {
       const { id: _id, ...rest } = p;
       return rest;
     }
   ),
-  deleteCustomAgent: httpDelete<{ deleted: boolean }, { id: string }>((p) => `/api/agents/custom/${p.id}`),
+  deleteCustomAgent: httpDelete<{ deleted: boolean }, { id: string }>(
+    (p) => `/api/agents/custom/${encodeURIComponent(p.id)}`
+  ),
   setAgentEnabled: httpPatch<AgentMetadata, { id: string; enabled: boolean }>(
-    (p) => `/api/agents/${p.id}/enabled`,
+    (p) => `/api/agents/${encodeURIComponent(p.id)}/enabled`,
     (p) => ({ enabled: p.enabled })
   ),
   checkManagedAgentHealthById: httpPost<import('@/renderer/utils/model/agentTypes').ManagedAgent, { id: string }>(
-    (p) => `/api/agents/${p.id}/health-check`,
+    (p) => `/api/agents/${encodeURIComponent(p.id)}/health-check`,
     () => undefined
   ),
   checkProviderHealth: httpPost<ProviderHealthCheckResponse, ProviderHealthCheckRequest>(
     '/api/agents/provider-health-check'
   ),
   setConfigOption: httpPut<SetConfigOptionResponse, { conversation_id: string; option_id: string; value: string }>(
-    (p) => `/api/conversations/${p.conversation_id}/config-options/${encodeURIComponent(p.option_id)}`,
+    (p) =>
+      `/api/conversations/${encodeURIComponent(p.conversation_id)}/config-options/${encodeURIComponent(p.option_id)}`,
     (p): SetConfigOptionRequest => ({ value: p.value })
   ),
 };
@@ -1328,12 +1337,12 @@ export const mcpService = {
       data: Partial<Pick<IMcpServer, 'name' | 'description' | 'transport' | 'original_json' | 'builtin'>>;
     }
   >(
-    (p) => `/api/mcp/servers/${p.id}`,
+    (p) => `/api/mcp/servers/${encodeURIComponent(p.id)}`,
     (p) => p.data
   ),
-  deleteServer: httpDelete<void, { id: string }>((p) => `/api/mcp/servers/${p.id}`),
+  deleteServer: httpDelete<void, { id: string }>((p) => `/api/mcp/servers/${encodeURIComponent(p.id)}`),
   toggleServer: httpPost<IMcpServer, { id: string }>(
-    (p) => `/api/mcp/servers/${p.id}/toggle`,
+    (p) => `/api/mcp/servers/${encodeURIComponent(p.id)}/toggle`,
     () => undefined
   ),
   batchImportServers: httpPost<
@@ -1407,7 +1416,7 @@ export const openclawConversation = {
       };
     },
     { conversation_id: string }
-  >((p) => `/api/conversations/${p.conversation_id}/openclaw/runtime`),
+  >((p) => `/api/conversations/${encodeURIComponent(p.conversation_id)}/openclaw/runtime`),
 };
 
 // ---------------------------------------------------------------------------
@@ -1417,7 +1426,7 @@ export const openclawConversation = {
 export const remoteAgent = {
   list: httpGet<import('@/common/types/agent/remoteAgentTypes').RemoteAgentConfig[], void>('/api/remote-agents'),
   get: httpGet<import('@/common/types/agent/remoteAgentTypes').RemoteAgentConfig | null, { id: string }>(
-    (p) => `/api/remote-agents/${p.id}`
+    (p) => `/api/remote-agents/${encodeURIComponent(p.id)}`
   ),
   create: httpPost<
     import('@/common/types/agent/remoteAgentTypes').RemoteAgentConfig,
@@ -1427,16 +1436,16 @@ export const remoteAgent = {
     boolean,
     { id: string; updates: Partial<import('@/common/types/agent/remoteAgentTypes').RemoteAgentInput> }
   >(
-    (p) => `/api/remote-agents/${p.id}`,
+    (p) => `/api/remote-agents/${encodeURIComponent(p.id)}`,
     (p) => p.updates
   ),
-  delete: httpDelete<boolean, { id: string }>((p) => `/api/remote-agents/${p.id}`),
+  delete: httpDelete<boolean, { id: string }>((p) => `/api/remote-agents/${encodeURIComponent(p.id)}`),
   testConnection: httpPost<
     { success: boolean; error?: string },
     { url: string; auth_type: string; auth_token?: string; allow_insecure?: boolean }
   >('/api/remote-agents/test-connection'),
   handshake: httpPost<{ status: 'ok' | 'pending_approval' | 'error'; error?: string }, { id: string }>(
-    (p) => `/api/remote-agents/${p.id}/handshake`
+    (p) => `/api/remote-agents/${encodeURIComponent(p.id)}/handshake`
   ),
 };
 
@@ -1479,12 +1488,12 @@ export const database = {
     if (p.anchor_message_id) params.set('anchor_message_id', p.anchor_message_id);
     if (p.content_mode) params.set('content_mode', p.content_mode);
     const qs = params.toString();
-    return `/api/conversations/${p.conversation_id}/messages${qs ? `?${qs}` : ''}`;
+    return `/api/conversations/${encodeURIComponent(p.conversation_id)}/messages${qs ? `?${qs}` : ''}`;
   }),
   getConversationMessage: httpGet<
     import('@/common/chat/chatLib').TMessage,
     { conversation_id: string; message_id: string }
-  >((p) => `/api/conversations/${p.conversation_id}/messages/${encodeURIComponent(p.message_id)}`),
+  >((p) => `/api/conversations/${encodeURIComponent(p.conversation_id)}/messages/${encodeURIComponent(p.message_id)}`),
   getUserConversations: withResponseMap(
     httpGet<PaginatedResult<import('@/common/config/storage').TChatConversation>, { cursor?: string; limit?: number }>(
       (p) => {
@@ -1756,10 +1765,10 @@ export const cron = {
   listJobsByConversation: httpGet<ICronJob[], { conversation_id: string }>(
     (p) => `/api/cron/jobs?conversation_id=${encodeURIComponent(p.conversation_id)}`
   ),
-  getJob: httpGet<ICronJob | null, { job_id: string }>((p) => `/api/cron/jobs/${p.job_id}`),
+  getJob: httpGet<ICronJob | null, { job_id: string }>((p) => `/api/cron/jobs/${encodeURIComponent(p.job_id)}`),
   addJob: httpPost<ICronJob, ICreateCronJobParams>('/api/cron/jobs'),
   updateJob: httpPut<ICronJob, { job_id: string; updates: ICronJobUpdateParams }>(
-    (p) => `/api/cron/jobs/${p.job_id}`,
+    (p) => `/api/cron/jobs/${encodeURIComponent(p.job_id)}`,
     (p) => ({
       name: p.updates.name,
       description: p.updates.description,
@@ -1773,17 +1782,19 @@ export const cron = {
       queue_enabled: p.updates.state?.queue_enabled,
     })
   ),
-  removeJob: httpDelete<void, { job_id: string }>((p) => `/api/cron/jobs/${p.job_id}`),
-  runNow: httpPost<{ conversation_id: string }, { job_id: string }>((p) => `/api/cron/jobs/${p.job_id}/run`),
+  removeJob: httpDelete<void, { job_id: string }>((p) => `/api/cron/jobs/${encodeURIComponent(p.job_id)}`),
+  runNow: httpPost<{ conversation_id: string }, { job_id: string }>(
+    (p) => `/api/cron/jobs/${encodeURIComponent(p.job_id)}/run`
+  ),
   saveSkill: httpPost<void, { job_id: string; content: string }>(
-    (p) => `/api/cron/jobs/${p.job_id}/skill`,
+    (p) => `/api/cron/jobs/${encodeURIComponent(p.job_id)}/skill`,
     (p) => ({ content: p.content })
   ),
   hasSkill: withResponseMap(
-    httpGet<{ has_skill: boolean }, { job_id: string }>((p) => `/api/cron/jobs/${p.job_id}/skill`),
+    httpGet<{ has_skill: boolean }, { job_id: string }>((p) => `/api/cron/jobs/${encodeURIComponent(p.job_id)}/skill`),
     (data) => Boolean(data?.has_skill)
   ),
-  deleteSkill: httpDelete<void, { job_id: string }>((p) => `/api/cron/jobs/${p.job_id}/skill`),
+  deleteSkill: httpDelete<void, { job_id: string }>((p) => `/api/cron/jobs/${encodeURIComponent(p.job_id)}/skill`),
   onJobCreated: wsEmitter<ICronJob>('cron.job-created'),
   onJobUpdated: wsEmitter<ICronJob>('cron.job-updated'),
   onJobRemoved: wsEmitter<{ job_id: string }>('cron.job-removed'),
@@ -2432,50 +2443,51 @@ export const team = {
     fromBackendTeamList
   ),
   get: withResponseMap(
-    httpGet<TTeam | null, { id: string }>((p) => `/api/teams/${p.id}`),
+    httpGet<TTeam | null, { id: string }>((p) => `/api/teams/${encodeURIComponent(p.id)}`),
     fromBackendTeamOptional
   ),
-  remove: httpDelete<void, { id: string }>((p) => `/api/teams/${p.id}`),
+  remove: httpDelete<void, { id: string }>((p) => `/api/teams/${encodeURIComponent(p.id)}`),
   addAgent: withResponseMap(
     httpPost<TeamAssistant, IAddTeamAssistantParams>(
-      (p) => `/api/teams/${p.team_id}/agents`,
+      (p) => `/api/teams/${encodeURIComponent(p.team_id)}/agents`,
       (p) => ({ assistant: toBackendAssistant(p.assistant) })
     ),
     fromBackendAssistant
   ),
   removeAgent: httpDelete<void, { team_id: string; slot_id: string }>(
-    (p) => `/api/teams/${p.team_id}/agents/${p.slot_id}`
+    (p) => `/api/teams/${encodeURIComponent(p.team_id)}/agents/${encodeURIComponent(p.slot_id)}`
   ),
-  stop: httpDelete<void, { team_id: string }>((p) => `/api/teams/${p.team_id}/session`),
-  ensureSession: httpPost<void, { team_id: string }>((p) => `/api/teams/${p.team_id}/session`),
+  stop: httpDelete<void, { team_id: string }>((p) => `/api/teams/${encodeURIComponent(p.team_id)}/session`),
+  ensureSession: httpPost<void, { team_id: string }>((p) => `/api/teams/${encodeURIComponent(p.team_id)}/session`),
   getConfigOptions: httpGet<GetConfigOptionsResponse, { team_id: string; conversation_id: string }>(
-    (p) => `/api/teams/${p.team_id}/conversations/${encodeURIComponent(p.conversation_id)}/config-options`
+    (p) =>
+      `/api/teams/${encodeURIComponent(p.team_id)}/conversations/${encodeURIComponent(p.conversation_id)}/config-options`
   ),
   activeLease: httpPost<void, { team_id: string }>(
-    (p) => `/api/teams/${p.team_id}/active-lease`,
+    (p) => `/api/teams/${encodeURIComponent(p.team_id)}/active-lease`,
     () => undefined
   ),
   renameAgent: httpPatch<void, { team_id: string; slot_id: string; new_name: string }>(
-    (p) => `/api/teams/${p.team_id}/agents/${p.slot_id}/name`,
+    (p) => `/api/teams/${encodeURIComponent(p.team_id)}/agents/${encodeURIComponent(p.slot_id)}/name`,
     (p) => ({ name: p.new_name })
   ),
   renameTeam: httpPatch<void, { id: string; name: string }>(
-    (p) => `/api/teams/${p.id}/name`,
+    (p) => `/api/teams/${encodeURIComponent(p.id)}/name`,
     (p) => ({ name: p.name })
   ),
   setSessionMode: httpPost<void, { team_id: string; session_mode: string }>(
-    (p) => `/api/teams/${p.team_id}/session-mode`,
+    (p) => `/api/teams/${encodeURIComponent(p.team_id)}/session-mode`,
     (p) => ({ mode: p.session_mode })
   ),
   // Run payloads are normalized (see `fromBackendTeamRunState`) so `slot_work`
   // is always an array, even on backends that predate the field.
   getRunState: withResponseMap(
-    httpGet<unknown, { team_id: string }>((p) => `/api/teams/${p.team_id}/run-state`),
+    httpGet<unknown, { team_id: string }>((p) => `/api/teams/${encodeURIComponent(p.team_id)}/run-state`),
     fromBackendTeamRunState
   ),
   sendMessage: withResponseMap(
     httpPost<unknown, ISendTeamMessageParams>(
-      (p) => `/api/teams/${p.team_id}/messages`,
+      (p) => `/api/teams/${encodeURIComponent(p.team_id)}/messages`,
       (p) => ({
         content: p.input,
         files: p.files,
@@ -2485,7 +2497,7 @@ export const team = {
   ),
   sendMessageToAgent: withResponseMap(
     httpPost<unknown, ISendTeamAgentMessageParams>(
-      (p) => `/api/teams/${p.team_id}/agents/${p.slot_id}/messages`,
+      (p) => `/api/teams/${encodeURIComponent(p.team_id)}/agents/${encodeURIComponent(p.slot_id)}/messages`,
       (p) => ({
         content: p.input,
         files: p.files,
@@ -2494,20 +2506,22 @@ export const team = {
     fromBackendTeamRunAck
   ),
   cancelRun: httpPost<void, ICancelTeamRunParams>(
-    (p) => `/api/teams/${p.team_id}/runs/${p.team_run_id}/cancel`,
+    (p) => `/api/teams/${encodeURIComponent(p.team_id)}/runs/${encodeURIComponent(p.team_run_id)}/cancel`,
     (p) => ({
       target_slot_id: p.target_slot_id,
       reason: p.reason,
     })
   ),
   cancelChildTurn: httpPost<void, ICancelTeamChildTurnParams>(
-    (p) => `/api/teams/${p.team_id}/runs/${p.team_run_id}/agents/${p.slot_id}/cancel`,
+    (p) =>
+      `/api/teams/${encodeURIComponent(p.team_id)}/runs/${encodeURIComponent(p.team_run_id)}/agents/${encodeURIComponent(p.slot_id)}/cancel`,
     (p) => ({
       reason: p.reason,
     })
   ),
   pauseSlotWork: httpPost<void, IPauseTeamSlotParams>(
-    (p) => `/api/teams/${p.team_id}/runs/${p.team_run_id}/agents/${p.slot_id}/pause`,
+    (p) =>
+      `/api/teams/${encodeURIComponent(p.team_id)}/runs/${encodeURIComponent(p.team_run_id)}/agents/${encodeURIComponent(p.slot_id)}/pause`,
     (p) => ({
       reason: p.reason,
     })

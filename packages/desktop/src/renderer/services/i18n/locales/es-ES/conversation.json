@@ -349,6 +349,10 @@
         "title": "Se alcanzó el límite de velocidad del proveedor",
         "body": "El proveedor está limitando temporalmente las solicitudes. Espera un momento, reduce la frecuencia de solicitudes o cambia de modelo."
       },
+      "USER_LLM_PROVIDER_QUOTA_EXHAUSTED": {
+        "title": "Cuota del proveedor de modelos agotada",
+        "body": "La cuenta del proveedor se ha quedado sin saldo o cuota, así que esperar no servirá. Añade crédito a la cuenta, revisa su plan de facturación o cambia a otro modelo."
+      },
       "USER_LLM_PROVIDER_TIMEOUT": {
         "title": "Tiempo de espera del proveedor agotado",
         "body": "El proveedor no respondió a tiempo. Reintenta más tarde o cambia a un proveedor más estable."

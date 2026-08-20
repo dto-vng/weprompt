@@ -9,6 +9,7 @@ import type { AcpAvailableCommand } from '@/common/chat/slash/types';
 import type { IResponseMessage } from '../adapter/ipcBridge';
 import { uuid } from '../utils';
 import { sanitizeAcpToolCallContent, sanitizeAcpToolUpdate } from './acpToolCallOutput';
+import { isQuotaExhaustedMessage } from '@/common/types/provider/quotaExhaustion';
 
 export { sanitizeAcpToolCallContent } from './acpToolCallOutput';
 
@@ -646,6 +647,32 @@ export const normalizeAgentStreamError = (value: unknown): AgentStreamErrorInfo 
     !rawError
   ) {
     return undefined;
+  }
+
+  if (code === 'USER_LLM_PROVIDER_RATE_LIMITED' && isQuotaExhaustedMessage(detail ?? value.message)) {
+    /**
+     * BUG-055: aioncore classifies a provider's `exceeded_current_quota_error` as
+     * `Rate limited, retry after 5000ms`, so an account suspended for insufficient
+     * balance reaches here wearing a rate limit's envelope: retryable, with a
+     * `retry` resolution. Waiting never clears a suspended account, and each retry
+     * spends an attempt that cannot succeed — measured as three failed compaction
+     * retries per attempt, ten minutes apart, which read as a burst limit that
+     * never recovers and sent the investigation toward load and timing.
+     *
+     * The provider's own words survive intact, so the correction is made here at
+     * the single boundary where code, detail, retryable and resolution arrive
+     * together, rather than in each surface that renders them.
+     */
+    return {
+      message: value.message,
+      code: 'USER_LLM_PROVIDER_QUOTA_EXHAUSTED',
+      ...(ownership ? { ownership } : {}),
+      ...(detail ? { detail } : {}),
+      ...(workspacePath ? { workspacePath } : {}),
+      retryable: false,
+      ...(feedback_recommended !== undefined ? { feedback_recommended } : {}),
+      ...(rawError ? { rawError } : {}),
+    };
   }
 
   return {

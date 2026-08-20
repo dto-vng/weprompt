@@ -125,6 +125,29 @@ describe('ProjectHomePage', () => {
     expect(screen.queryByTestId('project-not-found')).not.toBeInTheDocument();
   });
 
+  /**
+   * BUG-058 wiring: the hook decides, but the page has to act on it. Without the
+   * `isHubStacked` term the hub keeps `grid-template-columns: 1fr 356px` at every
+   * width and the fixed rail crushes the main column.
+   */
+  it.each([
+    ['stacks the hub once it is measured below the threshold', 600, true],
+    ['keeps two columns when the hub has room', 1200, false],
+  ])('%s', (_case, hubWidth, expectStacked) => {
+    const rect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ width: hubWidth, height: 0 } as DOMRect);
+    seedProject();
+    renderAt('p1');
+
+    const hub = screen.getByTestId('project-hub');
+    // CSS modules hash the class name, so match the stem rather than the literal.
+    const isStacked = Array.from(hub.classList).some((name) => name.includes('hubMobile'));
+
+    expect(isStacked).toBe(expectStacked);
+    rect.mockRestore();
+  });
+
   it('shows a whole-page not-found state for an unknown project id', () => {
     renderAt('missing');
 

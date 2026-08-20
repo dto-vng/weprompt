@@ -910,6 +910,9 @@
     "rateLimit": {
       "action": "Sağlayıcı sınırının sıfırlanmasını bekleyip tekrar deneyin."
     },
+    "quota": {
+      "action": "Sağlayıcı hesabının kotası veya bakiyesi tükendi. Bakiye yükleyin veya sağlayıcıyı değiştirip yeniden deneyin."
+    },
     "setup": {
       "action": "Sağlayıcı kimlik bilgilerini ve yapılandırmasını kontrol edip tekrar deneyin."
     },
