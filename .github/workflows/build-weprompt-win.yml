@@ -118,7 +118,9 @@ jobs:
           mkdir -p "$OFFICE_DIR"
           URL="https://github.com/iOfficeAI/OfficeCli/releases/download/${OFFICECLI_VERSION}/${OFFICECLI_ASSET}"
           curl -fSL --retry 5 --retry-delay 3 -o "$OFFICE_DIR/officecli.exe" "$URL"
-          ACTUAL=$(sha256sum "$OFFICE_DIR/officecli.exe" | awk '{print $1}')
+          # Read via stdin: a Windows-style path (backslashes) makes sha256sum
+          # prepend '\' to the checksum line, corrupting the parsed digest.
+          ACTUAL=$(sha256sum < "$OFFICE_DIR/officecli.exe" | awk '{print $1}')
           if [ "$ACTUAL" != "$OFFICECLI_SHA256" ]; then
             echo "::error::officecli digest mismatch: expected $OFFICECLI_SHA256, got $ACTUAL"; exit 1
           fi
