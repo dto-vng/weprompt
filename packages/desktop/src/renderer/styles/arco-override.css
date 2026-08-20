@@ -621,3 +621,28 @@ body[arco-theme='dark'] .arco-message-error {
   border-left: 2px solid var(--border-base);
   margin-top: 4px;
 }
+
+/* The window is `titleBarStyle: 'hidden'` and the app paints its own titlebar,
+   marked `-webkit-app-region: drag` across the full window width — measured at
+   1209x46. A drag region is consumed by the OS for window-dragging before the
+   DOM sees the click, so any control Arco renders into a body-level portal that
+   lands in that band is unclickable with a real mouse. It is invisible to
+   `elementFromPoint` and to synthetic events, both of which sit below the OS
+   layer, so it reproduces only for a person using the app.
+
+   Found via a knowledge preview whose close icon sat at y=24: the X did nothing
+   while Escape and a mask click, both outside the band, closed it normally.
+
+   Opt the panels out. Not the full-screen wrappers — those would make the
+   titlebar undraggable whenever a drawer or modal is open. Each panel here is
+   0x0 while closed, so this costs nothing until one is on screen. */
+.arco-drawer,
+.arco-modal,
+.arco-popover-content,
+.arco-dropdown,
+.arco-select-popup,
+.arco-tooltip-content,
+.arco-message,
+.arco-notification {
+  -webkit-app-region: no-drag;
+}
