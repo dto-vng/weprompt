@@ -82,6 +82,7 @@ vi.mock('@/renderer/components/chat/SpeechInputButton', () => ({ default: () => 
 vi.mock('@/renderer/components/media/UploadProgressBar', () => ({ default: () => null }));
 vi.mock('@/renderer/hooks/chat/useCompositionInput', () => ({
   useCompositionInput: () => ({
+    createCompositionValueSync: () => vi.fn(),
     compositionHandlers: {},
     createKeyDownHandler: () => vi.fn(),
     isComposingState: false,
