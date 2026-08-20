@@ -474,6 +474,7 @@ const ProjectNewChatComposer: React.FC<ProjectNewChatComposerProps> = ({ project
         selectedAssistantId={agentSelection.selectedAssistantId}
         assistants={agentSelection.assistants}
         localeKey={localeKey}
+        variant='inline'
         onSelectAssistant={handleSelectAssistant}
       />
 
