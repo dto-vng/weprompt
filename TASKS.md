@@ -102,6 +102,24 @@
   - Fix: `-webkit-app-region: no-drag` on the portal **panels** in `arco-override.css`. Deliberately not on the full-screen wrappers, which would make the titlebar undraggable whenever a drawer or modal is open; each panel is 0x0 while closed, so the opt-out costs nothing until one is on screen. Verified live: the close icon now resolves to `no-drag` while `.app-titlebar` stays `drag`.
   - Guarded as a source contract only (`tests/unit/renderer/arcoPortalDragRegion.test.ts`), since vitest loads no CSS. Mutation-checked: deleting the rule fails 8 of its 10 cases. A rendered assertion is not available at this layer.
 
+- [ ] **[BUG-058][P2][Project home] The project-home grid never reflows, so a fixed 356px right rail crushes the main column below ~1150px** — found 2026-08-20 while measuring the composer for the assistant-bar fix
+  - Symptom, measured live: at a **880x850** window the New chat card is **77px wide**, with a 43px composer inside it. The card is unusable — the placeholder, model picker and send button are all clipped — and the chat list beneath it is squeezed the same way.
+  - Cause: `.hub` in `packages/desktop/src/renderer/pages/project/ProjectHomePage.module.css` is `grid-template-columns: 1fr 356px` with **no viewport breakpoint anywhere in the file**. The right rail keeps its full 356px at every width, so every pixel lost comes out of the `1fr` main column. Measured at vw 880: computed `grid-template-columns: 77.4141px 356px`.
+  - The stacking rule exists but cannot fire in this band. `.hubMobile` (flex column) is applied from `ProjectHomePage.tsx:74` on `layout.isMobile`, which on Electron desktop is **`window.innerWidth < 768`** (`detectMobileViewportOrTouch`, `packages/desktop/src/renderer/pages/conversation/utils/detectPlatform.ts:10`). That threshold reads the **window**, not the hub's own available width, and so ignores the Sider entirely.
+  - The Sider is the missing term, and it is user-resizable (`SIDER_MIN_WIDTH` 200 → `SIDER_MAX_WIDTH` 420, default 260), so the band moves with it. Main column ≈ `vw − siderWidth − 454` (68px hub padding + 30px gap + 356px rail):
+
+    | Sider            | main column hits 0 | vw needed for a 380px composer |
+    | ---------------- | ------------------ | ------------------------------ |
+    | 200px            | 654px              | 1034px                         |
+    | 260px (default)  | 714px              | 1094px                         |
+    | 343px (measured) | 797px              | 1177px                         |
+    | 420px            | 874px              | 1254px                         |
+
+    At the default Sider the main column is already below 380px from **1094px down**, and still not stacked at 768px, where it computes to **−46px** and the grid falls back to min-content.
+
+  - Suggested shape: reflow on the hub's own width rather than the window's — a container query on `.hub`, or a `ResizeObserver` on the hub element feeding the same `hubMobile` class the mobile path already uses. A plain `@media` breakpoint would be an improvement but still wrong at Sider widths away from the default, and wrong again if the Sider is collapsed.
+  - Not a regression from the assistant-bar fix (`163b84dfe`): that change was measured in this band and made the bar track the composer's width exactly, at 394→437 in the 43px case. It makes the crushed card tidier; it does not make it usable.
+
 - [ ] **[BUG-054][P3][Test infrastructure] A vitest worker teardown race reds the push gate with zero failing tests** — found 2026-08-19 by a `just push` gate run
   - Symptom: `bun run test` exits **1** while reporting **8368 passed, 19 skipped, 0 failed**. The failure is an unhandled rejection outside the assertions: `EnvironmentTeardownError: [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending`, attributed to `tests/unit/renderer/team/TeamSiderSection.dom.test.tsx`.
   - **A new member of the gate-poisoner family, and the first that is not a test.** BUG-046's members are timing-sensitive tests; this one is the harness closing a worker's RPC channel while a console log is still in flight. Nothing asserts, nothing fails, and the gate still blocks the push.
