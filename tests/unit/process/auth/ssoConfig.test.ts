@@ -66,6 +66,30 @@ describe('loadSsoConfig', () => {
     const config = loadSsoConfig(dir, {});
     expect(config.allowedEmailDomains).toEqual(['company.com', 'vng.com.vn']);
   });
+
+  it('enables SSO from the bundled config when userData and env are empty', () => {
+    const bundled = makeUserDataDir({ tenantId: 'baked-tenant', clientId: 'baked-client' });
+    const config = loadSsoConfig(makeUserDataDir(), {}, bundled);
+    expect(config.enabled).toBe(true);
+    expect(config.tenantId).toBe('baked-tenant');
+    expect(config.clientId).toBe('baked-client');
+  });
+
+  it('lets the userData file and env override the bundled config', () => {
+    const bundled = makeUserDataDir({ tenantId: 'baked-tenant', clientId: 'baked-client' });
+    const userData = makeUserDataDir({ tenantId: 'file-tenant', clientId: 'file-client' });
+    expect(loadSsoConfig(userData, {}, bundled).tenantId).toBe('file-tenant');
+    const envConfig = loadSsoConfig(
+      makeUserDataDir(),
+      { WEPROMPT_SSO_TENANT_ID: 'env-tenant', WEPROMPT_SSO_CLIENT_ID: 'env-client' },
+      bundled
+    );
+    expect(envConfig.tenantId).toBe('env-tenant');
+  });
+
+  it('stays dormant when neither userData, env, nor a bundled config are present', () => {
+    expect(loadSsoConfig(makeUserDataDir(), {}, makeUserDataDir()).enabled).toBe(false);
+  });
 });
 
 describe('isEmailDomainAllowed', () => {

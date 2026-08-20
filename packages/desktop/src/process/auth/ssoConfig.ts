@@ -9,9 +9,12 @@
  * Configuration is read from, in priority order:
  *   1. Environment variables (WEPROMPT_SSO_*), useful for build-time baking.
  *   2. `sso-config.json` in the app's userData directory, for IT to fill in-place.
+ *   3. `sso-config.json` shipped inside the app bundle (packaged builds), so a
+ *      release can enable the gate out-of-the-box while (1) and (2) still override.
  *
  * This module deliberately avoids importing electron so it stays unit-testable; the
- * caller passes the resolved userData directory (e.g. `app.getPath('userData')`).
+ * caller passes the resolved userData directory (e.g. `app.getPath('userData')`) and,
+ * optionally, the bundled-resource directory (e.g. `process.resourcesPath`).
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -61,15 +64,26 @@ function firstNonEmpty(...values: Array<string | undefined>): string | undefined
   return undefined;
 }
 
-export function loadSsoConfig(userDataDir: string, env: NodeJS.ProcessEnv = process.env): SsoConfig {
+export function loadSsoConfig(
+  userDataDir: string,
+  env: NodeJS.ProcessEnv = process.env,
+  bundledConfigDir?: string
+): SsoConfig {
   const file = readConfigFile(userDataDir);
+  // Lowest-priority baked config shipped inside the packaged app bundle. Lets a
+  // release turn the gate on out-of-the-box, while env vars and the userData file
+  // still take precedence so an operator can override or disable per install.
+  const bundled = bundledConfigDir ? readConfigFile(bundledConfigDir) : {};
 
-  const tenantId = firstNonEmpty(env.WEPROMPT_SSO_TENANT_ID, file.tenantId);
-  const clientId = firstNonEmpty(env.WEPROMPT_SSO_CLIENT_ID, file.clientId);
-  const redirectUri = firstNonEmpty(env.WEPROMPT_SSO_REDIRECT_URI, file.redirectUri) ?? DEFAULT_REDIRECT_URI;
-  const scopes = Array.isArray(file.scopes) && file.scopes.length > 0 ? file.scopes : DEFAULT_SCOPES;
-  const allowedEmailDomains = Array.isArray(file.allowedEmailDomains)
-    ? file.allowedEmailDomains.map((domain) => String(domain).trim().toLowerCase()).filter(Boolean)
+  const tenantId = firstNonEmpty(env.WEPROMPT_SSO_TENANT_ID, file.tenantId, bundled.tenantId);
+  const clientId = firstNonEmpty(env.WEPROMPT_SSO_CLIENT_ID, file.clientId, bundled.clientId);
+  const redirectUri =
+    firstNonEmpty(env.WEPROMPT_SSO_REDIRECT_URI, file.redirectUri, bundled.redirectUri) ?? DEFAULT_REDIRECT_URI;
+  const scopesSource = [file.scopes, bundled.scopes].find((value) => Array.isArray(value) && value.length > 0);
+  const scopes = scopesSource ?? DEFAULT_SCOPES;
+  const domainsSource = [file.allowedEmailDomains, bundled.allowedEmailDomains].find((value) => Array.isArray(value));
+  const allowedEmailDomains = domainsSource
+    ? domainsSource.map((domain) => String(domain).trim().toLowerCase()).filter(Boolean)
     : [];
 
   return {

@@ -123,6 +123,11 @@ extraResources:
   # vendored MCP bridge (mcp-remote) so OAuth MCP servers need no npx/PATH lookup
   - from: resources/mcp-bundled
     to: mcp-bundled
+  # Baked Microsoft SSO config (tenant/client, non-secret public-client ids) so the
+  # login gate is enabled out-of-the-box. Gitignored + optional: when the file is
+  # absent electron-builder skips it and the gate stays dormant (WP 24045).
+  - from: resources/sso-config.json
+    to: sso-config.json
 win:
   target:
     - nsis

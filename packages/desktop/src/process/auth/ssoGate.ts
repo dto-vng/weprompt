@@ -79,9 +79,14 @@ export function createElectronSsoGateDeps(config: SsoConfig, userDataDir: string
 export async function runSsoGateForApp(options?: {
   userDataDir?: string;
   env?: NodeJS.ProcessEnv;
+  bundledConfigDir?: string;
 }): Promise<SsoGateOutcome> {
   const userDataDir = options?.userDataDir ?? app.getPath('userData');
-  const config = loadSsoConfig(userDataDir, options?.env);
+  // In a packaged build, a baked `sso-config.json` shipped via extraResources lands
+  // in process.resourcesPath; it enables the gate out-of-the-box. In dev there is no
+  // such file, so the gate stays dormant unless env / userData configure it.
+  const bundledConfigDir = options?.bundledConfigDir ?? (app.isPackaged ? process.resourcesPath : undefined);
+  const config = loadSsoConfig(userDataDir, options?.env, bundledConfigDir);
   if (!config.enabled) return { proceed: true, account: null, skipped: true };
   return runSsoGate(createElectronSsoGateDeps(config, userDataDir));
 }
