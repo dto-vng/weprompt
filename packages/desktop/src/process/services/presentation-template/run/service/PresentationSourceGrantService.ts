@@ -7,6 +7,7 @@
 import { randomUUID as createRandomUUID } from 'node:crypto';
 import path from 'node:path';
 import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
+import { isBoundedConversationId } from '@/common/types/office/conversationId';
 import type {
   BindPresentationDraftRequest,
   BindPresentationDraftResult,
@@ -317,7 +318,11 @@ function isOwner(value: unknown): value is PresentationGrantOwner {
   if (record.owner_type === 'draft') {
     return Object.keys(record).length === 2 && isUuid(record.draft_id);
   }
-  return record.owner_type === 'conversation' && Object.keys(record).length === 2 && isUuid(record.conversation_id);
+  return (
+    record.owner_type === 'conversation' &&
+    Object.keys(record).length === 2 &&
+    isBoundedConversationId(record.conversation_id)
+  );
 }
 
 function isSourceRef(value: unknown): value is PresentationSourceRef {
@@ -475,7 +480,11 @@ export class PresentationSourceGrantService {
   async bindDraft(request: BindPresentationDraftRequest): Promise<BindPresentationDraftResult> {
     const gate = this.baseGate();
     if (gate !== null) return constrainSourceFailure('bindDraft', gate) as BindPresentationDraftResult;
-    if (!isUuid(request?.draft_id) || !isUuid(request?.conversation_id) || !isRevision(request?.expected_revision)) {
+    if (
+      !isUuid(request?.draft_id) ||
+      !isBoundedConversationId(request?.conversation_id) ||
+      !isRevision(request?.expected_revision)
+    ) {
       return constrainSourceFailure('bindDraft', sourceFailure('INVALID_REQUEST')) as BindPresentationDraftResult;
     }
     const authorization = await this.authorizeOwner({
@@ -571,7 +580,7 @@ export class PresentationSourceGrantService {
       return constrainSourceFailure('grantWorkspaceSource', gate) as GrantPresentationWorkspaceSourceResult;
     }
     if (
-      !isUuid(request?.conversation_id) ||
+      !isBoundedConversationId(request?.conversation_id) ||
       !isStrictRelativePath(request?.relative_path) ||
       !isRevision(request?.expected_owner_revision)
     ) {

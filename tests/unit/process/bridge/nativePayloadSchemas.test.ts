@@ -145,7 +145,10 @@ const VALID_PAYLOADS = {
     expected_owner_revision: 2,
   },
   'presentation-runs.start': {
-    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    // Measured from the running app (route `#/conversation/1af97a0d`, and
+    // `session_id: '8f165203'` on the turn-completed payload): conversation ids
+    // are short hex. A uuid here is what let BUG-048 hide behind a green suite.
+    conversation_id: '1af97a0d',
     client_request_id: 'c9426c09-4352-4c7c-88ca-039bfcaaf0d8',
     input: 'Create a concise board update',
     selected_template_id: 'business-review',
@@ -632,8 +635,18 @@ const INVALID_PAYLOADS = [
   ],
   [
     'presentation-sources.get-source-owner',
-    'malformed owner UUID',
-    { owner: { owner_type: 'conversation', conversation_id: 'conversation-1' } },
+    // Was 'malformed owner UUID' with `conversation-1`, which BUG-048 established
+    // is a perfectly ordinary conversation id — the app mints short ids, not
+    // uuids. What a conversation owner still may not be is path-shaped: the id
+    // reaches a `sessionStorage` key and, before BUG-052 escaped them, URL path
+    // segments.
+    'path-shaped owner conversation id',
+    { owner: { owner_type: 'conversation', conversation_id: '../foreign' } },
+  ],
+  [
+    'presentation-sources.get-source-owner',
+    'empty owner conversation id',
+    { owner: { owner_type: 'conversation', conversation_id: '' } },
   ],
   [
     'presentation-sources.get-source-owner',

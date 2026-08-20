@@ -31,6 +31,7 @@ import i18n from 'i18next';
 import { useTranslation } from 'react-i18next';
 import useSWR from 'swr';
 import { classifyConversationBusyError } from './conversationBusyError';
+import { isBoundedConversationId } from '@/common/types/office/conversationId';
 
 export type ConversationCommandQueueItem = {
   id: string;
@@ -1306,8 +1307,7 @@ const decodePresentationQueueOwner = (value: unknown): PresentationGrantOwner | 
   if (
     value.owner_type === 'conversation' &&
     hasPresentationQueueKeys(value, ['owner_type', 'conversation_id']) &&
-    typeof value.conversation_id === 'string' &&
-    PRESENTATION_QUEUE_UUID_RE.test(value.conversation_id)
+    isBoundedConversationId(value.conversation_id)
   ) {
     return { owner_type: 'conversation', conversation_id: value.conversation_id };
   }
@@ -1488,8 +1488,7 @@ export const decodePresentationCommandQueueState = (
     !isPresentationQueueRecord(value) ||
     !hasPresentationQueueKeys(value, ['version', 'conversationId', 'revision', 'items']) ||
     value.version !== PRESENTATION_COMMAND_QUEUE_VERSION ||
-    typeof value.conversationId !== 'string' ||
-    !PRESENTATION_QUEUE_UUID_RE.test(value.conversationId) ||
+    !isBoundedConversationId(value.conversationId) ||
     (expectedConversationId !== undefined && value.conversationId !== expectedConversationId) ||
     !isPresentationQueueRevision(value.revision) ||
     !Array.isArray(value.items) ||
@@ -1779,7 +1778,7 @@ const defaultPresentationQueueStorage = (): PresentationCommandQueueStorage => {
 export const createPresentationCommandQueueController = (
   options: PresentationCommandQueueControllerOptions
 ): PresentationCommandQueueController => {
-  if (!PRESENTATION_QUEUE_UUID_RE.test(options.conversationId)) {
+  if (!isBoundedConversationId(options.conversationId)) {
     throw new PresentationCommandQueueError('Invalid managed presentation queue conversation id', 'INVALID_STATE');
   }
   const storage = options.storage ?? defaultPresentationQueueStorage();

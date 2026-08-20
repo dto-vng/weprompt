@@ -10,6 +10,7 @@ import {
   PRESENTATION_RUN_DISPOSITIONS,
   PRESENTATION_RUN_LIMITS,
 } from '@/common/config/constants';
+import { isBoundedConversationId } from '@/common/types/office/conversationId';
 import type {
   PresentationReadinessBlocker,
   PresentationReadinessEvidence,
@@ -1116,8 +1117,7 @@ function isGrantOwner(value: unknown): value is PresentationGrantOwner {
     value.owner_type === 'conversation' &&
     hasExactManifestKeys(value, ['owner_type', 'conversation_id']) &&
     'conversation_id' in value &&
-    typeof value.conversation_id === 'string' &&
-    UUID_RE.test(value.conversation_id)
+    isBoundedConversationId(value.conversation_id)
   );
 }
 

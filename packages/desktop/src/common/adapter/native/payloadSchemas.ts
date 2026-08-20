@@ -11,6 +11,7 @@ import {
 } from '../../types/office/artifactEditor';
 import { PRESENTATION_RUN_LIMITS } from '../../types/office/presentationRunPolicy';
 import type { NativeBridgeProviderKey, RendererBridgeQueryKey } from './constants';
+import { isBoundedConversationId } from '@/common/types/office/conversationId';
 
 const MAX_PATH_LENGTH = 4096;
 const MAX_IDENTIFIER_LENGTH = 256;
@@ -28,6 +29,14 @@ const MAX_PROJECT_KB_FILE_PATHS = 100;
 const voidPayloadSchema = z.undefined();
 const pathSchema = z.string().min(1).max(MAX_PATH_LENGTH);
 const identifierSchema = z.string().min(1).max(MAX_IDENTIFIER_LENGTH);
+
+/**
+ * Conversation ids are short hex, not uuids (BUG-046/BUG-048), but they are not
+ * free-form either — see `isBoundedConversationId`. Sharing that predicate keeps
+ * the wire boundary and the services from drifting apart, which is how the same
+ * assumption survived in twelve places after BUG-046 fixed three.
+ */
+const conversationIdSchema = z.string().refine(isBoundedConversationId);
 const shortTextSchema = z.string().min(1).max(MAX_SHORT_TEXT_LENGTH);
 const textSchema = z.string().max(MAX_TEXT_LENGTH);
 const urlSchema = z.string().max(MAX_URL_LENGTH).url();
@@ -98,7 +107,7 @@ const contextPinSchema = z
 const appOperationsContextCompactSchema = z
   .object({
     operation_id: identifierSchema,
-    conversation_id: identifierSchema,
+    conversation_id: conversationIdSchema,
     trigger: z.enum(['auto', 'manual', 'handoff']),
     previous_snapshot: contextSnapshotSchema.optional(),
     previous_markdown: z.string().max(MAX_CONTEXT_MARKDOWN_LENGTH).optional(),
@@ -178,7 +187,7 @@ const presentationRevisionSchema = z
   .refine((value) => Number.isSafeInteger(value));
 const presentationGrantOwnerSchema = z.discriminatedUnion('owner_type', [
   z.object({ owner_type: z.literal('draft'), draft_id: presentationUuidSchema }).strict(),
-  z.object({ owner_type: z.literal('conversation'), conversation_id: presentationUuidSchema }).strict(),
+  z.object({ owner_type: z.literal('conversation'), conversation_id: conversationIdSchema }).strict(),
 ]);
 const presentationRelativePathSchema = z
   .string()
@@ -225,7 +234,7 @@ const presentationQueuedSourceRefsSchema = z
   });
 const startPresentationRunSchema = z
   .object({
-    conversation_id: presentationUuidSchema,
+    conversation_id: conversationIdSchema,
     client_request_id: presentationUuidSchema,
     input: z
       .string()
@@ -246,8 +255,8 @@ const startPresentationRunSchema = z
     }
   });
 const getPresentationRunSchema = z.union([
-  z.object({ conversation_id: presentationUuidSchema, run_id: presentationUuidSchema }).strict(),
-  z.object({ conversation_id: presentationUuidSchema, client_request_id: presentationUuidSchema }).strict(),
+  z.object({ conversation_id: conversationIdSchema, run_id: presentationUuidSchema }).strict(),
+  z.object({ conversation_id: conversationIdSchema, client_request_id: presentationUuidSchema }).strict(),
 ]);
 const presentationRecoveryCursorSchema = z
   .string()
@@ -536,18 +545,18 @@ export const nativeBridgePayloadSchemas = {
   'presentation-templates.import-spec': z.object({ file_path: pathSchema }).strict(),
   // Conversation ids are short ids, not uuids; matches `presentation-templates.scratch.allocate`.
   'presentation-templates.describe-spec': z
-    .object({ conversation_id: identifierSchema, file_path: pathSchema })
+    .object({ conversation_id: conversationIdSchema, file_path: pathSchema })
     .strict(),
   'presentation-templates.import-spec-bound': z
     .object({
-      conversation_id: identifierSchema,
+      conversation_id: conversationIdSchema,
       file_path: pathSchema,
       expected_sha256: presentationSha256Schema,
     })
     .strict(),
   'presentation-templates.remove': z.object({ id: identifierSchema }).strict(),
   'presentation-templates.scratch.allocate': z
-    .object({ conversation_id: identifierSchema, template_id: identifierSchema })
+    .object({ conversation_id: conversationIdSchema, template_id: identifierSchema })
     .strict(),
   'presentation-templates.scratch.complete': z.object({ run_id: z.string().uuid() }).strict(),
   'presentation-templates.scratch.retain': z
@@ -559,7 +568,7 @@ export const nativeBridgePayloadSchemas = {
   'presentation-sources.bind-draft': z
     .object({
       draft_id: presentationUuidSchema,
-      conversation_id: presentationUuidSchema,
+      conversation_id: conversationIdSchema,
       expected_revision: presentationRevisionSchema,
     })
     .strict(),
@@ -568,7 +577,7 @@ export const nativeBridgePayloadSchemas = {
     .strict(),
   'presentation-sources.grant-workspace-source': z
     .object({
-      conversation_id: presentationUuidSchema,
+      conversation_id: conversationIdSchema,
       relative_path: presentationRelativePathSchema,
       expected_owner_revision: presentationRevisionSchema,
     })
@@ -592,7 +601,7 @@ export const nativeBridgePayloadSchemas = {
   'presentation-runs.get': getPresentationRunSchema,
   'presentation-runs.list-recoverable': z
     .object({
-      conversation_id: presentationUuidSchema,
+      conversation_id: conversationIdSchema,
       cursor: presentationRecoveryCursorSchema.optional(),
       limit: z
         .number()
@@ -605,21 +614,21 @@ export const nativeBridgePayloadSchemas = {
     .strict(),
   'presentation-runs.open-recovery': z
     .object({
-      conversation_id: presentationUuidSchema,
+      conversation_id: conversationIdSchema,
       run_id: presentationUuidSchema,
       expected_sha256: presentationSha256Schema,
     })
     .strict(),
   'presentation-runs.discard': z
     .object({
-      conversation_id: presentationUuidSchema,
+      conversation_id: conversationIdSchema,
       run_id: presentationUuidSchema,
       expected_revision: presentationRevisionSchema,
     })
     .strict(),
   'presentation-runs.claim-initial-dispatch': z
     .object({
-      conversation_id: presentationUuidSchema,
+      conversation_id: conversationIdSchema,
       run_id: presentationUuidSchema,
       holder_id: presentationUuidSchema,
       expected_revision: presentationRevisionSchema,
@@ -627,7 +636,7 @@ export const nativeBridgePayloadSchemas = {
     .strict(),
   'presentation-runs.renew-initial-dispatch': z
     .object({
-      conversation_id: presentationUuidSchema,
+      conversation_id: conversationIdSchema,
       run_id: presentationUuidSchema,
       lease_token: z
         .string()
@@ -639,7 +648,7 @@ export const nativeBridgePayloadSchemas = {
     .strict(),
   'presentation-runs.dispatch': z
     .object({
-      conversation_id: presentationUuidSchema,
+      conversation_id: conversationIdSchema,
       run_id: presentationUuidSchema,
       lease_token: z
         .string()
@@ -802,7 +811,7 @@ export const nativeBridgePayloadSchemas = {
       title: shortTextSchema,
       body: z.string().max(4096),
       icon: pathSchema.optional(),
-      conversation_id: identifierSchema.optional(),
+      conversation_id: conversationIdSchema.optional(),
     })
     .strict(),
   'webui.get-status': voidPayloadSchema,

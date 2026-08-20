@@ -17,6 +17,7 @@ import type {
   PresentationTemplateSummary,
 } from '@/common/types/office/presentationTemplate';
 import type { BuiltinTemplatePack } from '@process/resources/presentation-templates/index';
+import { isBoundedConversationId } from '@/common/types/office/conversationId';
 import type { PresentationSourcePathAuthorization } from './run';
 import { TEMPLATE_ID_RE, validateTemplateManifest } from './templateManifest';
 import { parseThemeTokens, renderThemeThumbnailSvg, svgToDataUrl } from './themeThumbnail';
@@ -32,7 +33,6 @@ const NO_FOLLOW = constants.O_NOFOLLOW ?? 0;
 const DIRECTORY_ONLY = constants.O_DIRECTORY ?? 0;
 const STRICT_UTF8 = new TextDecoder('utf-8', { fatal: true });
 const SHA256_RE = /^[0-9a-f]{64}$/;
-const MAX_CONVERSATION_ID_LENGTH = 256;
 
 /**
  * Bounds a conversation id without constraining its shape. The bound is deliberate and must not be
@@ -42,9 +42,6 @@ const MAX_CONVERSATION_ID_LENGTH = 256;
  * the workspace authorizer enforce that separately. The NUL rejection is load-bearing: confirmation
  * keys join their segments with NUL, so a NUL-bearing id could forge another candidate's key.
  */
-function isBoundedConversationId(value: string): boolean {
-  return value.length > 0 && value.length <= MAX_CONVERSATION_ID_LENGTH && !value.includes('\0');
-}
 
 type WorkspaceSourceAuthorizer = {
   authorizeWorkspaceSourcePath: (
