@@ -24,6 +24,9 @@
     "unknown": "Sign-in failed, please try again"
   },
   "sso": {
+    "title": "Sign in to continue",
+    "subtitle": "Use your organization Microsoft account to access WePrompt.",
+    "signInButton": "Sign in with Microsoft",
     "signingIn": "Signing in with Microsoft",
     "signingInHint": "Complete sign-in in the browser window that just opened, then return to WePrompt.",
     "failedTitle": "Microsoft sign-in failed",

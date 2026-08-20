@@ -24,6 +24,9 @@
     "unknown": "登录失败，请稍后再试"
   },
   "sso": {
+    "title": "登录以继续",
+    "subtitle": "使用你的组织 Microsoft 账户访问 WePrompt。",
+    "signInButton": "使用 Microsoft 登录",
     "signingIn": "正在使用 Microsoft 登录",
     "signingInHint": "请在刚打开的浏览器窗口中完成登录，然后返回 WePrompt。",
     "failedTitle": "Microsoft 登录失败",

@@ -137,7 +137,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Feedback: export a local diagnostic package chosen by the user
   exportLocalFeedbackDiagnostics: (input: unknown) => ipcRenderer.invoke('feedback:export-local', input),
   recoverCorruptedDatabase: () => ipcRenderer.invoke('backend:recover-corrupted-database'),
-  // Sign out of Microsoft SSO and relaunch to the login gate (WP 24045)
+  // Microsoft SSO: user-initiated sign-in (resolves to the account) and sign-out (WP 24045)
+  signInSso: () => ipcRenderer.invoke('sso:login'),
   signOutSso: () => ipcRenderer.invoke('sso:logout'),
 });
 
@@ -153,6 +154,7 @@ const ssoAccount = ipcRenderer.sendSync('get-sso-account') as {
   name?: string;
   homeAccountId: string;
 } | null;
+const ssoEnabled = ipcRenderer.sendSync('get-sso-enabled') as boolean;
 contextBridge.exposeInMainWorld('__backendPort', backendPort > 0 ? backendPort : 0);
 // Secret the `--local` backend requires on every call. Exposed to the app's own
 // renderer only — webviews and iframes get their own preload (or none), so page
@@ -162,6 +164,8 @@ contextBridge.exposeInMainWorld('__initialLanguage', initialLanguage ?? null);
 // Signed-in Microsoft SSO account (WP 24045) so the renderer can show who is logged
 // in. Null when SSO is not configured.
 contextBridge.exposeInMainWorld('__ssoAccount', ssoAccount ?? null);
+// Whether SSO is configured, so the renderer can show the login screen (WP 24045).
+contextBridge.exposeInMainWorld('__ssoEnabled', ssoEnabled === true);
 contextBridge.exposeInMainWorld('__aionuiE2ETest', process.env.AIONUI_E2E_TEST === '1');
 contextBridge.exposeInMainWorld('__backendStartupFailed', backendStartupFailed === true);
 contextBridge.exposeInMainWorld('__backendStartupFailure', backendStartupFailure ?? null);

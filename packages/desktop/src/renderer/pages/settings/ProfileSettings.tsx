@@ -5,6 +5,7 @@
  */
 
 import { useConfig } from '@/renderer/hooks/config/useConfig';
+import { useSsoAuth } from '@/renderer/components/sso/SsoLoginGate';
 import { Button, Input, Popconfirm, Switch, Typography } from '@arco-design/web-react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,17 +17,16 @@ const ProfileSettings: React.FC = () => {
   const enabled = ctx?.enabled ?? true;
   const instructions = ctx?.instructions ?? '';
 
-  // Microsoft SSO account (WP 24045), exposed by the preload; null when SSO is off.
-  const ssoAccount =
-    (globalThis as typeof globalThis & { __ssoAccount?: { username: string; name?: string } | null }).__ssoAccount ??
-    null;
+  // Microsoft SSO account (WP 24045), from the login gate; null when SSO is off.
+  const { account: ssoAccount, setAccount } = useSsoAuth();
   const ssoName = ssoAccount?.name?.trim() || ssoAccount?.username;
   const showSsoEmail = Boolean(ssoAccount?.name?.trim() && ssoAccount.name.trim() !== ssoAccount.username);
 
-  // Sign out of Microsoft SSO: the main process clears the token cache and relaunches
-  // the app, so the login gate runs again for a fresh sign-in (WP 24045).
+  // Sign out of Microsoft SSO: clear the cached token in the main process and return to
+  // the login screen for a fresh sign-in (WP 24045).
   const handleSignOut = () => {
     void window.electronAPI?.signOutSso?.();
+    setAccount(null);
   };
 
   return (

@@ -11,8 +11,8 @@ import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { app, BrowserWindow, dialog } from 'electron';
 import i18n from '@process/services/i18n';
-import { loadSsoConfig, type SsoConfig } from './ssoConfig';
-import { MsalAuthService, SSO_TOKEN_CACHE_FILENAME } from './msalAuthService';
+import { isEmailDomainAllowed, loadSsoConfig, type SsoConfig } from './ssoConfig';
+import { MsalAuthService, SSO_TOKEN_CACHE_FILENAME, type SsoAccount } from './msalAuthService';
 import { runSsoGate, type SsoGateDeps, type SsoGateOutcome } from './ssoGateCore';
 
 export type { SsoGateOutcome } from './ssoGateCore';
@@ -93,15 +93,61 @@ export async function runSsoGateForApp(options?: {
   return runSsoGate(createElectronSsoGateDeps(config, userDataDir));
 }
 
-/**
- * Sign the current user out of Microsoft SSO: drop the cached MSAL account and
- * remove the encrypted token cache from disk, so the next startup runs the gate
- * and asks for a fresh interactive sign-in. Safe to call when SSO is disabled.
- */
-export async function signOutSso(options?: { userDataDir?: string; env?: NodeJS.ProcessEnv }): Promise<void> {
+type SsoCallOptions = { userDataDir?: string; env?: NodeJS.ProcessEnv };
+
+function resolveInstallSsoConfig(options?: SsoCallOptions): { config: SsoConfig; userDataDir: string } {
   const userDataDir = options?.userDataDir ?? app.getPath('userData');
   const bundledConfigDir = app.isPackaged ? process.resourcesPath : undefined;
-  const config = loadSsoConfig(userDataDir, options?.env, bundledConfigDir);
+  return { config: loadSsoConfig(userDataDir, options?.env, bundledConfigDir), userDataDir };
+}
+
+/** Whether Microsoft SSO is configured for this install, so the UI can offer sign-in. */
+export function isSsoConfigured(options?: SsoCallOptions): boolean {
+  return resolveInstallSsoConfig(options).config.enabled;
+}
+
+/**
+ * Resolve an already–signed-in Microsoft account silently at startup, without ever
+ * blocking the app or opening a browser. Returns null when SSO is not configured, no
+ * cached account exists, or the account's email domain is not allowed.
+ */
+export async function resolveSsoAccountAtStartup(options?: SsoCallOptions): Promise<SsoAccount | null> {
+  const { config, userDataDir } = resolveInstallSsoConfig(options);
+  if (!config.enabled) return null;
+  try {
+    const account = await new MsalAuthService(config, userDataDir).acquireSilent();
+    if (account && !isEmailDomainAllowed(account.username, config)) return null;
+    return account;
+  } catch (error) {
+    console.error('[SSO] silent account resolve failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Run the interactive Microsoft sign-in when the user clicks the login button. Opens
+ * the system browser and resolves to the signed-in account. Throws 'domainNotAllowed'
+ * when the signed-in email is outside the optional app-side allowlist.
+ */
+export async function signInSso(options?: SsoCallOptions): Promise<SsoAccount | null> {
+  const { config, userDataDir } = resolveInstallSsoConfig(options);
+  if (!config.enabled) return null;
+  const service = new MsalAuthService(config, userDataDir);
+  const account = await service.loginInteractive();
+  if (account && !isEmailDomainAllowed(account.username, config)) {
+    await service.logout();
+    throw new Error('domainNotAllowed');
+  }
+  return account;
+}
+
+/**
+ * Sign the current user out of Microsoft SSO: drop the cached MSAL account and remove
+ * the encrypted token cache from disk, so the next sign-in starts fresh. Safe to call
+ * when SSO is disabled.
+ */
+export async function signOutSso(options?: SsoCallOptions): Promise<void> {
+  const { config, userDataDir } = resolveInstallSsoConfig(options);
   if (config.enabled) {
     try {
       await new MsalAuthService(config, userDataDir).logout();
@@ -110,7 +156,7 @@ export async function signOutSso(options?: { userDataDir?: string; env?: NodeJS.
     }
   }
   // Belt-and-suspenders: delete the persisted cache even if MSAL kept a stale
-  // file, so a fresh sign-in is guaranteed on the next launch.
+  // file, so a fresh sign-in is guaranteed next time.
   try {
     rmSync(join(userDataDir, SSO_TOKEN_CACHE_FILENAME), { force: true });
   } catch {

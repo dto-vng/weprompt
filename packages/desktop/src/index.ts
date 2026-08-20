@@ -53,7 +53,7 @@ import {
 import { wasLaunchedAtLogin } from '@process/bridge/applicationBridge';
 import { onLanguageChanged } from './process/bridge/native/systemSettingsBridge';
 import i18n, { setInitialLanguage } from '@process/services/i18n';
-import { runSsoGateForApp, signOutSso } from '@process/auth/ssoGate';
+import { resolveSsoAccountAtStartup, isSsoConfigured, signInSso, signOutSso } from '@process/auth/ssoGate';
 import type { SsoAccount } from '@process/auth/msalAuthService';
 import { appOperationsBroker } from '@process/services/app-operations';
 import { installOfficePreviewSession } from '@process/services/office-artifact/officePreviewSession';
@@ -374,6 +374,9 @@ let rendererInitialLanguage: string | null = null;
 // Microsoft SSO account of the signed-in user (WP 24045), surfaced to the renderer
 // so the UI can show who is logged in. Null when SSO is not configured.
 let rendererSsoAccount: SsoAccount | null = null;
+// Whether Microsoft SSO is configured for this install, so the renderer can offer a
+// "Sign in with Microsoft" button. Login is optional and never blocks startup.
+let ssoConfigured = false;
 let backendMigrationsScheduled = false;
 let ensureAdminUserPromise: Promise<void> | null = null;
 
@@ -402,12 +405,24 @@ ipcMain.on('get-sso-account', (event) => {
   event.returnValue = rendererSsoAccount;
 });
 
-// Sign out of Microsoft SSO, then relaunch so the login gate runs again and the
-// user can sign in from scratch (WP 24045).
+// Whether Microsoft SSO is configured for this install, so the renderer can show a
+// "Sign in with Microsoft" button (WP 24045).
+ipcMain.on('get-sso-enabled', (event) => {
+  event.returnValue = ssoConfigured;
+});
+
+// User-initiated Microsoft sign-in from Profile settings (WP 24045): opens the system
+// browser and resolves to the signed-in account, or rejects when sign-in fails.
+ipcMain.handle('sso:login', async () => {
+  const account = await signInSso();
+  rendererSsoAccount = account;
+  return account;
+});
+
+// Sign out of Microsoft SSO: clear the cached token so the next sign-in starts fresh.
 ipcMain.handle('sso:logout', async () => {
   await signOutSso();
-  app.relaunch();
-  app.quit();
+  rendererSsoAccount = null;
 });
 
 ipcMain.on('get-backend-startup-failed', (event) => {
@@ -1306,23 +1321,18 @@ const handleAppReady = async (): Promise<void> => {
       }
     }
 
-    // Microsoft SSO gate (WP 24045, Hướng B): when the install is configured with a
-    // tenant + client id, require a Microsoft sign-in before the main window opens.
-    // It is a no-op (returns immediately) when SSO is not configured. Initialize the
-    // saved UI language first so the gate's status window and dialogs are localized.
+    // Microsoft SSO (WP 24045): the app opens without forcing a login. Here we only
+    // resolve an already–signed-in account silently (from the cached token) so the UI
+    // can show who is logged in. Interactive sign-in is optional and user-initiated
+    // from Profile settings. Initialize the saved UI language first for localized UI.
     try {
       const savedLanguageForGate = await ProcessConfig.get('language');
       await setInitialLanguage(savedLanguageForGate);
     } catch (error) {
-      console.error('[SSO] Failed to initialize language before gate:', error);
+      console.error('[SSO] Failed to initialize language:', error);
     }
-    const ssoOutcome = await runSsoGateForApp();
-    if (!ssoOutcome.proceed) {
-      console.log('[SSO] Sign-in was not completed; quitting.');
-      app.quit();
-      return;
-    }
-    rendererSsoAccount = ssoOutcome.account;
+    ssoConfigured = isSsoConfigured();
+    rendererSsoAccount = await resolveSsoAccountAtStartup();
 
     const showMainWindowOnReady = !(wasLaunchedAtLogin() && getCloseToTrayEnabled());
 

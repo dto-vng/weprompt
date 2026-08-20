@@ -106,6 +106,7 @@ import {
   getRuntimeComponentInstallationDescription,
   showInstallationIntegrityModal,
 } from './components/layout/InstallationIntegrityDialog';
+import { SsoLoginGate } from './components/sso/SsoLoginGate';
 
 // Patch Korean locale with missing properties from English locale
 const koKRComplete = {
@@ -421,7 +422,9 @@ if (backendStartupFailure && shouldShowBackendStartupFailureDialog) {
 } else {
   root.render(
     <AppProviders>
-      <App />
+      <SsoLoginGate>
+        <App />
+      </SsoLoginGate>
     </AppProviders>
   );
 }
