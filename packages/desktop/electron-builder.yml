@@ -114,9 +114,15 @@ extraResources:
     to: bundled-aioncore
   - from: resources/hub
     to: hub
-  # built-in presentation template reference decks
+  # built-in presentation template reference decks. Source lives under the
+  # desktop package (where the reference-deck generators write and dev resolves
+  # it), NOT the repo-root resources/ dir the other extraResources use — so this
+  # entry must be package-qualified or electron-builder finds nothing (WP #24093).
   - from: packages/desktop/resources/presentation-templates
     to: presentation-templates
+  # vendored MCP bridge (mcp-remote) so OAuth MCP servers need no npx/PATH lookup
+  - from: resources/mcp-bundled
+    to: mcp-bundled
 win:
   target:
     - nsis
@@ -167,6 +173,8 @@ dmg:
 
 afterPack: scripts/afterPack.js
 afterSign: scripts/afterSign.js
+# Mac retries re-enter signing through artifactBuildStarted; kept from sprint4,
+# mainline does not define it. `releasePackagingConfig.test.ts` pins its presence.
 artifactBuildStarted: scripts/afterSign.js
 
 linux:

@@ -2,6 +2,7 @@ const { Arch } = require('builder-util');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { spawnSync } = require('child_process');
 const {
   normalizeArch,
   rebuildSingleModule,
@@ -79,6 +80,113 @@ function verifyPresentationTemplateResources(resourcesDir) {
   return checked;
 }
 
+/**
+ * Sign the ad-hoc / linker-signed Mach-O binaries shipped inside bundled-aioncore
+ * (extraResources) so the packaged app can pass Apple notarization.
+ *
+ * Why this is needed: electron-builder does NOT code-sign files under `extraResources`.
+ * Most bundled binaries (node, codex, claude, officecli) already carry their publisher's
+ * Developer ID signature, but a few — the `aioncore` binary and the `rg`/`zsh` tools
+ * vendored inside codex — ship with only an ad-hoc linker signature (no Developer ID,
+ * no secure timestamp, no hardened runtime), which makes notarytool reject the whole
+ * archive. afterPack runs before electron-builder seals the .app, so signing them here
+ * lands their fresh hashes in the app's CodeResources.
+ */
+function runTool(command, args) {
+  const result = spawnSync(command, args, { encoding: 'utf8' });
+  return { status: result.status ?? 1, output: `${result.stdout || ''}${result.stderr || ''}` };
+}
+
+// Only sign for real Developer ID builds — never for internal-release / local ad-hoc
+// builds, whose afterSign step intentionally applies (and enforces) an ad-hoc signature.
+function shouldSignBundledAioncore(electronPlatformName, env) {
+  if (electronPlatformName !== 'darwin') return false;
+  if (env.WEPROMPT_INTERNAL_RELEASE === '1') return false;
+  if (env.CSC_IDENTITY_AUTO_DISCOVERY === 'false') return false;
+  return true;
+}
+
+function resolveSigningIdentity(env, run) {
+  if (typeof env.CSC_NAME === 'string' && env.CSC_NAME.trim() !== '') return env.CSC_NAME.trim();
+  const found = run('security', ['find-identity', '-v', '-p', 'codesigning']);
+  const match = found.output.match(/"(Developer ID Application:[^"]+)"/);
+  return match ? match[1] : null;
+}
+
+function listFilesRecursive(root) {
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isSymbolicLink()) continue;
+      const entryPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(entryPath);
+      else if (entry.isFile()) files.push(entryPath);
+    }
+  };
+  walk(root);
+  return files;
+}
+
+function signBundledAioncoreBinaries(resourcesDir, options = {}) {
+  const { env = process.env, run = runTool, projectRoot = path.resolve(__dirname, '..'), logger = console } = options;
+
+  const bundledRoot = path.join(resourcesDir, 'bundled-aioncore');
+  if (!fs.existsSync(bundledRoot)) return { signed: 0, skipped: 0 };
+
+  const identity = resolveSigningIdentity(env, run);
+  if (!identity) {
+    logger.warn(
+      '   ⚠️  No "Developer ID Application" identity found (set CSC_NAME or add one to the login keychain); skipping bundled-aioncore signing — notarization will fail.'
+    );
+    return { signed: 0, skipped: 0 };
+  }
+
+  const entitlements = path.join(projectRoot, 'entitlements.plist');
+  if (!fs.existsSync(entitlements)) {
+    throw new Error(`entitlements.plist not found at ${entitlements}`);
+  }
+
+  // Deepest path first so nested code is signed before any bundle that contains it.
+  const machoFiles = listFilesRecursive(bundledRoot)
+    .filter((file) => run('file', ['-b', file]).output.includes('Mach-O'))
+    .sort((a, b) => b.split(path.sep).length - a.split(path.sep).length);
+
+  let signed = 0;
+  let skipped = 0;
+  for (const file of machoFiles) {
+    const rel = path.relative(bundledRoot, file);
+    if (run('codesign', ['-dvv', file]).output.includes('Authority=Developer ID Application')) {
+      skipped++;
+      continue;
+    }
+    const result = run('codesign', [
+      '--force',
+      '--timestamp',
+      '--options',
+      'runtime',
+      '--entitlements',
+      entitlements,
+      '--sign',
+      identity,
+      file,
+    ]);
+    if (result.status !== 0) {
+      throw new Error(`Failed to codesign bundled binary ${rel}: ${result.output.trim()}`);
+    }
+    const verify = run('codesign', ['-dvv', file]).output;
+    if (!/flags=\S*runtime/.test(verify) || !verify.includes('Authority=Developer ID Application')) {
+      throw new Error(`Bundled binary ${rel} did not receive a hardened-runtime Developer ID signature`);
+    }
+    logger.log(`     ✓ signed ${rel}`);
+    signed++;
+  }
+
+  logger.log(
+    `   ✓ bundled-aioncore signing complete (${signed} signed, ${skipped} already Developer ID) with "${identity}"`
+  );
+  return { signed, skipped };
+}
+
 async function afterPack(context) {
   const { arch, electronPlatformName, appOutDir, packager } = context;
   const targetArch = normalizeArch(typeof arch === 'string' ? arch : Arch[arch] || process.arch);
@@ -116,6 +224,13 @@ async function afterPack(context) {
 
     verifyBundledResources(resourcesDir, electronPlatformName, targetArch);
     verifyPresentationTemplateResources(resourcesDir);
+
+    // Notarization prerequisite: sign the ad-hoc bundled-aioncore binaries that
+    // electron-builder leaves untouched (extraResources are never auto-signed).
+    if (shouldSignBundledAioncore(electronPlatformName, process.env)) {
+      console.log(`\n🔏 Signing bundled-aioncore Mach-O binaries for notarization...`);
+      signBundledAioncoreBinaries(resourcesDir);
+    }
   } else {
     throw new Error(`resources directory not found: ${resourcesDir}`);
   }
@@ -272,3 +387,6 @@ module.exports = afterPack;
 module.exports.assertBundledRuntimeIsolation = assertBundledRuntimeIsolation;
 module.exports.resolveResourcesDir = resolveResourcesDir;
 module.exports.verifyPresentationTemplateResources = verifyPresentationTemplateResources;
+module.exports.shouldSignBundledAioncore = shouldSignBundledAioncore;
+module.exports.resolveSigningIdentity = resolveSigningIdentity;
+module.exports.signBundledAioncoreBinaries = signBundledAioncoreBinaries;

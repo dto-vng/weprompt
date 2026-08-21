@@ -29,6 +29,8 @@ import {
   MainBackendHttpError,
   getLocalToken,
   withLocalTokenHeaders,
+  withLocalTokenQuery,
+  getWsProtocols,
 } from '@/common/adapter/httpBridge';
 
 type FakeSocketEventMap = {
@@ -145,7 +147,7 @@ describe('httpBridge', () => {
       expect(getLocalToken()).toBe('');
     });
 
-    it('adds the secret as a Bearer credential while keeping the caller headers', () => {
+    it('adds the secret as Authorization: Bearer (what aioncore validates)', () => {
       (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'abc123';
 
       // The pinned fork authenticates via `Authorization: Bearer`, not the
@@ -173,6 +175,21 @@ describe('httpBridge', () => {
       isolatedWsEmitter('test-event').on(() => {});
 
       expect(FakeWebSocket.instances[0].url).toBe('ws://127.0.0.1:1234/ws');
+    });
+
+    // A browser WebSocket cannot set request headers, and aioncore never reads
+    // the secret from the query string — it authenticates the upgrade from
+    // `Sec-WebSocket-Protocol`. So the direct-backend socket must carry the
+    // secret as a subprotocol, or every live event is rejected (1008) and the
+    // socket reconnect-loops forever with no live messages reaching the UI.
+    it('carries the secret as a WebSocket subprotocol for the direct-backend connection', () => {
+      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'abc123';
+
+      expect(getWsProtocols()).toEqual(['abc123']);
+    });
+
+    it('sends no subprotocol in WebUI mode, where the session cookie authenticates the upgrade', () => {
+      expect(getWsProtocols()).toEqual([]);
     });
   });
 
@@ -634,6 +651,7 @@ describe('httpBridge', () => {
         headers: {
           'Content-Type': 'application/json',
           Authorization: 'Bearer lifecycle-secret',
+
         },
         body: '{"content":"private prompt"}',
         signal: undefined,

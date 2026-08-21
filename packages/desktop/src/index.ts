@@ -533,6 +533,38 @@ function exposeBackendPort(backendPort: number): void {
   // backend through httpBridge too, and it reads the token from globalThis when
   // there is no `window`.
   (globalThis as typeof globalThis & { __backendLocalToken?: string }).__backendLocalToken = backendManager.localToken;
+  installBackendSessionCookie(backendPort);
+}
+
+/**
+ * Plant the local-mode secret as the `aionui-session` cookie the backend already
+ * accepts (crates/aionui-auth extract_token_from_headers), so the renderer's
+ * header-less backend requests authenticate without a query token: `<img>` asset
+ * loads (model/agent logos, assistant avatars) and EventSource channels.
+ *
+ * The renderer is cross-site to the loopback backend (dev: localhost:5173,
+ * packaged: a custom scheme → 127.0.0.1), so the cookie must be SameSite=None
+ * (`no_restriction`) and Secure to ride cross-site subresource requests;
+ * 127.0.0.1 is a secure context, so Chromium honors a Secure cookie over http
+ * there. Cookies are port-agnostic, so one cookie covers whatever port the
+ * backend was assigned. Requests that can carry a header (fetch via
+ * Authorization, the chat WebSocket via Sec-WebSocket-Protocol) still do and do
+ * not depend on this.
+ */
+function installBackendSessionCookie(backendPort: number): void {
+  const token = backendManager.localToken;
+  if (!token) return;
+  void session.defaultSession.cookies
+    .set({
+      url: `http://127.0.0.1:${backendPort}`,
+      name: 'aionui-session',
+      value: token,
+      path: '/',
+      secure: true,
+      httpOnly: true,
+      sameSite: 'no_restriction',
+    })
+    .catch((err) => console.warn('[AionUi] failed to install backend session cookie:', err));
 }
 
 function installLocalBackendAuthForMainWindow(backendPort: number): void {
@@ -927,11 +959,15 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
         autoUpdaterService.setBeforeQuitAndInstall(async () => {
           await stopBackendWithPresentationRuntimeLifecycle();
         });
-        // Check for updates after 3 seconds delay
-        // 3秒后检查更新
-        setTimeout(() => {
-          void autoUpdaterService.checkForUpdatesAndNotify();
-        }, 3000);
+        // Automatic update check is intentionally disabled for this pilot build: the update
+        // feed points at upstream's CDN, and an automatic check could silently move a pilot
+        // install onto an upstream release carrying upstream's backend instead of this
+        // project's hardened one. The service is still initialized so its IPC surface (manual
+        // check, install-on-quit, etc.) keeps working; only the automatic 3s-after-launch
+        // check is removed.
+        // 本次试点构建有意禁用自动检查更新：更新源指向上游 CDN，自动检查可能会将试点安装
+        // 静默切换到携带上游后端的上游发行版，而非本项目加固后的后端。服务仍会正常初始化，
+        // 以保留其 IPC 能力（手动检查、退出时安装等）；仅移除启动 3 秒后的自动检查。
       })
       .catch((error) => {
         console.error('[App] Failed to initialize autoUpdaterService:', error);

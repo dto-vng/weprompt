@@ -464,4 +464,30 @@ describe('URL derivation', () => {
     startSpeechStream({ callbacks, createSocket });
     expect(lastSocket().url).toBe('ws://127.0.0.1:14512/api/stt/stream');
   });
+
+  /**
+   * Mainline appends the secret to this URL as a query fallback. This branch
+   * deliberately does not, and the assertion is inverted rather than deleted so
+   * the next merge cannot quietly reintroduce it.
+   *
+   * `44f00a112 fix(auth): inject local backend credentials in main process`
+   * replaced the query approach with `installLocalBackendAuth`, which adds
+   * `Authorization: Bearer` from `session.webRequest.onBeforeSendHeaders` for
+   * every app-shell request to the backend — `http://` and `ws://` alike, and
+   * `<img src>` too, which is the case mainline's fallback exists for. The
+   * secret therefore never has to appear in a URL, where it would reach logs,
+   * referrers and process listings.
+   */
+  it('Electron mode with a local token: still keeps it out of the URL', () => {
+    setBackendPort(14512);
+    const w = window as Window & { __backendLocalToken?: string };
+    w.__backendLocalToken = 'stt-secret';
+    try {
+      const callbacks = makeCallbacks();
+      startSpeechStream({ callbacks, createSocket });
+      expect(lastSocket().url).toBe('ws://127.0.0.1:14512/api/stt/stream');
+    } finally {
+      delete w.__backendLocalToken;
+    }
+  });
 });

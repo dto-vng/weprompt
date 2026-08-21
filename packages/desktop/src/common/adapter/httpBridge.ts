@@ -30,6 +30,9 @@ declare global {
  */
 export const LOCAL_TOKEN_HEADER = 'X-AionUI-Local-Token';
 
+/** Query parameter carrying the same secret, for callers that cannot set headers. */
+export const LOCAL_TOKEN_QUERY = 'local_token';
+
 /**
  * Resolve the local-mode secret for the current context.
  *
@@ -62,12 +65,30 @@ export function localTokenAuthHeaders(token: string): Record<string, string> {
  * Add the local-mode secret to a header bag.
  *
  * Every `fetch`/`XMLHttpRequest` aimed at the backend must go through this —
- * without the header the backend answers 401.
+ * without the secret the backend answers 401.
+ *
+ * aioncore authenticates the per-launch secret from `Authorization: Bearer`
+ * (crates/aionui-auth/src/extract.rs `extract_token_from_headers`); it never
+ * reads the legacy `X-AionUI-Local-Token` header, so only `Authorization: Bearer`
+ * is sent — the value the backend validates.
  */
 export function withLocalTokenHeaders(headers: Record<string, string> = {}): Record<string, string> {
   const token = getLocalToken();
   if (!token) return headers;
   return { ...headers, ...localTokenAuthHeaders(token) };
+}
+
+/**
+ * Add the local-mode secret to a URL's query string.
+ *
+ * For request kinds that cannot carry a header: `WebSocket`, `EventSource`, and
+ * URLs handed to `<img src>` or an iframe.
+ */
+export function withLocalTokenQuery(url: string): string {
+  const token = getLocalToken();
+  if (!token) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${LOCAL_TOKEN_QUERY}=${encodeURIComponent(token)}`;
 }
 
 /**
@@ -118,6 +139,22 @@ function getWsUrl(): string {
     return `${proto}//${window.location.host}/ws`;
   }
   return `ws://127.0.0.1:${getBackendPort()}/ws`;
+}
+
+/**
+ * WebSocket subprotocols carrying the local-mode secret for the direct-backend
+ * (Electron) connection.
+ *
+ * A browser `WebSocket` cannot set request headers, so the per-launch secret must
+ * ride in the first `Sec-WebSocket-Protocol` value — NOT the query string, which
+ * aioncore never reads for auth. The backend extracts it via
+ * `extract_token_from_ws_headers` (crates/aionui-auth/src/extract.rs) and echoes
+ * the protocol back so the handshake completes. Empty in WebUI browser mode,
+ * where the session cookie authenticates the same-origin upgrade instead.
+ */
+export function getWsProtocols(): string[] {
+  const token = getLocalToken();
+  return token ? [token] : [];
 }
 
 // ---------------------------------------------------------------------------
@@ -514,9 +551,10 @@ function ensureWs(): void {
   }
 
   const url = getWsUrl();
+  const protocols = getWsProtocols();
   console.debug('[ensureWs] connecting to', url);
   try {
-    ws = new WebSocket(url);
+    ws = protocols.length > 0 ? new WebSocket(url, protocols) : new WebSocket(url);
   } catch (e) {
     console.error('[ensureWs] WebSocket constructor threw:', e);
     scheduleWsReconnect();
