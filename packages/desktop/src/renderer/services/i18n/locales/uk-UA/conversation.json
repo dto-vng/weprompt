@@ -220,7 +220,8 @@
     "codes": {
       "TEAM_ASSISTANT_ID_REQUIRED": "Please select an assistant before creating the team.",
       "TEAM_ASSISTANT_NOT_FOUND": "Assistant {{assistantId}} is no longer available. Refresh the assistant list and choose another one.",
-      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Use assistant_id instead of {{field}}."
+      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Use assistant_id instead of {{field}}.",
+      "TEAM_MEMBER_MODEL_UNRESOLVED": "No model is available for this team member. Add or enable a model provider in Settings, then try again."
     }
   },
   "agentError": {
@@ -367,6 +368,10 @@
       "USER_LLM_PROVIDER_RATE_LIMITED": {
         "title": "Досягнуто ліміту запитів постачальника моделі",
         "body": "Постачальник тимчасово обмежує запити. Зачекайте, зменште частоту запитів або перемкніть модель."
+      },
+      "USER_LLM_PROVIDER_QUOTA_EXHAUSTED": {
+        "title": "Квоту провайдера моделей вичерпано",
+        "body": "На обліковому записі провайдера закінчився баланс або квота, тож очікування не допоможе. Поповніть рахунок, перевірте тарифний план або перейдіть на іншу модель."
       },
       "USER_LLM_PROVIDER_TIMEOUT": {
         "title": "Час запиту до постачальника моделі минув",
@@ -515,6 +520,8 @@
     "changes": {
       "tab": "Зміни",
       "filesTab": "Файли",
+      "previewTab": "Попередній перегляд",
+      "browserTab": "Браузер",
       "currentBranchLabel": "Поточна гілка",
       "summary": "{{count}} файл(ів) змінено",
       "insertions": "+{{count}} додано",
@@ -635,10 +642,6 @@
     "contextWindow": "Контекстне вікно",
     "percentUsed": "Використано {{percent}}%",
     "tokenCount": "{{used}} із {{limit}} токенів",
-    "localTokenUsage": "Локальне використання токенів",
-    "today": "Сьогодні",
-    "weekToDate": "З початку тижня",
-    "monthToDate": "З початку місяця",
     "triggerLabel": "Показати використання контексту",
     "estimated": "Орієнтовно",
     "unavailable": "Дані про використання контексту недоступні"
@@ -924,7 +927,7 @@
         "continueToProduce": "Перейти до створення",
         "askAssistant": "Запитати помічника",
         "assistantTitle": "Помічник зі сценарію",
-        "assistantDescription": "Використовуйте помічника для розвитку структури історії, ідей кадрів і промптів.",
+        "assistantDescription": "Створіть чернетку розкадрування на основі брифу.",
         "textChargeDisclosure": "Для чернетки розкадрування використовується налаштована текстова модель. Провайдер може стягувати плату за її використання.",
         "draftStoryboard": "Створити чернетку розкадрування",
         "addShot": "Додати кадр",
@@ -996,10 +999,67 @@
         "openProduce": "Відкрити створення",
         "handoffDescription": "Передача містить лише маніфест розкадрування та вибрані матеріали. Заставки з режиму перевірки не експортуються.",
         "partialHandoff": "Передача неповна, оскільки в деяких сценах не вибрано матеріал.",
+        "cut": {
+          "duration": {
+            "played": "Відтворено {{seconds}} с",
+            "untrimmed": "Джерело {{seconds}} с",
+            "render": "У файлі {{seconds}} с"
+          },
+          "trimmed": "Обрізано",
+          "graded": "Кольорокорекція",
+          "clipAccessible": "Кліп {{number}}, {{title}}, {{seconds}} секунд",
+          "dragClip": "Перетягніть {{title}}, щоб змінити порядок",
+          "moveAnnouncement": "Кліп {{clip}} переміщено на позицію {{position}} з {{total}}. Тепер порядок монтажу задано вручну.",
+          "playhead": "Курсор монтажу",
+          "secondsValue": "{{seconds}} секунд",
+          "trimInHandle": "Маркер точки входу",
+          "trimOutHandle": "Маркер точки виходу",
+          "inspector": "Інспектор кліпу",
+          "selectClip": "Виберіть кліп або заглушку для перегляду.",
+          "takes": "Дублі",
+          "trim": "Обрізання",
+          "inPoint": "Вхід",
+          "outPoint": "Вихід",
+          "trimInField": "Точка входу в секундах",
+          "trimOutField": "Точка виходу в секундах",
+          "setIn": "Установити I на курсорі",
+          "setOut": "Установити O на курсорі",
+          "frame": "Кадрування",
+          "scale": "Масштаб обрізання",
+          "scaleValue": "{{percent}}%",
+          "cropHint": "Стрілки зсувають область кадрування; Shift переміщує на десять кроків.",
+          "cropOverlay": "Рамка кадрування",
+          "colour": "Колір",
+          "colourLabels": {
+            "exposure": "Експозиція",
+            "contrast": "Контраст",
+            "saturation": "Насиченість",
+            "temperature": "Температура"
+          },
+          "resetClip": "Скинути цей кліп",
+          "noUndo": "Скасування немає. Скидання повертає обрізання, кадрування й колір до початкових значень.",
+          "divergence": "Ваша версія · ручний монтаж",
+          "resyncTitle": "Синхронізувати порядок монтажу?",
+          "resyncDescription": "Порядок розкадрування буде відновлено. Обрізання, кадрування та кольорові фільтри збережуться.",
+          "resyncAction": "Синхронізувати з розкадруванням",
+          "outsideTitle": "Ще не в монтажі",
+          "outsideDescription": "Ці сцени мають дубль, але не входять до вашого ручного монтажу.",
+          "placeIt": "Розмістити {{title}}…",
+          "placeBefore": "Перед {{number}} · {{title}}",
+          "addToEnd": "Додати {{title}} в кінець",
+          "addAllToEnd": "Додати все в кінець",
+          "volume": "Гучність попереднього перегляду"
+        },
         "render": {
+          "footer": "Рендер монтажу",
           "action": "Зібрати відео",
           "progress": "Збирання відео… {{percent}}%",
+          "progressWithClip": "Збирання відео… {{percent}}% · Кліп {{clip}} із {{total}}",
           "cancel": "Скасувати збирання",
+          "busyReason": "Цей проєкт уже збирається. Дочекайтеся завершення або скасуйте збирання у вікні, де його запущено.",
+          "installFfmpeg": "Встановити FFmpeg",
+          "tryAgain": "Повторити збирання",
+          "openProduce": "Перейти до створення",
           "missingScenes": "У {{count}} сценах немає дубля, тому вони не увійдуть до відео.",
           "missingScenes_one": "У {{count}} сцені немає дубля, тому вона не увійде до відео.",
           "missingScenes_other": "У {{count}} сценах немає дубля, тому вони не увійдуть до відео.",
@@ -1009,6 +1069,12 @@
             "busy": "Цей проєкт уже збирається.",
             "noRenderableScenes": "Немає сцен із дублем для збирання.",
             "failed": "Не вдалося зібрати відео.",
+            "failedClip": "Не вдалося зібрати кліп {{clip}} із {{total}}.",
+            "noRenderableShots": "У кадрах {{shots}} немає кліпів для збирання.",
+            "noRenderableShots_one": "У кадрі {{shots}} немає кліпу для збирання.",
+            "noRenderableShots_few": "У кадрах {{shots}} немає кліпів для збирання.",
+            "noRenderableShots_many": "Кадри {{shots}} не містять кліпів для збирання.",
+            "noRenderableShots_other": "У кадрах {{shots}} немає кліпів для збирання.",
             "cancelled": "Збирання відео скасовано."
           }
         }
@@ -1314,6 +1380,11 @@
     "export": {
       "title": "Експорт матеріалів",
       "body": "Експортуйте маніфест розкадрування та вибраний матеріал кожної сцени.",
+      "checkingRender": "Перевірка зібраного монтажу…",
+      "noRender": "Ще не зібрано",
+      "renderedAt": "Зібрано",
+      "staleRender": "Цей монтаж було зібрано до останніх змін.",
+      "latestRenderUnavailable": "Не вдалося перевірити останній зібраний монтаж. Відкрийте експорт знову.",
       "gapWarning": "Кадри {{shots}} досі є заставками й не будуть включені.",
       "gapWarning_one": "Кадр {{shots}} досі є заставкою й не буде включений.",
       "gapWarning_few": "Кадри {{shots}} досі є заставками й не будуть включені.",

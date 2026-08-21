@@ -150,6 +150,8 @@ describe('httpBridge', () => {
     it('adds the secret as Authorization: Bearer (what aioncore validates)', () => {
       (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'abc123';
 
+      // The pinned fork authenticates via `Authorization: Bearer`, not the
+      // legacy `X-AionUI-Local-Token` header that upstream AionCore read.
       expect(withLocalTokenHeaders({ 'Content-Type': 'application/json' })).toEqual({
         'Content-Type': 'application/json',
         Authorization: 'Bearer abc123',
@@ -162,30 +164,17 @@ describe('httpBridge', () => {
       });
     });
 
-    it('appends the secret to a URL with no query string', () => {
+    it('keeps the local secret out of the desktop realtime WebSocket URL', async () => {
       (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'abc123';
+      vi.stubGlobal('window', { __backendPort: 1234 });
+      vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket);
+      FakeWebSocket.instances = [];
+      vi.resetModules();
+      const { wsEmitter: isolatedWsEmitter } = await import('@/common/adapter/httpBridge');
 
-      expect(withLocalTokenQuery('ws://127.0.0.1:1234/ws')).toBe('ws://127.0.0.1:1234/ws?local_token=abc123');
-    });
+      isolatedWsEmitter('test-event').on(() => {});
 
-    it('appends the secret to a URL that already has a query string', () => {
-      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'abc123';
-
-      expect(withLocalTokenQuery('http://127.0.0.1:1234/api/x?a=1')).toBe(
-        'http://127.0.0.1:1234/api/x?a=1&local_token=abc123'
-      );
-    });
-
-    it('percent-encodes the secret so it cannot break out of the query string', () => {
-      (globalThis as { __backendLocalToken?: string }).__backendLocalToken = 'a&b=c';
-
-      expect(withLocalTokenQuery('http://127.0.0.1:1234/api/x')).toBe(
-        'http://127.0.0.1:1234/api/x?local_token=a%26b%3Dc'
-      );
-    });
-
-    it('leaves the URL untouched when no secret is exposed', () => {
-      expect(withLocalTokenQuery('ws://127.0.0.1:1234/ws')).toBe('ws://127.0.0.1:1234/ws');
+      expect(FakeWebSocket.instances[0].url).toBe('ws://127.0.0.1:1234/ws');
     });
 
     // A browser WebSocket cannot set request headers, and aioncore never reads
@@ -662,7 +651,6 @@ describe('httpBridge', () => {
         headers: {
           'Content-Type': 'application/json',
           Authorization: 'Bearer lifecycle-secret',
-          'X-AionUI-Local-Token': 'lifecycle-secret',
         },
         body: '{"content":"private prompt"}',
         signal: undefined,

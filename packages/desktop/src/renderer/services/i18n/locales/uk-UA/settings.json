@@ -362,9 +362,6 @@
   "modelNotFoundAfterUrlChange": "Модель {{model}} не знайдено за новою адресою; виберіть її знову, якщо не працює.",
   "apiKey": "API-ключ",
   "deleteModelConfirm": "Ви впевнені, що хочете видалити цю модель?",
-  "deleteAllModelConfirm": "Ви впевнені, що хочете видалити всі моделі?",
-  "modelCount": "Модель",
-  "apiKeyCount": "API-ключ",
   "pleaseEnterBaseUrlAndApiKey": "Будь ласка, введіть base url та API-ключ",
   "pleaseEnterApiKey": "Будь ласка, введіть API-ключ",
   "pleaseEnterBaseUrl": "Будь ласка, введіть Base URL",
@@ -824,8 +821,65 @@
   "includePrereleaseUpdates": "Включити попередні/dev збірки",
   "saveModelConfigFailed": "Не вдалося зберегти конфігурацію моделі",
   "healthCheck": "Перевірка здоров'я",
-  "clearStatus": "Очистити статус",
-  "healthStatusCleared": "Статус здоров'я очищено",
+  "modelRow": {
+    "latency": "{{latency}} мс",
+    "neverChecked": "Жодного разу не перевірялася",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "Видалити модель",
+    "deleteAppOperationsWarning": "Цю модель закріплено за операціями застосунку. Після видалення це налаштування буде недоступним, доки ви не оберете іншу модель."
+  },
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "{{count}} моделей",
+    "modelCount_one": "{{count}} модель",
+    "modelCount_few": "{{count}} моделі",
+    "modelCount_many": "{{count}} моделей",
+    "modelCount_other": "{{count}} моделі",
+    "apiKeyCount": "{{count}} ключів",
+    "apiKeyCount_one": "{{count}} ключ",
+    "apiKeyCount_few": "{{count}} ключі",
+    "apiKeyCount_many": "{{count}} ключів",
+    "apiKeyCount_other": "{{count}} ключа",
+    "healthChecked": "Перевірено {{checked}} з {{total}}",
+    "healthNotChecked": "Не перевірено",
+    "healthFailing": "{{count}} з помилками",
+    "healthFailing_one": "{{count}} з помилкою",
+    "healthFailing_few": "{{count}} з помилками",
+    "healthFailing_many": "{{count}} з помилками",
+    "healthFailing_other": "{{count}} з помилками",
+    "deleteConfirmTitle": "Видалити провайдера",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "Видаляє провайдера, його API-ключі та всі налаштовані ним моделі. Наявні чати збережуть модель, з якою їх було розпочато.",
+    "clearHealth": "Очистити стан",
+    "clearHealthConfirmTitle": "Очистити стан",
+    "clearHealthConfirmBody": "Записані результати перевірок для «{{provider}}» буде видалено. Запустіть перевірку, щоб виміряти їх знову.",
+    "healthCleared": "Стан провайдера «{{provider}}» очищено.",
+    "deleteAppOperationsWarning": "Цього провайдера закріплено за операціями застосунку. Після видалення це налаштування буде недоступним, доки ви не оберете іншу модель.",
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "Увімкнути або вимкнути"
+  },
+  "providerHealth": {
+    "configuredInferenceUnavailable": "Налаштовано · інференс недоступний.",
+    "setupNeedsAttention": "Потрібно перевірити налаштування.",
+    "overload": {
+      "action": "Провайдер тимчасово перевантажений. Спробуйте пізніше."
+    },
+    "rateLimit": {
+      "action": "Дочекайтеся скидання ліміту провайдера та спробуйте знову."
+    },
+    "quota": {
+      "action": "На обліковому записі провайдера вичерпано квоту або баланс. Поповніть рахунок чи змініть провайдера та спробуйте ще раз."
+    },
+    "setup": {
+      "action": "Перевірте облікові дані й налаштування провайдера та спробуйте знову."
+    },
+    "connectivity": {
+      "action": "Перевірте мережу, проксі та Base URL і спробуйте знову."
+    },
+    "provider": {
+      "action": "Провайдер не зміг завершити перевірку інференсу. Спробуйте пізніше."
+    }
+  },
   "latency": "Затримка",
   "customAcpAgent": "Власні агенти ACP",
   "addCustomAgent": "Додати",
@@ -1350,31 +1404,44 @@
   "mcpNoTools": "Цей сервер не надає інструментів",
   "appOperationsModel": {
     "title": "Модель для операцій застосунку",
-    "description": "Використовується для фонової обробки контексту й майбутньої допомоги в усьому застосунку незалежно від моделей чату.",
+    "panelLabel": "Операції застосунку",
+    "panelInfo": "WePrompt використовує це для власних фонових завдань — наразі для стиснення довгих розмов, щоб їх можна було продовжити. На ваші чати це не впливає.",
+    "popoverSubtitle": "Лише для фонової роботи. Зміна не впливає на ваші чати.",
     "selectionLabel": "Вибір",
     "auto": "Автоматично",
     "fixed": "Фіксована",
-    "resolvedModelLabel": "Визначена модель",
-    "healthLabel": "Стан",
-    "usedByLabel": "Використовується для",
-    "contextCompaction": "Стискання контексту",
-    "saving": "Збереження…",
+    "autoExplainer": "WePrompt вибирає найкращу доступну модель і визначає її знову, коли змінюються постачальники.",
+    "modelLabel": "Модель",
+    "managedByAuto": "Керується автоматично",
+    "kept": "Збережено",
+    "switchToAuto": "Перейти на автоматично",
+    "pickAnother": "Вибрати іншу",
+    "checkNow": "Перевірити зараз",
+    "openSettings": "Змінити модель для операцій застосунку",
+    "contextCompaction": "Скорочення довгих розмов",
+    "usedByCompaction": "Використовується для скорочення довгих розмов",
+    "setupRequiredImpact": "Придатну текстову модель не налаштовано. Доки ви її не додасте, довгі розмови скорочуються простим правилом, а не моделлю.",
     "loadFailed": "Не вдалося завантажити налаштування операцій застосунку.",
     "saveFailed": "Не вдалося зберегти модель для операцій застосунку.",
+    "saveFailedToast": "Не вдалося зберегти. Виберіть знову, щоб повторити.",
     "checkFailed": "Перевірка працездатності операцій застосунку не вдалася.",
     "backendUpdateRequired": "Оновіть WePrompt, щоб налаштувати модель для операцій застосунку.",
-    "checkResult": {
-      "ready": "Справна · {{checked}}",
-      "setupRequired": "Потрібне налаштування · {{checked}}",
-      "unavailable": "Перевірку не пройдено · {{checked}}",
-      "checkedJustNow": "щойно перевірено",
-      "checkedAt": "перевірено {{time}}"
+    "backendUpdateRequiredDetail": "Бекенд цієї збірки не надає цього налаштування. На чати це не впливає.",
+    "checkTime": {
+      "never": "Ще не перевірено",
+      "justNow": "Перевірено щойно",
+      "today": "Перевірено сьогодні, {{time}}",
+      "date": "Перевірено {{date}}, {{time}}"
     },
     "status": {
       "ready": "Готово",
-      "checking": "Перевірка",
+      "checking": "Перевірка…",
       "setupRequired": "Потрібне налаштування",
-      "unavailable": "Недоступно"
+      "unavailable": "Недоступно",
+      "loading": "Завантаження…",
+      "saving": "Збереження…",
+      "saveFailed": "Не збережено",
+      "loadFailed": "Не завантажено"
     },
     "reason": {
       "noEligibleModel": "Додайте або ввімкніть текстову модель із дійсними обліковими даними.",

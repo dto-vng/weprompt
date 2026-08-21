@@ -90,7 +90,7 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
   const { t } = useTranslation();
-  const { compositionHandlers, isComposing } = useCompositionInput();
+  const { compositionHandlers, createCompositionValueSync, isComposing } = useCompositionInput();
   const inputRef = useRef<RefTextAreaType | null>(null);
   const textareaAutoSize = isMobile ? { minRows: 2, maxRows: 8 } : { minRows: 2, maxRows: 20 };
 
@@ -169,6 +169,9 @@ const GuidInputCard: React.FC<GuidInputCardProps> = ({
           className={`text-14px focus:b-none rounded-xl !bg-transparent !b-none !resize-none !py-0 !pr-0 !pl-7px ${styles.lightPlaceholder}`}
           value={input}
           onChange={onInputChange}
+          // Arco suppresses onChange while an IME composition is open; this keeps
+          // `input` in step with what is already on screen. See createCompositionValueSync.
+          onInput={createCompositionValueSync(onInputChange)}
           onPaste={onPaste}
           onFocus={onFocus}
           onBlur={onBlur}

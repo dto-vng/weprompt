@@ -17,6 +17,27 @@
   "imageLoadFailed": "Failed to load image",
   "scrollToBottom": "Scroll to bottom",
   "reasoning": "Reasoning",
+  "templateReview": {
+    "reviewing": "Reviewing the theme…",
+    "disclosure": "Theme content is retained locally and used in future templated sends.",
+    "confirm": "Install in Template Gallery",
+    "installing": "Installing…",
+    "installed": "Installed in Template Gallery",
+    "requestFailed": "The theme could not be reviewed. Nothing was installed.",
+    "failure": {
+      "INVALID_REQUEST": "The template review request is invalid. Nothing was installed.",
+      "RUN_NOT_FOUND": "The presentation run could not be found. Nothing was installed.",
+      "RUN_FORBIDDEN": "This presentation run does not belong to this chat. Nothing was installed.",
+      "SCOPE_UNAVAILABLE": "This chat workspace is unavailable. Nothing was installed.",
+      "TEAM_SCOPE_UNSUPPORTED": "Template review is not available in team chats. Nothing was installed.",
+      "CANDIDATE_OUTSIDE_WORKSPACE": "The theme file is outside this chat workspace. Nothing was installed.",
+      "CANDIDATE_UNSUPPORTED": "The theme file is not a supported THEME.md. Nothing was installed.",
+      "CANDIDATE_TOO_LARGE": "The theme file is too large. Nothing was installed.",
+      "CANDIDATE_CHANGED": "The theme content changed after you reviewed it. Nothing was installed.",
+      "CONFIRMATION_NOT_MINTED": "This review is no longer valid. Review the theme again before installing it. Nothing was installed.",
+      "INSTALL_FAILED": "The theme could not be installed. Nothing was installed."
+    }
+  },
   "availableCommands": "{{count}} Available Commands",
   "atFile.hint": "Type to search for files",
   "atFile.menuLabel": "File mentions",

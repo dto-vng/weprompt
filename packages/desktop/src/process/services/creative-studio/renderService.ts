@@ -13,6 +13,9 @@ import { pipeline } from 'node:stream/promises';
 import type {
   StudioAspectRatio,
   StudioAsset,
+  StudioCutClip,
+  StudioCutFilter,
+  StudioNormalisedRect,
   StudioProject,
   StudioRenderCutResult,
   StudioRenderErrorCode,
@@ -29,6 +32,8 @@ const RENDER_PIXEL_FORMAT = 'yuv420p';
 const STDERR_TAIL_BYTES = 16 * 1024;
 const NORMALISE_PROGRESS_SHARE = 0.75;
 const CONCAT_PROGRESS_SHARE = 0.24;
+const DEFAULT_TERMINATION_GRACE_MS = 1_000;
+const DEFAULT_SEGMENT_TIMEOUT_MS = 120_000;
 
 const RENDER_DIMENSIONS = {
   '720p': {
@@ -68,13 +73,21 @@ export type StudioRenderSpawn = (
   options: SpawnOptionsWithoutStdio
 ) => ChildProcessWithoutNullStreams;
 
+export type StudioRenderProgress = {
+  progress: number;
+  clipIndex: number;
+  clipTotal: number;
+};
+
 export type StudioRenderDeps = {
   store: Pick<CreativeStudioStore, 'getProject'>;
   mediaStore: Pick<StudioMediaStore, 'resolveAsset' | 'persistProjectOutput'>;
-  onProgress?: (progress: number) => void;
+  onProgress?: (progress: StudioRenderProgress) => void;
   environment?: NodeJS.ProcessEnv;
   temporaryRoot?: string;
   spawnProcess?: StudioRenderSpawn;
+  terminationGraceMs?: number;
+  segmentTimeoutMs?: number;
 };
 
 export class CreativeStudioRenderError extends Error {
@@ -92,23 +105,183 @@ export class CreativeStudioRenderError extends Error {
 type RenderSegment = {
   scene: StudioScene;
   asset: StudioAsset;
+  edits: Pick<StudioCutClip, 'sourceInSeconds' | 'sourceOutSeconds' | 'crop' | 'filters'>;
   openVerifiedStream: () => Promise<Readable>;
   inputPath?: string;
   outputPath?: string;
+  renderedDurationSeconds?: number;
 };
 
 type RenderState = {
   cancelled: boolean;
   activeProcess: ChildProcessWithoutNullStreams | null;
   activeStream: Readable | null;
+  activeTerminationTimer: NodeJS.Timeout | null;
 };
 
 type FfmpegRunResult = {
   code: number | null;
   stderrTail: string;
+  stdoutTail: string;
 };
 
 class RenderCancelledError extends Error {}
+
+type ColourMatrix = readonly [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+];
+
+const IDENTITY_COLOUR_MATRIX: ColourMatrix = [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
+
+const matrixValue = (matrix: ColourMatrix, row: number, column: number): number => matrix[row * 5 + column]!;
+
+/** Composes affine RGBA matrices so the right operand is evaluated first. */
+const multiplyColourMatrices = (left: ColourMatrix, right: ColourMatrix): ColourMatrix => {
+  const output: number[] = [];
+  for (let row = 0; row < 4; row += 1) {
+    for (let column = 0; column < 4; column += 1) {
+      let value = 0;
+      for (let inner = 0; inner < 4; inner += 1) {
+        value += matrixValue(left, row, inner) * matrixValue(right, inner, column);
+      }
+      output.push(Number(value.toFixed(12)));
+    }
+    let offset = matrixValue(left, row, 4);
+    for (let inner = 0; inner < 4; inner += 1) {
+      offset += matrixValue(left, row, inner) * matrixValue(right, inner, 4);
+    }
+    output.push(Number(offset.toFixed(12)));
+  }
+  return output as unknown as ColourMatrix;
+};
+
+const rgbScaleMatrix = (red: number, green: number, blue: number): ColourMatrix => [
+  red,
+  0,
+  0,
+  0,
+  0,
+  0,
+  green,
+  0,
+  0,
+  0,
+  0,
+  0,
+  blue,
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  0,
+];
+
+const contrastMatrix = (amount: number): ColourMatrix => {
+  const scale = 1 + amount;
+  const offset = (1 - scale) / 2;
+  return [scale, 0, 0, 0, offset, 0, scale, 0, 0, offset, 0, 0, scale, 0, offset, 0, 0, 0, 1, 0];
+};
+
+const saturationMatrix = (amount: number): ColourMatrix => {
+  const scale = 1 + amount;
+  const inverse = 1 - scale;
+  const redLuma = 0.2126 * inverse;
+  const greenLuma = 0.7152 * inverse;
+  const blueLuma = 0.0722 * inverse;
+  return [
+    scale + redLuma,
+    greenLuma,
+    blueLuma,
+    0,
+    0,
+    redLuma,
+    scale + greenLuma,
+    blueLuma,
+    0,
+    0,
+    redLuma,
+    greenLuma,
+    scale + blueLuma,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+  ];
+};
+
+const deriveColourMatrix = (filters: readonly StudioCutFilter[]): ColourMatrix => {
+  const amounts = { exposure: 0, temperature: 0, contrast: 0, saturation: 0 };
+  for (const filter of filters) amounts[filter.id] = filter.amount;
+  const exposure = rgbScaleMatrix(1 + amounts.exposure, 1 + amounts.exposure, 1 + amounts.exposure);
+  const temperature = rgbScaleMatrix(1 + 0.2 * amounts.temperature, 1, 1 - 0.2 * amounts.temperature);
+  return [exposure, temperature, contrastMatrix(amounts.contrast), saturationMatrix(amounts.saturation)].reduce(
+    (matrix, operation) => multiplyColourMatrices(operation, matrix),
+    IDENTITY_COLOUR_MATRIX
+  );
+};
+
+const coefficient = (value: number): string => String(Object.is(value, -0) ? 0 : value);
+
+const colourMatrixUsesMixerRange = (matrix: ColourMatrix): boolean => {
+  const rgbIndexes = [0, 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 14] as const;
+  return rgbIndexes.every((index) => Math.abs(matrix[index]) <= 2);
+};
+
+const colourMatrixFilter = (matrix: ColourMatrix): string => {
+  if (colourMatrixUsesMixerRange(matrix)) {
+    return [
+      'format=gbrap,',
+      'colorchannelmixer=',
+      `rr=${coefficient(matrix[0])}:rg=${coefficient(matrix[1])}:rb=${coefficient(matrix[2])}:ra=${coefficient(matrix[4])}`,
+      `:gr=${coefficient(matrix[5])}:gg=${coefficient(matrix[6])}:gb=${coefficient(matrix[7])}:ga=${coefficient(matrix[9])}`,
+      `:br=${coefficient(matrix[10])}:bg=${coefficient(matrix[11])}:bb=${coefficient(matrix[12])}:ba=${coefficient(matrix[14])}`,
+    ].join('');
+  }
+  const expression = (row: 0 | 1 | 2): string => {
+    const offset = row * 5;
+    return `clip(${coefficient(matrix[offset]!)}*r(X,Y)+${coefficient(matrix[offset + 1]!)}*g(X,Y)+${coefficient(matrix[offset + 2]!)}*b(X,Y)+${coefficient(matrix[offset + 4]! * 255)},0,255)`;
+  };
+  return `format=gbrp,geq=r='${expression(0)}':g='${expression(1)}':b='${expression(2)}'`;
+};
+
+const trimFilterOptions = (edits: RenderSegment['edits']): string[] => [
+  ...(edits.sourceInSeconds === null ? [] : [`start=${edits.sourceInSeconds}`]),
+  ...(edits.sourceOutSeconds === null ? [] : [`end=${edits.sourceOutSeconds}`]),
+];
+
+const cropFilter = (crop: StudioNormalisedRect): string =>
+  `crop=w=iw*${crop.width}:h=ih*${crop.height}:x=iw*${crop.x}:y=ih*${crop.y}:exact=1`;
+
+const uneditedClip = (): RenderSegment['edits'] => ({
+  sourceInSeconds: null,
+  sourceOutSeconds: null,
+  crop: null,
+  filters: [],
+});
 
 const appendTail = (current: string, chunk: Buffer): string => {
   const combined = current + chunk.toString('utf8');
@@ -133,6 +306,16 @@ const unavailableSpawnError = (error: unknown): boolean => {
   return code === 'ENOENT' || code === 'EACCES' || code === 'ENOTDIR';
 };
 
+const positiveTimeout = (value: number | undefined, fallback: number): number =>
+  value !== undefined && Number.isFinite(value) && value > 0 ? value : fallback;
+
+const terminateProcess = (child: ChildProcessWithoutNullStreams, graceMs: number): NodeJS.Timeout => {
+  child.kill('SIGTERM');
+  const timer = setTimeout(() => child.kill('SIGKILL'), graceMs);
+  timer.unref?.();
+  return timer;
+};
+
 const runFfmpeg = (
   binary: string,
   args: string[],
@@ -142,6 +325,9 @@ const runFfmpeg = (
     spawnProcess: StudioRenderSpawn;
     cwd?: string;
     onOutTime?: (seconds: number) => void;
+    onFrame?: (frame: number) => void;
+    timeoutMs?: number;
+    terminationGraceMs: number;
   }
 ): Promise<FfmpegRunResult> => {
   if (options.state.cancelled) return Promise.reject(new RenderCancelledError());
@@ -164,23 +350,36 @@ const runFfmpeg = (
     options.state.activeProcess = child;
     let settled = false;
     let stderrTail = '';
+    let stdoutTail = '';
     let progressBuffer = '';
+    let terminationTimer: NodeJS.Timeout | null = null;
+    let timeoutTimer: NodeJS.Timeout | null = null;
+    let timedOut = false;
     const finish = (work: () => void): void => {
       if (settled) return;
       settled = true;
-      if (options.state.activeProcess === child) options.state.activeProcess = null;
+      if (terminationTimer !== null) clearTimeout(terminationTimer);
+      if (timeoutTimer !== null) clearTimeout(timeoutTimer);
+      if (options.state.activeProcess === child) {
+        if (options.state.activeTerminationTimer !== null) clearTimeout(options.state.activeTerminationTimer);
+        options.state.activeTerminationTimer = null;
+        options.state.activeProcess = null;
+      }
       work();
     };
     child.stderr.on('data', (chunk: Buffer) => {
       stderrTail = appendTail(stderrTail, chunk);
     });
     child.stdout.on('data', (chunk: Buffer) => {
+      stdoutTail = appendTail(stdoutTail, chunk);
       progressBuffer += chunk.toString('utf8');
       const lines = progressBuffer.split(/\r?\n/);
       progressBuffer = lines.pop() ?? '';
       for (const line of lines) {
         const seconds = parseProgressTime(line);
         if (seconds !== null) options.onOutTime?.(seconds);
+        const frameMatch = /^frame=(\d+)$/.exec(line);
+        if (frameMatch !== null) options.onFrame?.(Number(frameMatch[1]));
       }
     });
     child.once('error', (error) => {
@@ -190,12 +389,29 @@ const runFfmpeg = (
         else reject(new CreativeStudioRenderError('render_failed'));
       });
     });
+    child.once('exit', (code, signal) => {
+      if (code === 0 && signal === null) return;
+      finish(() => {
+        if (options.state.cancelled) reject(new RenderCancelledError());
+        else if (timedOut) reject(new CreativeStudioRenderError('render_failed', stderrTail || undefined));
+        else resolve({ code, stderrTail, stdoutTail });
+      });
+    });
     child.once('close', (code) => {
       finish(() => {
         if (options.state.cancelled) reject(new RenderCancelledError());
-        else resolve({ code, stderrTail });
+        else if (timedOut) reject(new CreativeStudioRenderError('render_failed', stderrTail || undefined));
+        else resolve({ code, stderrTail, stdoutTail });
       });
     });
+    if (options.timeoutMs !== undefined) {
+      timeoutTimer = setTimeout(() => {
+        timedOut = true;
+        terminationTimer = terminateProcess(child, options.terminationGraceMs);
+        options.state.activeTerminationTimer = terminationTimer;
+      }, options.timeoutMs);
+      timeoutTimer.unref?.();
+    }
   });
 };
 
@@ -206,6 +422,45 @@ const requireSuccess = (result: FfmpegRunResult, temporaryDirectory: string): vo
   if (result.code === 0) return;
   const tail = sanitizedTail(result.stderrTail, temporaryDirectory);
   throw new CreativeStudioRenderError('render_failed', tail || undefined);
+};
+
+const resolveFfprobeBinary = (ffmpegBinary: string, environment: NodeJS.ProcessEnv): string => {
+  const configured = environment.FFPROBE_PATH?.trim();
+  if (configured) return configured;
+  if (!ffmpegBinary.includes(path.sep)) return 'ffprobe';
+  const extension = path.extname(ffmpegBinary).toLowerCase() === '.exe' ? '.exe' : '';
+  return path.join(path.dirname(ffmpegBinary), `ffprobe${extension}`);
+};
+
+const validateDecodedDimensions = async (
+  ffmpegBinary: string,
+  inputPath: string,
+  runOptions: Parameters<typeof runFfmpeg>[2],
+  temporaryDirectory: string,
+  timeoutMs: number
+): Promise<void> => {
+  const result = await runFfmpeg(
+    resolveFfprobeBinary(ffmpegBinary, runOptions.environment),
+    ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height', '-of', 'json', inputPath],
+    { ...runOptions, timeoutMs }
+  );
+  requireSuccess(result, temporaryDirectory);
+  try {
+    const parsed = JSON.parse(result.stdoutTail) as { streams?: Array<{ width?: unknown; height?: unknown }> };
+    const decodable = parsed.streams?.some(
+      ({ width, height }) =>
+        typeof width === 'number' &&
+        Number.isFinite(width) &&
+        width > 0 &&
+        typeof height === 'number' &&
+        Number.isFinite(height) &&
+        height > 0
+    );
+    if (!decodable) throw new CreativeStudioRenderError('render_failed');
+  } catch (error) {
+    if (error instanceof CreativeStudioRenderError) throw error;
+    throw new CreativeStudioRenderError('render_failed');
+  }
 };
 
 const selectEncoder = async (
@@ -262,8 +517,22 @@ const videoHasAudio = async (
   return false;
 };
 
-const normalizationFilter = ({ width, height }: { width: number; height: number }): string =>
-  [
+const normalizationFilter = (
+  { width, height }: { width: number; height: number },
+  edits: RenderSegment['edits'],
+  stillDurationSeconds?: number
+): string => {
+  const trim = trimFilterOptions(edits);
+  const colour = edits.filters.some(({ amount }) => amount !== 0)
+    ? colourMatrixFilter(deriveColourMatrix(edits.filters))
+    : null;
+  return [
+    ...(stillDurationSeconds === undefined
+      ? []
+      : [`tpad=stop_mode=clone:stop_duration=${stillDurationSeconds}`, `trim=duration=${stillDurationSeconds}`]),
+    ...(trim.length === 0 ? [] : [`trim=${trim.join(':')}`, 'setpts=PTS-STARTPTS']),
+    ...(edits.crop === null ? [] : [cropFilter(edits.crop)]),
+    ...(colour === null ? [] : [colour]),
     `scale=${width}:${height}:force_original_aspect_ratio=decrease:force_divisible_by=2`,
     `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black`,
     'setsar=1',
@@ -271,6 +540,12 @@ const normalizationFilter = ({ width, height }: { width: number; height: number 
     `format=${RENDER_PIXEL_FORMAT}`,
     'setpts=PTS-STARTPTS',
   ].join(',');
+};
+
+const audioFilterWithTrim = (baseFilter: string, edits: RenderSegment['edits']): string => {
+  const trim = trimFilterOptions(edits);
+  return trim.length === 0 ? baseFilter : `atrim=${trim.join(':')},asetpts=PTS-STARTPTS,${baseFilter}`;
+};
 
 const encodeSegment = async (
   binary: string,
@@ -288,20 +563,30 @@ const encodeSegment = async (
   const durationArgs: string[] = [];
   let audioFilter: string;
   if (segment.scene.mediaKind === 'image') {
-    inputArgs.push('-loop', '1', '-t', String(segment.scene.durationSeconds), '-i', inputPath);
+    inputArgs.push('-i', inputPath);
     inputArgs.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
     mappingArgs.push('-map', '1:a:0');
-    durationArgs.push('-t', String(segment.scene.durationSeconds));
-    audioFilter = 'asetpts=PTS-STARTPTS';
+    durationArgs.push(
+      '-t',
+      String(segment.scene.durationSeconds),
+      '-frames:v',
+      String(Math.ceil(segment.scene.durationSeconds * RENDER_FPS))
+    );
+    audioFilter = audioFilterWithTrim('asetpts=PTS-STARTPTS', segment.edits);
   } else if (await videoHasAudio(binary, inputPath, runOptions, temporaryDirectory)) {
     inputArgs.push('-i', inputPath);
     mappingArgs.push('-map', '0:a:0');
-    audioFilter = 'aresample=48000:async=1:first_pts=0,apad,asetpts=PTS-STARTPTS';
+    audioFilter = audioFilterWithTrim(
+      trimFilterOptions(segment.edits).length === 0
+        ? 'aresample=48000:async=1:first_pts=0,apad,asetpts=PTS-STARTPTS'
+        : 'aresample=48000:async=1:first_pts=0,asetpts=PTS-STARTPTS',
+      segment.edits
+    );
   } else {
     inputArgs.push('-i', inputPath);
     inputArgs.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
     mappingArgs.push('-map', '1:a:0');
-    audioFilter = 'asetpts=PTS-STARTPTS';
+    audioFilter = audioFilterWithTrim('asetpts=PTS-STARTPTS', segment.edits);
   }
   const result = await runFfmpeg(
     binary,
@@ -312,7 +597,11 @@ const encodeSegment = async (
       ...inputArgs,
       ...mappingArgs,
       '-vf',
-      normalizationFilter(dimensions),
+      normalizationFilter(
+        dimensions,
+        segment.edits,
+        segment.scene.mediaKind === 'image' ? segment.scene.durationSeconds : undefined
+      ),
       '-af',
       audioFilter,
       ...durationArgs,
@@ -351,9 +640,42 @@ const encodeSegment = async (
       '-y',
       outputPath,
     ],
-    { ...runOptions, onOutTime }
+    { ...runOptions, onOutTime, timeoutMs: runOptions.timeoutMs }
   );
   requireSuccess(result, temporaryDirectory);
+};
+
+const countEncodedVideoFrames = async (
+  binary: string,
+  inputPath: string,
+  runOptions: Omit<Parameters<typeof runFfmpeg>[2], 'onOutTime' | 'onFrame'>,
+  temporaryDirectory: string
+): Promise<number> => {
+  let frameCount = 0;
+  const result = await runFfmpeg(
+    binary,
+    [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-i',
+      inputPath,
+      '-map',
+      '0:v:0',
+      '-c',
+      'copy',
+      '-progress',
+      'pipe:1',
+      '-nostats',
+      '-f',
+      'null',
+      '-',
+    ],
+    { ...runOptions, onFrame: (frame) => (frameCount = frame) }
+  );
+  requireSuccess(result, temporaryDirectory);
+  if (frameCount < 1) throw new CreativeStudioRenderError('render_failed');
+  return frameCount;
 };
 
 const concatSegments = async (
@@ -366,7 +688,14 @@ const concatSegments = async (
   const concatPath = path.join(temporaryDirectory, 'concat.txt');
   await fs.writeFile(
     concatPath,
-    segments.map((segment) => `file '${path.basename(segment.outputPath!)}'`).join('\n') + '\n',
+    segments
+      .flatMap((segment) => [
+        `file '${path.basename(segment.outputPath!)}'`,
+        ...(segment.renderedDurationSeconds === undefined
+          ? []
+          : [`duration ${segment.renderedDurationSeconds}`, `outpoint ${segment.renderedDurationSeconds}`]),
+      ])
+      .join('\n') + '\n',
     'utf8'
   );
   const outputPath = path.join(temporaryDirectory, 'render.mp4');
@@ -409,40 +738,93 @@ const readSegments = async (
 ): Promise<{ segments: RenderSegment[]; missingSceneIds: string[] }> => {
   const segments: RenderSegment[] = [];
   const missingSceneIds: string[] = [];
-  for (const sceneId of project.sceneOrder) {
+  const missingSceneIdSet = new Set<string>();
+  const reportMissingScene = (sceneId: string): void => {
+    if (missingSceneIdSet.has(sceneId)) return;
+    missingSceneIdSet.add(sceneId);
+    missingSceneIds.push(sceneId);
+  };
+  const activeCut =
+    project.activeCutId === null || project.activeCutId === undefined ? undefined : project.cuts?.[project.activeCutId];
+  const candidates: Array<{
+    sceneId: string;
+    assetId: string | null;
+    edits: RenderSegment['edits'];
+  }> =
+    activeCut === undefined
+      ? project.sceneOrder.map((sceneId) => ({
+          sceneId,
+          assetId: project.scenes[sceneId]?.selectedAssetId ?? null,
+          edits: uneditedClip(),
+        }))
+      : activeCut.clipOrder.flatMap((clipId) => {
+          const clip = activeCut.clips[clipId];
+          if (clip === undefined) return [];
+          const filterIds = clip.filters.map(({ id }) => id);
+          if (new Set(filterIds).size !== filterIds.length) throw new CreativeStudioRenderError('render_failed');
+          return [
+            {
+              sceneId: clip.sceneId,
+              assetId: clip.assetId,
+              edits: {
+                sourceInSeconds: clip.sourceInSeconds,
+                sourceOutSeconds: clip.sourceOutSeconds,
+                crop: clip.crop,
+                filters: clip.filters,
+              },
+            },
+          ];
+        });
+  const clippedSceneIds = activeCut === undefined ? null : new Set(candidates.map(({ sceneId }) => sceneId));
+  for (const candidate of candidates) {
     if (state.cancelled) throw new RenderCancelledError();
-    const scene = project.scenes[sceneId];
-    const selected =
-      scene?.selectedAssetId === null || scene === undefined ? undefined : project.assets[scene.selectedAssetId];
-    if (!scene || !selected || !isCanonicalStudioGeneratedTake(selected, project.id, scene)) {
-      missingSceneIds.push(sceneId);
+    const scene = project.scenes[candidate.sceneId];
+    const asset = candidate.assetId === null ? undefined : project.assets[candidate.assetId];
+    if (!scene || !asset || !isCanonicalStudioGeneratedTake(asset, project.id, scene)) {
+      reportMissingScene(candidate.sceneId);
       continue;
     }
     // Selection and verification stay ordered so cancellation never leaves parallel reads alive.
     // eslint-disable-next-line no-await-in-loop
-    const resolved = await mediaStore.resolveAsset(project.id, selected.id);
+    const resolved = await mediaStore.resolveAsset(project.id, asset.id);
     if (
       !resolved ||
-      resolved.asset.id !== selected.id ||
+      resolved.asset.id !== asset.id ||
       !isCanonicalStudioGeneratedTake(resolved.asset, project.id, scene)
     ) {
-      missingSceneIds.push(sceneId);
+      reportMissingScene(candidate.sceneId);
       continue;
     }
     segments.push({
       scene,
       asset: resolved.asset,
+      edits: candidate.edits,
       openVerifiedStream: resolved.openVerifiedStream,
     });
   }
+  if (clippedSceneIds !== null) {
+    for (const sceneId of project.sceneOrder) {
+      if (state.cancelled) throw new RenderCancelledError();
+      if (!clippedSceneIds.has(sceneId)) reportMissingScene(sceneId);
+    }
+  }
   return { segments, missingSceneIds };
+};
+
+const expectedSegmentDuration = (segment: RenderSegment): number | undefined => {
+  const sourceDuration =
+    segment.scene.mediaKind === 'image' ? segment.scene.durationSeconds : segment.asset.durationSeconds;
+  if (sourceDuration === undefined) return undefined;
+  const sourceIn = Math.min(segment.edits.sourceInSeconds ?? 0, sourceDuration);
+  const sourceOut = Math.min(segment.edits.sourceOutSeconds ?? sourceDuration, sourceDuration);
+  return Math.max(0, sourceOut - sourceIn);
 };
 
 const executeRender = async (
   projectId: string,
   deps: StudioRenderDeps,
   state: RenderState,
-  reportProgress: (progress: number) => void
+  reportProgress: (progress: StudioRenderProgress) => void
 ): Promise<StudioRenderResult> => {
   let temporaryDirectory: string | null = null;
   let missingSceneIds: string[] = [];
@@ -461,7 +843,8 @@ const executeRender = async (
         'aionui-studio-render-'
       )
     );
-    reportProgress(0);
+    const clipTotal = selection.segments.length;
+    reportProgress({ progress: 0, clipIndex: 1, clipTotal });
     for (const [index, segment] of selection.segments.entries()) {
       if (state.cancelled) throw new RenderCancelledError();
       const extension = path.extname(segment.asset.managedAsset.fileName);
@@ -479,12 +862,23 @@ const executeRender = async (
     const binary = environment.FFMPEG_PATH?.trim() || 'ffmpeg';
     const spawnProcess: StudioRenderSpawn =
       deps.spawnProcess ?? ((command, args, options) => spawn(command, args, options));
-    const runOptions = { state, environment, spawnProcess };
+    const terminationGraceMs = positiveTimeout(deps.terminationGraceMs, DEFAULT_TERMINATION_GRACE_MS);
+    const segmentTimeoutMs = positiveTimeout(deps.segmentTimeoutMs, DEFAULT_SEGMENT_TIMEOUT_MS);
+    const runOptions = { state, environment, spawnProcess, terminationGraceMs };
     const dimensions = resolveStudioRenderDimensions(project.resolution, project.aspectRatio);
+    for (const segment of selection.segments) {
+      // Validate every copied asset before any segment encoder can enter an unbounded decode loop.
+      // eslint-disable-next-line no-await-in-loop
+      await validateDecodedDimensions(
+        binary,
+        segment.inputPath!,
+        runOptions,
+        temporaryDirectory,
+        DEFAULT_SEGMENT_TIMEOUT_MS
+      );
+    }
     const encoder = await selectEncoder(binary, dimensions, runOptions, temporaryDirectory);
-    const expectedDurations = selection.segments.map((segment) =>
-      segment.scene.mediaKind === 'image' ? segment.scene.durationSeconds : segment.asset.durationSeconds
-    );
+    const expectedDurations = selection.segments.map(expectedSegmentDuration);
     const hasKnownDuration = expectedDurations.every((duration): duration is number => duration !== undefined);
     const totalDuration = hasKnownDuration ? expectedDurations.reduce((total, duration) => total + duration, 0) : null;
     let completedDuration = 0;
@@ -492,24 +886,58 @@ const executeRender = async (
       const segmentDuration = expectedDurations[index];
       // Sequential encoding keeps ffmpeg resource use bounded and produces deterministic progress.
       // eslint-disable-next-line no-await-in-loop
-      await encodeSegment(binary, encoder, segment, dimensions, runOptions, temporaryDirectory, (outTime) => {
-        if (totalDuration !== null) {
-          reportProgress(NORMALISE_PROGRESS_SHARE * Math.min(1, (completedDuration + outTime) / totalDuration));
+      await encodeSegment(
+        binary,
+        encoder,
+        segment,
+        dimensions,
+        { ...runOptions, timeoutMs: segmentTimeoutMs },
+        temporaryDirectory,
+        (outTime) => {
+          if (totalDuration !== null) {
+            reportProgress({
+              progress: NORMALISE_PROGRESS_SHARE * Math.min(1, (completedDuration + outTime) / totalDuration),
+              clipIndex: index + 1,
+              clipTotal,
+            });
+          }
         }
-      });
+      );
+      if (trimFilterOptions(segment.edits).length !== 0) {
+        // The concat demuxer otherwise advances by AAC-padded container duration and leaves a frame gap.
+        // eslint-disable-next-line no-await-in-loop
+        const frameCount = await countEncodedVideoFrames(binary, segment.outputPath!, runOptions, temporaryDirectory);
+        segment.renderedDurationSeconds = frameCount / RENDER_FPS;
+      }
       if (totalDuration !== null && segmentDuration !== undefined) {
         completedDuration += segmentDuration;
-        reportProgress(NORMALISE_PROGRESS_SHARE * Math.min(1, completedDuration / totalDuration));
+        reportProgress({
+          progress: NORMALISE_PROGRESS_SHARE * Math.min(1, completedDuration / totalDuration),
+          clipIndex: index + 1,
+          clipTotal,
+        });
       } else {
-        reportProgress(NORMALISE_PROGRESS_SHARE * ((index + 1) / selection.segments.length));
+        reportProgress({
+          progress: NORMALISE_PROGRESS_SHARE * ((index + 1) / selection.segments.length),
+          clipIndex: index + 1,
+          clipTotal,
+        });
       }
     }
     const outputPath = await concatSegments(binary, selection.segments, temporaryDirectory, runOptions, (outTime) => {
       if (totalDuration !== null) {
-        reportProgress(NORMALISE_PROGRESS_SHARE + CONCAT_PROGRESS_SHARE * Math.min(1, outTime / totalDuration));
+        reportProgress({
+          progress: NORMALISE_PROGRESS_SHARE + CONCAT_PROGRESS_SHARE * Math.min(1, outTime / totalDuration),
+          clipIndex: clipTotal,
+          clipTotal,
+        });
       }
     });
-    reportProgress(NORMALISE_PROGRESS_SHARE + CONCAT_PROGRESS_SHARE);
+    reportProgress({
+      progress: NORMALISE_PROGRESS_SHARE + CONCAT_PROGRESS_SHARE,
+      clipIndex: clipTotal,
+      clipTotal,
+    });
     if (state.cancelled) throw new RenderCancelledError();
     const stats = await fs.stat(outputPath);
     const output = createReadStream(outputPath);
@@ -525,7 +953,7 @@ const executeRender = async (
     });
     if (state.activeStream === output) state.activeStream = null;
     if (state.cancelled) throw new RenderCancelledError();
-    reportProgress(1);
+    reportProgress({ progress: 1, clipIndex: clipTotal, clipTotal });
     return { status: 'rendered', assetId: asset.id, missingSceneIds };
   } catch (error) {
     if (state.cancelled || error instanceof RenderCancelledError) return { status: 'cancelled', missingSceneIds };
@@ -534,22 +962,31 @@ const executeRender = async (
   } finally {
     state.activeStream = null;
     state.activeProcess = null;
+    if (state.activeTerminationTimer !== null) clearTimeout(state.activeTerminationTimer);
+    state.activeTerminationTimer = null;
     if (temporaryDirectory !== null) {
       await fs.rm(temporaryDirectory, { recursive: true, force: true }).catch((): undefined => undefined);
     }
   }
 };
 
-/** Starts a pristine-cut render without entering the project's serialized mutation queue. */
+/** Starts an active-cut render without entering the project's serialized mutation queue. */
 export const renderCut = (projectId: string, deps: StudioRenderDeps): StudioRenderOperation => {
-  const state: RenderState = { cancelled: false, activeProcess: null, activeStream: null };
+  const state: RenderState = {
+    cancelled: false,
+    activeProcess: null,
+    activeStream: null,
+    activeTerminationTimer: null,
+  };
   let lastProgress = 0;
-  const reportProgress = (progress: number): void => {
-    const next = Math.max(lastProgress, Math.min(1, progress));
-    if (next === lastProgress && next !== 0) return;
+  let lastClipIndex = 0;
+  const reportProgress = (update: StudioRenderProgress): void => {
+    const next = Math.max(lastProgress, Math.min(1, update.progress));
+    if (next === lastProgress && update.clipIndex === lastClipIndex && next !== 0) return;
     lastProgress = next;
+    lastClipIndex = update.clipIndex;
     try {
-      deps.onProgress?.(next);
+      deps.onProgress?.({ ...update, progress: next });
     } catch {
       // A relay callback cannot invalidate a local render.
     }
@@ -560,7 +997,12 @@ export const renderCut = (projectId: string, deps: StudioRenderDeps): StudioRend
       if (state.cancelled) return;
       state.cancelled = true;
       state.activeStream?.destroy(new RenderCancelledError());
-      state.activeProcess?.kill('SIGKILL');
+      if (state.activeProcess !== null) {
+        state.activeTerminationTimer = terminateProcess(
+          state.activeProcess,
+          positiveTimeout(deps.terminationGraceMs, DEFAULT_TERMINATION_GRACE_MS)
+        );
+      }
     },
   };
   return operation;
@@ -570,10 +1012,11 @@ export type StudioRenderRunner = {
   renderCut(projectId: string): Promise<StudioRenderCutResult>;
   cancelRender(projectId: string): boolean;
   getState(projectId: string): StudioRenderProgressEvent | null;
+  dispose(): Promise<void>;
 };
 
 export type StudioRenderRunnerDeps = {
-  startOperation(projectId: string, onProgress: (progress: number) => void): StudioRenderOperation;
+  startOperation(projectId: string, onProgress: (progress: StudioRenderProgress) => void): StudioRenderOperation;
   onStateChanged(state: StudioRenderProgressEvent): void;
 };
 
@@ -620,15 +1063,39 @@ export const createStudioRenderRunner = (deps: StudioRenderRunnerDeps): StudioRe
   const start = async (projectId: string): Promise<StudioRenderCutResult> => {
     if (activeOperations.has(projectId)) throw new StudioRenderRunnerError('busy');
     let progress = 0;
+    let clipProgress: Pick<StudioRenderProgress, 'clipIndex' | 'clipTotal'> | null = null;
     let operation: StudioRenderOperation | null = null;
     publish({ projectId, status: 'running', progress });
     try {
       operation = deps.startOperation(projectId, (reportedProgress) => {
-        if (!Number.isFinite(reportedProgress)) return;
-        const next = Math.max(progress, Math.min(1, Math.max(0, reportedProgress)));
-        if (next === progress) return;
+        if (!Number.isFinite(reportedProgress.progress)) return;
+        const next = Math.max(progress, Math.min(1, Math.max(0, reportedProgress.progress)));
+        const hasValidClipProgress =
+          Number.isSafeInteger(reportedProgress.clipIndex) &&
+          Number.isSafeInteger(reportedProgress.clipTotal) &&
+          reportedProgress.clipIndex > 0 &&
+          reportedProgress.clipTotal > 0 &&
+          reportedProgress.clipIndex <= reportedProgress.clipTotal;
+        const reportedClipProgress = hasValidClipProgress
+          ? { clipIndex: reportedProgress.clipIndex, clipTotal: reportedProgress.clipTotal }
+          : null;
+        const nextClipProgress =
+          reportedClipProgress !== null &&
+          clipProgress !== null &&
+          reportedClipProgress.clipTotal === clipProgress.clipTotal &&
+          reportedClipProgress.clipIndex < clipProgress.clipIndex
+            ? clipProgress
+            : reportedClipProgress;
+        if (
+          next === progress &&
+          nextClipProgress?.clipIndex === clipProgress?.clipIndex &&
+          nextClipProgress?.clipTotal === clipProgress?.clipTotal
+        ) {
+          return;
+        }
         progress = next;
-        publish({ projectId, status: 'running', progress });
+        clipProgress = nextClipProgress;
+        publish({ projectId, status: 'running', progress, ...clipProgress });
       });
       activeOperations.set(projectId, operation);
       const result = await operation.result;
@@ -657,7 +1124,7 @@ export const createStudioRenderRunner = (deps: StudioRenderRunnerDeps): StudioRe
     } catch (error) {
       if (error instanceof StudioRenderRunnerError) throw error;
       const code = error instanceof CreativeStudioRenderError ? error.code : 'render_failed';
-      publish({ projectId, status: 'failed', progress, errorCode: code });
+      publish({ projectId, status: 'failed', progress, errorCode: code, ...clipProgress });
       throw new StudioRenderRunnerError(code);
     } finally {
       if (operation !== null && activeOperations.get(projectId) === operation) {
@@ -677,6 +1144,11 @@ export const createStudioRenderRunner = (deps: StudioRenderRunnerDeps): StudioRe
     getState(projectId): StudioRenderProgressEvent | null {
       const state = states.get(projectId);
       return state === undefined ? null : cloneRenderState(state);
+    },
+    async dispose(): Promise<void> {
+      const operations = [...activeOperations.values()];
+      for (const operation of operations) operation.cancel();
+      await Promise.allSettled(operations.map(({ result }) => result));
     },
   };
 };

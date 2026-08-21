@@ -7,6 +7,7 @@
 import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import sharp from 'sharp';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { IProvider, TProviderWithModel } from '@/common/config/storage';
 import type {
@@ -525,6 +526,27 @@ describe('Creative Studio runtime identity and lifecycle', () => {
     expect(uninstallProtocol).toHaveBeenCalledTimes(1);
   });
 
+  it('cancels and awaits active renders before runtime disposal completes', async () => {
+    let releaseRenders: (() => void) | undefined;
+    const rendersDisposed = new Promise<void>((resolve) => {
+      releaseRenders = resolve;
+    });
+    const { runtime } = createHarness();
+    const disposeRenders = vi.fn(() => rendersDisposed);
+    Object.assign(runtime.renderRunner, { dispose: disposeRenders });
+
+    let disposalFinished = false;
+    const disposal = runtime.dispose().then(() => {
+      disposalFinished = true;
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(disposeRenders).toHaveBeenCalledOnce();
+    expect(disposalFinished).toBe(false);
+    releaseRenders?.();
+    await disposal;
+  });
+
   it('waits for an in-flight protocol install and removes the handler before disposal completes', async () => {
     let releaseInstall: (() => void) | undefined;
     let markInstallStarted: (() => void) | undefined;
@@ -698,6 +720,36 @@ describe('Creative Studio E2E fake gate', () => {
 });
 
 describe('Creative Studio E2E fake adapter', () => {
+  it('emits a decodable non-zero-dimension PNG for image generation', async () => {
+    const rootDir = await mkdtemp(path.join(os.tmpdir(), 'weprompt-studio-fake-image-'));
+    temporaryDirectories.push(rootDir);
+    const bundle = createStudioE2EFakeBundle({ rootDir });
+    const adapter = bundle.adapters.get('weprompt-image-v1');
+    const fakeProvider = { ...bundle.provider, use_model: 'weprompt-e2e-image' } satisfies TProviderWithModel;
+    const request = {
+      prompt: 'A renderable E2E image',
+      mediaKind: 'image' as const,
+      aspectRatio: '16:9' as const,
+      resolution: '720p' as const,
+      durationSeconds: 4,
+      idempotencyKey: 'e2e_image_key_1',
+    };
+    const submitted = await adapter?.submit(request, fakeProvider, new AbortController().signal);
+    if (!submitted || submitted.kind !== 'remote') throw new Error('expected remote fake task');
+    await adapter?.poll?.(submitted.providerJobId, fakeProvider, new AbortController().signal);
+    await adapter?.poll?.(submitted.providerJobId, fakeProvider, new AbortController().signal);
+    const completed = await adapter?.poll?.(submitted.providerJobId, fakeProvider, new AbortController().signal);
+    if (!completed || completed.status !== 'succeeded') throw new Error('expected successful fake task');
+    const output = completed.outputs[0];
+    if (!output || output.source.kind !== 'file') throw new Error('expected file-backed fake output');
+
+    await expect(sharp(output.source.path).metadata()).resolves.toMatchObject({
+      format: 'png',
+      width: 1,
+      height: 1,
+    });
+  });
+
   it('reports queued and running before returning a tiny managed-output fixture', async () => {
     const rootDir = await mkdtemp(path.join(os.tmpdir(), 'weprompt-studio-fake-'));
     temporaryDirectories.push(rootDir);

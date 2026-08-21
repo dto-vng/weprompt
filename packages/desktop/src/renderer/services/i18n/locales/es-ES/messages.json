@@ -17,6 +17,27 @@
   "imageLoadFailed": "Error al cargar la imagen",
   "scrollToBottom": "Ir al final",
   "reasoning": "Razonamiento",
+  "templateReview": {
+    "reviewing": "Revisando el tema…",
+    "disclosure": "El contenido del tema se conserva localmente y se usa en futuros envíos con plantilla.",
+    "confirm": "Instalar en la galería de plantillas",
+    "installing": "Instalando…",
+    "installed": "Instalado en la galería de plantillas",
+    "requestFailed": "No se pudo revisar el tema. No se instaló nada.",
+    "failure": {
+      "INVALID_REQUEST": "La solicitud de revisión de plantilla no es válida. No se instaló nada.",
+      "RUN_NOT_FOUND": "No se encontró la ejecución de la presentación. No se instaló nada.",
+      "RUN_FORBIDDEN": "Esta ejecución de presentación no pertenece a este chat. No se instaló nada.",
+      "SCOPE_UNAVAILABLE": "El espacio de trabajo de este chat no está disponible. No se instaló nada.",
+      "TEAM_SCOPE_UNSUPPORTED": "La revisión de plantillas no está disponible en chats de equipo. No se instaló nada.",
+      "CANDIDATE_OUTSIDE_WORKSPACE": "El archivo del tema está fuera del espacio de trabajo de este chat. No se instaló nada.",
+      "CANDIDATE_UNSUPPORTED": "El archivo del tema no es un THEME.md compatible. No se instaló nada.",
+      "CANDIDATE_TOO_LARGE": "El archivo del tema es demasiado grande. No se instaló nada.",
+      "CANDIDATE_CHANGED": "El contenido del tema cambió después de revisarlo. No se instaló nada.",
+      "CONFIRMATION_NOT_MINTED": "Esta revisión ya no es válida. Revise el tema de nuevo antes de instalarlo. No se instaló nada.",
+      "INSTALL_FAILED": "No se pudo instalar el tema. No se instaló nada."
+    }
+  },
   "availableCommands": "{{count}} comandos disponibles",
   "atFile.hint": "Escribe para buscar archivos",
   "atFile.menuLabel": "Menciones de archivos",

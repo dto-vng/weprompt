@@ -1,9 +1,14 @@
 /*
  * Project Home layout: a full-width header slot on top, then a two-column hub
  * (main column = composer + chats; right rail = instructions + files).
- * The mobile/desktop switch is driven by LayoutContext's `isMobile` flag in
- * ProjectHomePage.tsx (applies .hubMobile), not a CSS media query, so it
- * stays in sync with the rest of the app's mobile breakpoint.
+ * .hubMobile is applied from ProjectHomePage.tsx, not from a media query, by
+ * either of two conditions: LayoutContext's `isMobile` flag, which keeps this
+ * page in step with the rest of the app's mobile breakpoint, or the hub's own
+ * measured width falling under HUB_STACK_MAX_WIDTH (useProjectHubLayout).
+ *
+ * The second exists because `isMobile` is `window.innerWidth < 768` and this
+ * grid does not live at window width — the Sider takes 200-420px of it first.
+ * A media query would repeat that mistake; only the hub's own width is right.
  */
 
 .page {

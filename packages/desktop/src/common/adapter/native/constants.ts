@@ -13,6 +13,7 @@ export const ADAPTER_BRIDGE_EVENT_KEY = 'office-ai-bridge-adapter';
  */
 export const NATIVE_BRIDGE_PROVIDER_KEYS = [
   'restart-app',
+  'quit-app',
   'open-dev-tools',
   'is-dev-tools-opened',
   'app.get-path',
@@ -38,6 +39,8 @@ export const NATIVE_BRIDGE_PROVIDER_KEYS = [
   'show-open',
   'presentation-templates.list',
   'presentation-templates.import-spec',
+  'presentation-templates.describe-spec',
+  'presentation-templates.import-spec-bound',
   'presentation-templates.remove',
   'presentation-templates.scratch.allocate',
   'presentation-templates.scratch.complete',
@@ -81,6 +84,7 @@ export const NATIVE_BRIDGE_PROVIDER_KEYS = [
   'creative-studio.update-project',
   'creative-studio.bind-brief-conversation',
   'creative-studio.update-cut',
+  'creative-studio.place-cut-scenes',
   'creative-studio.delete-project',
   'creative-studio.update-scene',
   'creative-studio.reorder-scenes',
@@ -88,6 +92,7 @@ export const NATIVE_BRIDGE_PROVIDER_KEYS = [
   'creative-studio.persist-captured-poster',
   'creative-studio.choose-and-import-reference',
   'creative-studio.choose-and-export-assets',
+  'creative-studio.get-latest-render',
   'creative-studio.render-cut',
   'creative-studio.cancel-render',
   'creative-studio.fit-storyboard',

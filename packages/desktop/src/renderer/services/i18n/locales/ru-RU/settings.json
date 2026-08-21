@@ -359,9 +359,6 @@
   "modelNotFoundAfterUrlChange": "Модель {{model}} не найдена по новому адресу; выберите её заново, если не работает.",
   "apiKey": "API-ключ",
   "deleteModelConfirm": "Вы уверены, что хотите удалить эту модель?",
-  "deleteAllModelConfirm": "Вы уверены, что хотите удалить все модели?",
-  "modelCount": "Модель",
-  "apiKeyCount": "API-ключ",
   "pleaseEnterBaseUrlAndApiKey": "Введите базовый URL и API-ключ",
   "pleaseEnterApiKey": "Введите API-ключ",
   "pleaseEnterBaseUrl": "Введите базовый URL",
@@ -865,8 +862,65 @@
   "includePrereleaseUpdates": "Включить предварительные/dev сборки",
   "saveModelConfigFailed": "Не удалось сохранить конфигурацию модели",
   "healthCheck": "Проверка здоровья",
-  "clearStatus": "Очистить статус",
-  "healthStatusCleared": "Статус здоровья очищен",
+  "modelRow": {
+    "latency": "{{latency}} мс",
+    "neverChecked": "Ни разу не проверялась",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "Удалить модель",
+    "deleteAppOperationsWarning": "Эта модель закреплена за операциями приложения. После удаления эта настройка останется недоступной, пока вы не выберете другую модель."
+  },
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "{{count}} моделей",
+    "modelCount_one": "{{count}} модель",
+    "modelCount_few": "{{count}} модели",
+    "modelCount_many": "{{count}} моделей",
+    "modelCount_other": "{{count}} модели",
+    "apiKeyCount": "{{count}} ключей",
+    "apiKeyCount_one": "{{count}} ключ",
+    "apiKeyCount_few": "{{count}} ключа",
+    "apiKeyCount_many": "{{count}} ключей",
+    "apiKeyCount_other": "{{count}} ключа",
+    "healthChecked": "Проверено {{checked}} из {{total}}",
+    "healthNotChecked": "Не проверено",
+    "healthFailing": "{{count}} с ошибками",
+    "healthFailing_one": "{{count}} с ошибкой",
+    "healthFailing_few": "{{count}} с ошибками",
+    "healthFailing_many": "{{count}} с ошибками",
+    "healthFailing_other": "{{count}} с ошибками",
+    "deleteConfirmTitle": "Удалить провайдера",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "Удаляет провайдера, его API-ключи и все настроенные им модели. Существующие чаты сохранят модель, с которой были начаты.",
+    "clearHealth": "Очистить состояние",
+    "clearHealthConfirmTitle": "Очистить состояние",
+    "clearHealthConfirmBody": "Записанные результаты проверок для «{{provider}}» будут удалены. Запустите проверку, чтобы измерить их заново.",
+    "healthCleared": "Состояние провайдера «{{provider}}» очищено.",
+    "deleteAppOperationsWarning": "Этот провайдер закреплён за операциями приложения. После удаления эта настройка останется недоступной, пока вы не выберете другую модель.",
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "Включить или отключить"
+  },
+  "providerHealth": {
+    "configuredInferenceUnavailable": "Настроено · инференс недоступен.",
+    "setupNeedsAttention": "Требуется проверить настройку.",
+    "overload": {
+      "action": "Провайдер временно перегружен. Повторите попытку позже."
+    },
+    "rateLimit": {
+      "action": "Дождитесь сброса лимита провайдера и повторите попытку."
+    },
+    "quota": {
+      "action": "На аккаунте провайдера закончилась квота или баланс. Пополните счёт или смените провайдера и повторите попытку."
+    },
+    "setup": {
+      "action": "Проверьте учётные данные и настройки провайдера, затем повторите попытку."
+    },
+    "connectivity": {
+      "action": "Проверьте сеть, прокси и Base URL, затем повторите попытку."
+    },
+    "provider": {
+      "action": "Провайдер не смог завершить проверку инференса. Повторите попытку позже."
+    }
+  },
   "latency": "Задержка",
   "customAcpAgent": "Пользовательские агенты ACP",
   "addCustomAgent": "Добавить",
@@ -1349,31 +1403,44 @@
   "mcpNoTools": "Этот сервер не предоставляет инструментов",
   "appOperationsModel": {
     "title": "Модель для операций приложения",
-    "description": "Используется для фоновой обработки контекста и будущей помощи во всем приложении независимо от моделей чата.",
+    "panelLabel": "Операции приложения",
+    "panelInfo": "WePrompt использует это для собственных фоновых задач — сейчас для сжатия длинных диалогов, чтобы их можно было продолжить. На ваши чаты это не влияет.",
+    "popoverSubtitle": "Только для фоновой работы. Изменение не влияет на ваши чаты.",
     "selectionLabel": "Выбор",
     "auto": "Автоматически",
     "fixed": "Фиксированная",
-    "resolvedModelLabel": "Определённая модель",
-    "healthLabel": "Статус",
-    "usedByLabel": "Используется для",
-    "contextCompaction": "Сжатие контекста",
-    "saving": "Сохранение…",
+    "autoExplainer": "WePrompt выбирает лучшую подходящую модель и определяет её заново при изменении поставщиков.",
+    "modelLabel": "Модель",
+    "managedByAuto": "Управляется автоматически",
+    "kept": "Сохранено",
+    "switchToAuto": "Переключить на автоматически",
+    "pickAnother": "Выбрать другую",
+    "checkNow": "Проверить сейчас",
+    "openSettings": "Изменить модель для операций приложения",
+    "contextCompaction": "Сокращение длинных диалогов",
+    "usedByCompaction": "Используется для сокращения длинных диалогов",
+    "setupRequiredImpact": "Подходящая текстовая модель не настроена. Пока вы её не добавите, длинные диалоги сокращаются простым правилом, а не моделью.",
     "loadFailed": "Не удалось загрузить настройки операций приложения.",
     "saveFailed": "Не удалось сохранить модель для операций приложения.",
+    "saveFailedToast": "Не удалось сохранить. Выберите снова, чтобы повторить.",
     "checkFailed": "Проверка работоспособности операций приложения не удалась.",
     "backendUpdateRequired": "Обновите WePrompt, чтобы настроить модель для операций приложения.",
-    "checkResult": {
-      "ready": "Исправно · {{checked}}",
-      "setupRequired": "Требуется настройка · {{checked}}",
-      "unavailable": "Проверка не пройдена · {{checked}}",
-      "checkedJustNow": "проверено только что",
-      "checkedAt": "проверено {{time}}"
+    "backendUpdateRequiredDetail": "Бэкенд этой сборки не предоставляет эту настройку. На чаты это не влияет.",
+    "checkTime": {
+      "never": "Ещё не проверялось",
+      "justNow": "Проверено только что",
+      "today": "Проверено сегодня, {{time}}",
+      "date": "Проверено {{date}}, {{time}}"
     },
     "status": {
       "ready": "Готово",
-      "checking": "Проверка",
+      "checking": "Проверка…",
       "setupRequired": "Требуется настройка",
-      "unavailable": "Недоступно"
+      "unavailable": "Недоступно",
+      "loading": "Загрузка…",
+      "saving": "Сохранение…",
+      "saveFailed": "Не сохранено",
+      "loadFailed": "Не загружено"
     },
     "reason": {
       "noEligibleModel": "Добавьте или включите текстовую модель с действительными учётными данными.",

@@ -263,7 +263,11 @@ export const useResizableSplit = (options: UseResizableSplitOptions = {}) => {
     >
       <span
         className={classNames(
-          'pointer-events-none block h-full w-2px bg-3 opacity-90 rd-full transition-all duration-150 group-hover:w-6px group-hover:bg-aou-6 group-active:w-6px group-active:bg-aou-6',
+          // Invisible at rest: the panes already draw their own 1px border, and painting a
+          // 2px bar on top of it read as one thick ~3px rule pressed against the content.
+          // The grip appears on hover/active, which is what a splitter should do — and in
+          // the primary accent, not the navy --aou-6 that C-22 removed from this pane.
+          'pointer-events-none block h-full w-2px bg-transparent rd-full transition-all duration-150 group-hover:w-6px group-hover:bg-primary group-active:w-6px group-active:bg-primary',
           lineClassName
         )}
         style={lineStyle}

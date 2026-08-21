@@ -10,6 +10,7 @@ import {
   PRESENTATION_RUN_DISPOSITIONS,
   PRESENTATION_RUN_LIMITS,
 } from '@/common/config/constants';
+import { isBoundedConversationId } from '@/common/types/office/conversationId';
 import type {
   PresentationReadinessBlocker,
   PresentationReadinessEvidence,
@@ -1073,19 +1074,31 @@ export type PresentationSourceDraftTombstone = {
   boundConversationId: string | null;
 };
 
-const SOURCE_FORMATS: readonly PresentationSourceFormat[] = ['pdf', 'docx', 'xlsx', 'pptx', 'txt', 'md', 'csv'];
-const SOURCE_KINDS: readonly PresentationSourceKind[] = ['native-picker', 'external-drop', 'workspace-relative'];
-const SOURCE_STATES: readonly PresentationSourceGrantManifest['state'][] = [
+const SOURCE_FORMATS: ReadonlySet<PresentationSourceFormat> = new Set([
+  'pdf',
+  'docx',
+  'xlsx',
+  'pptx',
+  'txt',
+  'md',
+  'csv',
+]);
+const SOURCE_KINDS: ReadonlySet<PresentationSourceKind> = new Set([
+  'native-picker',
+  'external-drop',
+  'workspace-relative',
+]);
+const SOURCE_STATES: ReadonlySet<PresentationSourceGrantManifest['state']> = new Set([
   'active',
   'claimed',
   'consumed',
   'revoked',
   'expired',
-];
+]);
 
 function hasExactManifestKeys(value: object, keys: readonly string[]): boolean {
-  const actual = Object.keys(value).sort();
-  const expected = [...keys].sort();
+  const actual = Object.keys(value).toSorted();
+  const expected = [...keys].toSorted();
   return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
 }
 
@@ -1104,8 +1117,7 @@ function isGrantOwner(value: unknown): value is PresentationGrantOwner {
     value.owner_type === 'conversation' &&
     hasExactManifestKeys(value, ['owner_type', 'conversation_id']) &&
     'conversation_id' in value &&
-    typeof value.conversation_id === 'string' &&
-    UUID_RE.test(value.conversation_id)
+    isBoundedConversationId(value.conversation_id)
   );
 }
 
@@ -1194,14 +1206,14 @@ export function assertPresentationSourceGrantManifest(value: PresentationSourceG
     !isIdentifier(value.displayName) ||
     value.displayName.includes('/') ||
     value.displayName.includes('\\') ||
-    !SOURCE_FORMATS.includes(value.format) ||
-    !SOURCE_KINDS.includes(value.sourceKind) ||
+    !SOURCE_FORMATS.has(value.format) ||
+    !SOURCE_KINDS.has(value.sourceKind) ||
     value.snapshotRelativePath !== `source.${value.format}` ||
     !/^[0-9a-f]{64}$/.test(value.sha256) ||
     !Number.isSafeInteger(value.byteLength) ||
     value.byteLength < 1 ||
     value.byteLength > PRESENTATION_RUN_LIMITS.MAX_SOURCE_BYTES ||
-    !SOURCE_STATES.includes(value.state) ||
+    !SOURCE_STATES.has(value.state) ||
     (value.queueExtendedAt === null) !== (value.queueItemId === null) ||
     (value.queueItemId !== null && !isIdentifier(value.queueItemId)) ||
     (value.state === 'claimed' || value.state === 'consumed') !== (value.claimedRunId !== null) ||

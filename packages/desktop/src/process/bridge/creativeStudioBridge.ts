@@ -318,6 +318,9 @@ export function initCreativeStudioBridge(dependencies: CreativeStudioBridgeDepen
     runCommand(() => dependencies.getService().bindBriefConversation(input))
   );
   ipcBridge.creativeStudio.updateCut.provider((input) => runCommand(() => dependencies.getService().updateCut(input)));
+  ipcBridge.creativeStudio.placeCutScenes.provider((input) =>
+    runCommand(() => dependencies.getService().placeCutScenes(input))
+  );
   ipcBridge.creativeStudio.deleteProject.provider((input) =>
     runCommand(() => dependencies.getService().deleteProject(input))
   );
@@ -354,6 +357,9 @@ export function initCreativeStudioBridge(dependencies: CreativeStudioBridgeDepen
         .exportAssetsToDirectory({ ...input, destinationDirectory: picked.filePaths[0] });
       return { status: 'exported' as const, ...result };
     })
+  );
+  ipcBridge.creativeStudio.getLatestRender.provider((input) =>
+    runCommand(() => dependencies.getService().getLatestRender(input))
   );
   ipcBridge.creativeStudio.renderCut.provider((input) =>
     runCommand(() => getRenderRunner().renderCut(input.projectId))

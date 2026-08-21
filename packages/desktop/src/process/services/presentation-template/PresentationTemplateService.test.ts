@@ -6,14 +6,34 @@
 
 import { createHash } from 'node:crypto';
 import { renameSync } from 'node:fs';
-import { mkdir, mkdtemp, open, readdir, readFile, rename, rm, symlink, truncate, writeFile } from 'node:fs/promises';
+import * as fsPromises from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  open,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  symlink,
+  truncate,
+  utimes,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PRESENTATION_RUN_LIMITS } from '@/common/config/constants';
 import type { PresentationTemplateManifest } from '@/common/types/office/presentationTemplate';
-import type { BuiltinTemplatePack } from '@process/resources/presentation-templates/index';
+import {
+  BUILTIN_TEMPLATE_INVENTORY,
+  BUILTIN_TEMPLATE_PACKS,
+  type BuiltinTemplatePack,
+} from '@process/resources/presentation-templates/index';
+import { PresentationRunFiles } from './run';
 import { PresentationTemplateService } from './PresentationTemplateService';
+
+vi.mock('node:fs/promises', { spy: true });
 
 const pack = (id: string, version = 1): BuiltinTemplatePack => ({
   manifest: {
@@ -75,14 +95,32 @@ async function createPptxPack(
 
 describe('PresentationTemplateService', () => {
   let rootDir: string;
+  let workspaceDir: string;
+  let symlinkedBases: string[];
 
   beforeEach(async () => {
     rootDir = await mkdtemp(path.join(tmpdir(), 'ptpl-'));
+    workspaceDir = await mkdtemp(path.join(tmpdir(), 'ptpl-workspace-'));
+    symlinkedBases = [];
   });
 
   afterEach(async () => {
-    await rm(rootDir, { recursive: true, force: true });
+    await Promise.all([
+      rm(rootDir, { recursive: true, force: true }),
+      rm(workspaceDir, { recursive: true, force: true }),
+      ...symlinkedBases.map((base) => rm(base, { recursive: true, force: true })),
+    ]);
   });
+
+  const createBoundService = (): PresentationTemplateService =>
+    new PresentationTemplateService({
+      rootDir,
+      builtinPacks: [],
+      workspaceSourceAuthorizer: new PresentationRunFiles({
+        userDataDir: path.join(rootDir, 'run-data'),
+        tempDir: path.join(rootDir, 'run-temp'),
+      }),
+    });
 
   it('syncs builtin packs on init and lists them', async () => {
     const service = new PresentationTemplateService({ rootDir, builtinPacks: [pack('alpha'), pack('beta')] });
@@ -91,6 +129,28 @@ describe('PresentationTemplateService', () => {
     expect(list.map((s) => s.manifest.id)).toEqual(['alpha', 'beta']);
     expect(list[0].themePath).toBe(path.join(rootDir, 'alpha', 'THEME.md'));
     expect(list[0].previewDataUrl.startsWith('data:image/svg+xml;base64,')).toBe(true);
+  });
+
+  it('installs every packaged-inventory builtin into the gallery', async () => {
+    const packagedResourcesDir = path.resolve(__dirname, '../../../../resources/presentation-templates');
+    const inventoryById = new Map(BUILTIN_TEMPLATE_INVENTORY.map((entry) => [entry.id, entry]));
+    const packagedPacks = BUILTIN_TEMPLATE_PACKS.map((builtin): BuiltinTemplatePack => {
+      const packagedReferenceFile = inventoryById.get(builtin.manifest.id)?.packagedReferenceFile;
+      return {
+        manifest: builtin.manifest,
+        themeMd: builtin.themeMd,
+        previewSvg: builtin.previewSvg,
+        referenceSourcePath:
+          packagedReferenceFile === null || packagedReferenceFile === undefined
+            ? undefined
+            : () => path.join(packagedResourcesDir, packagedReferenceFile),
+      };
+    });
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: packagedPacks });
+
+    const installedIds = (await service.list()).map((summary) => summary.manifest.id).toSorted();
+
+    expect(installedIds).toEqual(BUILTIN_TEMPLATE_INVENTORY.map((entry) => entry.id).toSorted());
   });
 
   it('rejects a symlinked template root before syncing a nonempty builtin pack', async () => {
@@ -175,6 +235,418 @@ describe('PresentationTemplateService', () => {
     const second = await service.importThemeSpec(specPath);
     expect(first.manifest.id).toBe('same-name');
     expect(second.manifest.id).toBe('same-name-2');
+  });
+
+  describe('hash-bound workspace imports', () => {
+    const conversationId = '2be7b8fc-6af5-42b8-aed5-03644735c730';
+    // The ids the running app actually mints are 8-hex short ids, never RFC-4122 uuids.
+    const shortConversationId = 'f90e8348';
+
+    it('installs the exact bytes described by the main process', async () => {
+      const service = createBoundService();
+      const themeBytes = Buffer.from('# Bound Theme\n\n--accent: #c8341e\nfamily=Fraunces&display=swap', 'utf-8');
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, themeBytes);
+
+      const described = await service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath });
+      const installed = await service.importThemeSpecBound({
+        conversationId,
+        workspaceRoot: workspaceDir,
+        filePath,
+        expectedSha256: described.sha256,
+      });
+
+      expect(described).toMatchObject({
+        name: 'Bound Theme',
+        tokens: { colors: ['#c8341e'], fonts: ['Fraunces'] },
+        sha256: sha256(themeBytes),
+        byte_length: themeBytes.byteLength,
+      });
+      expect(await readFile(installed.themePath)).toEqual(themeBytes);
+    });
+
+    // Regression: a uuid-shaped guard on this path rejected every real conversation id as
+    // CANDIDATE_OUTSIDE_WORKSPACE, so no user could ever install a theme from chat.
+    it('installs a theme for the short conversation id the app actually mints', async () => {
+      const service = createBoundService();
+      const themeBytes = Buffer.from('# Short Id Theme\n\n--accent: #c8341e\nfamily=Fraunces&display=swap', 'utf-8');
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, themeBytes);
+
+      const described = await service.describeThemeSpec({
+        conversationId: shortConversationId,
+        workspaceRoot: workspaceDir,
+        filePath,
+      });
+      const installed = await service.importThemeSpecBound({
+        conversationId: shortConversationId,
+        workspaceRoot: workspaceDir,
+        filePath,
+        expectedSha256: described.sha256,
+      });
+
+      expect(described).toMatchObject({ name: 'Short Id Theme', sha256: sha256(themeBytes) });
+      expect(await readFile(installed.themePath)).toEqual(themeBytes);
+    });
+
+    // The bound stays meaningful: a blank id carries no ownership, and a NUL-bearing id could
+    // forge a confirmation key, whose segments are NUL-joined.
+    it.each([
+      ['blank', ''],
+      ['NUL-bearing', 'f90e8348\0forged'],
+      ['over-length', 'f'.repeat(257)],
+    ] as const)('refuses a %s conversation id on the bound candidate path', async (_reason, badConversationId) => {
+      const service = createBoundService();
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, '# Rejected Theme\n#112233', 'utf-8');
+
+      await expect(
+        service.describeThemeSpec({ conversationId: badConversationId, workspaceRoot: workspaceDir, filePath })
+      ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+    });
+
+    /**
+     * Mirrors the real data-directory layout: `~/.aionui` is a symlink to
+     * `~/Library/Application Support/Forge/aionui` (dev uses `~/.aionui-dev` → `Forge-Dev/aionui`).
+     * The conversation record reports the workspace through the link while the assistant resolves
+     * the file's absolute path through the real directory, so the two sides disagree lexically. A
+     * plain temp dir cannot reproduce this and would pass either way.
+     */
+    const createSymlinkedWorkspace = async (): Promise<{ linkedRoot: string; realRoot: string }> => {
+      const base = await mkdtemp(path.join(tmpdir(), 'ptpl-symlinked-'));
+      const realRoot = path.join(base, 'real');
+      const linkedRoot = path.join(base, 'link');
+      await mkdir(realRoot, { recursive: true });
+      await symlink(realRoot, linkedRoot);
+      symlinkedBases.push(base);
+      return { linkedRoot, realRoot };
+    };
+
+    it('installs a theme when the workspace is reached through a symlinked data directory', async () => {
+      const service = createBoundService();
+      const { linkedRoot, realRoot } = await createSymlinkedWorkspace();
+      const themeBytes = Buffer.from('# Symlinked Theme\n\n--accent: #c8341e', 'utf-8');
+      await writeFile(path.join(realRoot, 'THEME.md'), themeBytes);
+
+      // Workspace via the link, file via the real path — exactly what the live walk captured.
+      const described = await service.describeThemeSpec({
+        conversationId: shortConversationId,
+        workspaceRoot: linkedRoot,
+        filePath: path.join(realRoot, 'THEME.md'),
+      });
+      const installed = await service.importThemeSpecBound({
+        conversationId: shortConversationId,
+        workspaceRoot: linkedRoot,
+        filePath: path.join(realRoot, 'THEME.md'),
+        expectedSha256: described.sha256,
+      });
+
+      expect(described).toMatchObject({ name: 'Symlinked Theme', sha256: sha256(themeBytes) });
+      expect(await readFile(installed.themePath)).toEqual(themeBytes);
+    });
+
+    it('still refuses a directory symlink that escapes the workspace after canonicalization', async () => {
+      const service = createBoundService();
+      const outsideDir = await mkdtemp(path.join(tmpdir(), 'ptpl-outside-dir-'));
+      const escapeDir = path.join(workspaceDir, 'escape');
+      await writeFile(path.join(outsideDir, 'THEME.md'), '# Escaped Theme\n#112233', 'utf-8');
+      await symlink(outsideDir, escapeDir);
+
+      try {
+        await expect(
+          service.describeThemeSpec({
+            conversationId: shortConversationId,
+            workspaceRoot: workspaceDir,
+            filePath: path.join(escapeDir, 'THEME.md'),
+          })
+        ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+      } finally {
+        await rm(outsideDir, { recursive: true, force: true });
+      }
+    });
+
+    it('maps an unreadable candidate directory to a candidate failure rather than a raw fs error', async () => {
+      const service = createBoundService();
+
+      await expect(
+        service.describeThemeSpec({
+          conversationId: shortConversationId,
+          workspaceRoot: workspaceDir,
+          filePath: path.join(workspaceDir, 'no-such-directory', 'THEME.md'),
+        })
+      ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+    });
+
+    it('maps a candidate deleted between describe and install to a candidate failure', async () => {
+      const service = createBoundService();
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, '# Vanishing Theme\n#112233', 'utf-8');
+      const described = await service.describeThemeSpec({
+        conversationId: shortConversationId,
+        workspaceRoot: workspaceDir,
+        filePath,
+      });
+      await rm(filePath);
+
+      await expect(
+        service.importThemeSpecBound({
+          conversationId: shortConversationId,
+          workspaceRoot: workspaceDir,
+          filePath,
+          expectedSha256: described.sha256,
+        })
+      ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+      expect(await service.list()).toEqual([]);
+    });
+
+    it('refuses content swapped after describe without creating a partial pack', async () => {
+      const service = createBoundService();
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, '# Original Theme\n#112233', 'utf-8');
+      const described = await service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath });
+      await writeFile(filePath, '# Swapped Theme\n#abcdef', 'utf-8');
+
+      await expect(
+        service.importThemeSpecBound({
+          conversationId,
+          workspaceRoot: workspaceDir,
+          filePath,
+          expectedSha256: described.sha256,
+        })
+      ).rejects.toMatchObject({ code: 'CANDIDATE_CHANGED' });
+      expect(await service.list()).toEqual([]);
+    });
+
+    it('refuses a caller-supplied digest that the main process never minted', async () => {
+      const service = createBoundService();
+      const themeBytes = Buffer.from('# Unminted Theme\n#112233', 'utf-8');
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, themeBytes);
+
+      await expect(
+        service.importThemeSpecBound({
+          conversationId,
+          workspaceRoot: workspaceDir,
+          filePath,
+          expectedSha256: sha256(themeBytes),
+        })
+      ).rejects.toMatchObject({ code: 'CONFIRMATION_NOT_MINTED' });
+      expect(await service.list()).toEqual([]);
+    });
+
+    it('refuses a lexical escape from the authorized workspace', async () => {
+      const service = createBoundService();
+      const outsidePath = path.join(path.dirname(workspaceDir), 'outside-theme.md');
+      const traversalPath = `${workspaceDir}/../${path.basename(outsidePath)}`;
+      await writeFile(outsidePath, '# Outside Theme\n#112233', 'utf-8');
+
+      try {
+        await expect(
+          service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath: traversalPath })
+        ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+        expect(await service.list()).toEqual([]);
+      } finally {
+        await rm(outsidePath, { force: true });
+      }
+    });
+
+    /**
+     * BUG-051: the discriminating case the suite was missing. Every other symlink
+     * fixture here points its link OUTSIDE the workspace, so parent-only
+     * canonicalization and a full `realpath(input.filePath)` both refuse it — by
+     * different checks, with the same code. Mutation proved it: swapping in the
+     * full realpath still passed 45/45.
+     *
+     * A link that stays INSIDE the workspace separates them. Parent-only keeps the
+     * final segment as written, so the candidate is still a symlink when the
+     * authorizer lstats it and is refused. A full realpath resolves it to the
+     * regular file behind it, and the refusal disappears — silently, because
+     * containment still holds. This is the fixture that makes the docblock's
+     * "canonicalize the parent, never the final segment" rule load-bearing.
+     */
+    it('refuses a symlinked file even when its target is inside the workspace', async () => {
+      const service = createBoundService();
+      const realPath = path.join(workspaceDir, 'REAL-THEME.md');
+      const linkedPath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(realPath, '# Inside Linked Theme\n#112233', 'utf-8');
+      await symlink(realPath, linkedPath);
+
+      await expect(
+        service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath: linkedPath })
+      ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+      expect(await service.list()).toEqual([]);
+    });
+
+    it('refuses a symlink escape from the authorized workspace', async () => {
+      const service = createBoundService();
+      const outsideDir = await mkdtemp(path.join(tmpdir(), 'ptpl-outside-workspace-'));
+      const outsidePath = path.join(outsideDir, 'THEME.md');
+      const linkedPath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(outsidePath, '# Linked Outside Theme\n#112233', 'utf-8');
+      await symlink(outsidePath, linkedPath);
+
+      try {
+        await expect(
+          service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath: linkedPath })
+        ).rejects.toMatchObject({ code: 'CANDIDATE_OUTSIDE_WORKSPACE' });
+        expect(await service.list()).toEqual([]);
+      } finally {
+        await rm(outsideDir, { recursive: true, force: true });
+      }
+    });
+
+    it('returns a typed size failure without creating partial state', async () => {
+      const service = createBoundService();
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, '# Oversized Theme', 'utf-8');
+      await truncate(filePath, PRESENTATION_RUN_LIMITS.MAX_THEME_BYTES + 1);
+
+      await expect(
+        service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath })
+      ).rejects.toMatchObject({ code: 'CANDIDATE_TOO_LARGE' });
+      expect(await service.list()).toEqual([]);
+    });
+
+    it('treats repeated install confirmation as idempotent', async () => {
+      const service = createBoundService();
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, '# Install Once\n#112233', 'utf-8');
+      const described = await service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath });
+      const input = {
+        conversationId,
+        workspaceRoot: workspaceDir,
+        filePath,
+        expectedSha256: described.sha256,
+      };
+
+      const first = await service.importThemeSpecBound(input);
+      const second = await service.importThemeSpecBound(input);
+
+      expect(second.manifest.id).toBe(first.manifest.id);
+      expect((await service.list()).map((template) => template.manifest.id)).toEqual(['install-once']);
+      expect(await readdir(rootDir)).not.toContain('install-once-2');
+    });
+
+    it('keeps an interrupted bound install hidden from the gallery', async () => {
+      const service = createBoundService();
+      const filePath = path.join(workspaceDir, 'THEME.md');
+      await writeFile(filePath, '# Interrupted Bound Theme\n#112233', 'utf-8');
+      const described = await service.describeThemeSpec({ conversationId, workspaceRoot: workspaceDir, filePath });
+      const actualFsPromises = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+      const writeSpy = vi.spyOn(fsPromises, 'writeFile').mockImplementation(async (file, data, options) => {
+        if (path.basename(file.toString()) === 'preview.svg') throw new Error('injected bound install interruption');
+        return actualFsPromises.writeFile(file, data, options);
+      });
+
+      try {
+        await expect(
+          service.importThemeSpecBound({
+            conversationId,
+            workspaceRoot: workspaceDir,
+            filePath,
+            expectedSha256: described.sha256,
+          })
+        ).rejects.toThrow('injected bound install interruption');
+      } finally {
+        writeSpy.mockRestore();
+      }
+
+      expect(await service.list()).toEqual([]);
+      expect(await readdir(rootDir)).not.toContain('interrupted-bound-theme');
+    });
+  });
+
+  it('uses only a gallery-hidden temporary while a failed import is incomplete', async () => {
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+    await service.ensureInitialized();
+    const specPath = path.join(rootDir, 'crash-safe-theme.md');
+    await writeFile(specPath, '# Crash Safe Theme\ncontent', 'utf-8');
+    let incompleteEntries: string[] = [];
+    let listedIdsDuringImport: string[] = [];
+    const actualFsPromises = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const writeSpy = vi.spyOn(fsPromises, 'writeFile').mockImplementation(async (file, data, options) => {
+      if (path.basename(file.toString()) === 'preview.svg') {
+        incompleteEntries = await actualFsPromises.readdir(rootDir);
+        listedIdsDuringImport = (await service.list()).map((summary) => summary.manifest.id);
+        throw new Error('injected preview write failure');
+      }
+      return actualFsPromises.writeFile(file, data, options);
+    });
+
+    try {
+      await expect(service.importThemeSpec(specPath)).rejects.toThrow('injected preview write failure');
+    } finally {
+      writeSpy.mockRestore();
+    }
+
+    expect({
+      hasFinalPath: incompleteEntries.includes('crash-safe-theme'),
+      temporaryCount: incompleteEntries.filter((name) => name.startsWith('.aionui-template-install-')).length,
+      listedIdsDuringImport,
+    }).toEqual({ hasFinalPath: false, temporaryCount: 1, listedIdsDuringImport: [] });
+    expect(await readdir(rootDir)).not.toContain('crash-safe-theme');
+  });
+
+  it('retries a failed import with the intended id', async () => {
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+    await service.ensureInitialized();
+    const specPath = path.join(rootDir, 'retry-theme.md');
+    await writeFile(specPath, '# Retry Theme\ncontent', 'utf-8');
+    const actualFsPromises = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const writeSpy = vi.spyOn(fsPromises, 'writeFile').mockImplementation(async (file, data, options) => {
+      if (path.basename(file.toString()) === 'preview.svg') throw new Error('injected preview write failure');
+      return actualFsPromises.writeFile(file, data, options);
+    });
+
+    await expect(service.importThemeSpec(specPath)).rejects.toThrow('injected preview write failure');
+    writeSpy.mockRestore();
+
+    const retried = await service.importThemeSpec(specPath);
+
+    expect(retried.manifest.id).toBe('retry-theme');
+  });
+
+  it('removes at most twenty stale install temporaries during initialization', async () => {
+    const staleTime = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const staleNames = Array.from(
+      { length: 22 },
+      (_, index) => `.aionui-template-install-stale-${index.toString().padStart(2, '0')}-ABC123`
+    );
+    await Promise.all(
+      staleNames.map(async (name) => {
+        const directory = path.join(rootDir, name);
+        await mkdir(directory);
+        await utimes(directory, staleTime, staleTime);
+      })
+    );
+    const recentName = '.aionui-template-install-recent-ABC123';
+    await mkdir(path.join(rootDir, recentName));
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+
+    await service.ensureInitialized();
+
+    const remainingTemporaries = (await readdir(rootDir)).filter((name) =>
+      name.startsWith('.aionui-template-install-')
+    );
+    expect(remainingTemporaries).toHaveLength(3);
+    expect(remainingTemporaries).toContain(recentName);
+  });
+
+  it('never cleans nonmatching directories or matching regular files', async () => {
+    const staleTime = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const similarDirectory = path.join(rootDir, '.aionui-template-install-not-ours');
+    const matchingFile = path.join(rootDir, '.aionui-template-install-file-ABC123');
+    await mkdir(similarDirectory);
+    await writeFile(matchingFile, 'keep', 'utf-8');
+    await Promise.all([utimes(similarDirectory, staleTime, staleTime), utimes(matchingFile, staleTime, staleTime)]);
+    const service = new PresentationTemplateService({ rootDir, builtinPacks: [] });
+
+    await service.ensureInitialized();
+
+    expect(await readdir(rootDir)).toEqual([
+      '.aionui-template-install-file-ABC123',
+      '.aionui-template-install-not-ours',
+    ]);
   });
 
   it('rejects non-md files', async () => {

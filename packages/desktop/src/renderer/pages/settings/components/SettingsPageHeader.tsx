@@ -7,9 +7,12 @@
 /**
  * SettingsPageHeader — the shared header paradigm for settings pages.
  *
- * Layout (top to bottom):
- *   1. Title row: page title + description on the left, action slot on the right.
- *   2. Tabs (optional): underline tabs with an optional count badge.
+ * Layout:
+ *   1. Title block: page title + description, with the action slot on its right.
+ *   2. Status panel (optional): a fixed-width card BESIDE the title block on wide
+ *      viewports, wrapping to its own full-width row below it when there is not
+ *      room for both. It is never squeezed into the leftover width.
+ *   3. Tabs (optional): underline tabs with an optional count badge.
  *
  * Pages own everything below the header (their list/content). This keeps the
  * title sizing, description, action placement, tab styling and responsive
@@ -32,6 +35,25 @@ type SettingsPageHeaderProps = {
   description?: React.ReactNode;
   /** Right-aligned action slot (search, create button, dropdowns, …). */
   actions?: React.ReactNode;
+  /**
+   * Where `actions` sits. `title-row` (default) right-aligns them beside the
+   * title. `below-description` stacks them under the description instead, so a
+   * page carrying a status panel does not leave a button stranded in the gap
+   * between the title block and the panel column.
+   */
+  actionsPlacement?: 'title-row' | 'below-description';
+  /**
+   * Status-panel slot inside the sticky header, for a panel that must stay
+   * glanceable while the body scrolls. It sits in its own column beside the title
+   * block — not in `actions`, whose `shrink-0` sizing would force the whole header
+   * to the panel's max-content width and overflow the page.
+   *
+   * The slot owns the column width, not the panel: the panel renders `w-full` and
+   * the column caps it at the card width once there is room for both. The column
+   * is `empty:hidden`, so a panel component that renders `null` (this prop is a
+   * live element either way) leaves no phantom column behind to squeeze the title.
+   */
+  statusPanel?: React.ReactNode;
   tabs?: SettingsPageTab[];
   activeTab?: string;
   onTabChange?: (key: string) => void;
@@ -45,6 +67,8 @@ const SettingsPageHeader: React.FC<SettingsPageHeaderProps> = ({
   title,
   description,
   actions,
+  actionsPlacement = 'title-row',
+  statusPanel,
   tabs,
   activeTab,
   onTabChange,
@@ -58,13 +82,34 @@ const SettingsPageHeader: React.FC<SettingsPageHeaderProps> = ({
       // mode. Non-sticky callers render this header outside their scroll body, and
       // painting it there leaves a panel the width of the caller's content column
       // instead of the full page width.
-      className={classNames(sticky && 'bg-1 sticky top-0 z-10 -mt-14px pt-14px md:-mt-32px md:pt-32px')}
+      //
+      // C-15: it must match the page it masks, not merely be opaque. At bg-1 it read as
+      // a warm band floating on the lighter content plane; bg-chat-surface is the plane
+      // itself, so the mask becomes invisible while still doing its job.
+      className={classNames(sticky && 'bg-chat-surface sticky top-0 z-10 -mt-14px pt-14px md:-mt-32px md:pt-32px')}
     >
-      <div className='flex items-center justify-between gap-12px sm:gap-16px'>
-        <h1 className='m-0 min-w-0 flex-1 text-22px md:text-24px font-bold leading-[1.2] text-t-primary'>{title}</h1>
-        {actions ? <div className='shrink-0 flex flex-wrap items-center justify-end gap-8px'>{actions}</div> : null}
+      <div className='flex flex-col gap-14px min-[1080px]:flex-row min-[1080px]:items-start min-[1080px]:gap-28px'>
+        <div className='min-w-0 min-[1080px]:flex-1'>
+          <div className='flex items-center justify-between gap-12px sm:gap-16px'>
+            <h1 className='m-0 min-w-0 flex-1 text-22px md:text-24px font-bold leading-[1.2] text-t-primary'>
+              {title}
+            </h1>
+            {actions && actionsPlacement === 'title-row' ? (
+              <div className='shrink-0 flex flex-wrap items-center justify-end gap-8px'>{actions}</div>
+            ) : null}
+          </div>
+          {description ? <p className='m-0 mt-8px text-13px leading-relaxed text-t-secondary'>{description}</p> : null}
+          {actions && actionsPlacement === 'below-description' ? (
+            <div className='mt-18px flex flex-wrap items-center gap-8px'>{actions}</div>
+          ) : null}
+        </div>
+        <div
+          data-testid='settings-header-status-panel'
+          className='empty:hidden w-full min-w-0 min-[1080px]:w-330px min-[1080px]:shrink-0'
+        >
+          {statusPanel}
+        </div>
       </div>
-      {description ? <p className='m-0 mt-8px text-13px leading-relaxed text-t-secondary'>{description}</p> : null}
 
       {tabs && tabs.length > 0 ? (
         <div className='mt-18px flex gap-26px border-b border-[var(--color-border-2)]' role='tablist'>

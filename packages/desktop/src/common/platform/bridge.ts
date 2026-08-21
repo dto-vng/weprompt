@@ -129,6 +129,43 @@ export const intercept = (callback: Interceptor): (() => void) => {
 
 export const hasListener = (name: string): boolean => eventEmitter.listenerCount(name) > 0;
 
+/**
+ * BUG-047: a provider that throws used to leave its caller pending forever.
+ * `subscribe` caught the rejection, logged it, and emitted nothing, so the
+ * `subscribe.callback-*` listener `invoke` is waiting on never fired. That is
+ * why BUG-046 presented as an invisible hang for nine days instead of an error,
+ * and it applied to every provider channel in the app, not to templates alone.
+ *
+ * Failures travel on their own channel rather than as a sentinel inside the
+ * result payload: a provider may legitimately resolve to any shape, and a
+ * marker in-band could collide with one. A separate channel also keeps the
+ * existing contract intact — a failing provider still emits no success
+ * callback.
+ *
+ * `subscribe.error-*` is as forgeable as `subscribe.callback-*`, so the native
+ * adapter refuses both as inbound request names (`common/adapter/main.ts`).
+ */
+const providerErrorChannel = (name: string, id: string): string => `subscribe.error-${name}${id}`;
+
+type BridgeProviderFailure = { message: string; name: string };
+
+/** Errors cross a JSON transport, so only plain, bounded fields survive. */
+const serializeProviderFailure = (error: unknown): BridgeProviderFailure => {
+  if (error instanceof Error) {
+    return { message: error.message, name: error.name };
+  }
+  return { message: typeof error === 'string' ? error : 'Provider failed', name: 'Error' };
+};
+
+const deserializeProviderFailure = (name: string, payload: unknown): Error => {
+  const failure = typeof payload === 'object' && payload !== null ? (payload as Partial<BridgeProviderFailure>) : {};
+  const message =
+    typeof failure.message === 'string' && failure.message.length > 0 ? failure.message : 'Provider failed';
+  const error = new Error(`[bridge] Provider "${name}" failed: ${message}`);
+  if (typeof failure.name === 'string' && failure.name.length > 0) error.name = failure.name;
+  return error;
+};
+
 export const subscribe = <Params = unknown, Data = unknown>(
   name: string,
   handler: (data: Params) => MaybePromise<Data>
@@ -145,6 +182,14 @@ export const subscribe = <Params = unknown, Data = unknown>(
       .then((result) => emit(`subscribe.callback-${name}${request.id}`, result))
       .catch((error: unknown) => {
         console.error(`[bridge] Provider "${name}" failed:`, error);
+        try {
+          emit(providerErrorChannel(name, request.id as string), serializeProviderFailure(error));
+        } catch (emitError: unknown) {
+          // Nothing further can be done for this caller; losing the transport is
+          // already terminal, and throwing here would replace one silent failure
+          // with another.
+          console.error(`[bridge] Provider "${name}" could not report its failure:`, emitError);
+        }
       });
   });
 
@@ -186,13 +231,38 @@ const subscribeRendererQuery = <Data>(
 export const invoke = <Data = unknown>(name: string, data?: unknown): Promise<Data> => {
   const id = createRequestId(name);
   const callbackName = `subscribe.callback-${name}${id}`;
+  const errorChannel = providerErrorChannel(name, id);
 
-  return new Promise<Data>((resolve) => {
-    const dispose = on(callbackName, (result) => {
-      dispose();
+  return new Promise<Data>((resolve, reject) => {
+    let settled = false;
+    let disposeResult = noop;
+    let disposeError = noop;
+    const disposeBoth = (): void => {
+      disposeResult();
+      disposeError();
+    };
+
+    disposeResult = on(callbackName, (result) => {
+      if (settled) return;
+      settled = true;
+      disposeBoth();
       resolve(result as Data);
     });
-    emit(`subscribe-${name}`, { id, data });
+    disposeError = on(errorChannel, (failure) => {
+      if (settled) return;
+      settled = true;
+      disposeBoth();
+      reject(deserializeProviderFailure(name, failure));
+    });
+
+    try {
+      emit(`subscribe-${name}`, { id, data });
+    } catch (error) {
+      if (settled) return;
+      settled = true;
+      disposeBoth();
+      reject(error);
+    }
   });
 };
 

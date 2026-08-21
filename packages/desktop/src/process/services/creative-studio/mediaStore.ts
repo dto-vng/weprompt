@@ -171,6 +171,7 @@ export type StudioMediaStore = {
   persistProviderPosterFromUrlForJob(input: PersistProviderJobPosterUrlInput): Promise<StudioAsset>;
   persistCapturedPoster(input: PersistCapturedPosterInput): Promise<StudioAsset>;
   persistProjectOutput(input: PersistProjectOutputInput): Promise<StudioAsset>;
+  getLatestProjectOutput(projectId: string): Promise<StudioAsset | null>;
   resolveAsset(
     projectId: string,
     assetId: string
@@ -1384,6 +1385,24 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
     });
   };
 
+  const getLatestProjectOutput = async (projectId: string): Promise<StudioAsset | null> => {
+    if (!SAFE_ID.test(projectId)) throw new CreativeStudioMediaError('invalid_media');
+    const [projectDir, project] = await Promise.all([
+      deps.store.getVerifiedProjectDirectory(projectId),
+      deps.store.getProject(projectId),
+    ]);
+    if (projectDir === null || project === null) throw new CreativeStudioMediaError('not_found');
+    const renderedCuts = (await listProjectOutputAssets(projectDir, projectId)).toSorted(
+      (left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id)
+    );
+    for (const renderedCut of renderedCuts) {
+      // eslint-disable-next-line no-await-in-loop
+      const resolved = await resolveAsset(projectId, renderedCut.id);
+      if (resolved !== null) return resolved.asset;
+    }
+    return null;
+  };
+
   const commitProviderJobAsset = async (input: ProviderJobOutputMetadata, asset: StudioAsset): Promise<void> => {
     await deps.store.updateProject(input.projectId, (current) => {
       const job = current.jobs[input.jobId];
@@ -1589,24 +1608,19 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
       });
       exported.push({ assetId: resolved.asset.id, fileName });
     }
-    const projectDir = await deps.store.getVerifiedProjectDirectory(input.projectId);
-    if (projectDir === null) throw new CreativeStudioMediaError('not_found');
-    const renderedCuts = (await listProjectOutputAssets(projectDir, input.projectId)).toSorted(
-      (left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id)
-    );
-    for (const renderedCut of renderedCuts) {
+    const renderedCut = await getLatestProjectOutput(input.projectId);
+    if (renderedCut !== null) {
       // Resolve through the sidecar-aware verifier before any rendered bytes leave managed storage.
-      // eslint-disable-next-line no-await-in-loop
       const resolved = await resolveAsset(input.projectId, renderedCut.id);
-      if (resolved === null) continue;
-      await writeVerifiedExportFile(path.join(directory, 'cut.mp4'), verifiedExportDirectory, [], async (handle) => {
-        await pipeline(
-          await resolved.openVerifiedStream(),
-          createWriteStream(path.join(directory, 'cut.mp4'), { fd: handle.fd, autoClose: false })
-        );
-      });
-      exported.push({ assetId: resolved.asset.id, fileName: 'cut.mp4' });
-      break;
+      if (resolved !== null) {
+        await writeVerifiedExportFile(path.join(directory, 'cut.mp4'), verifiedExportDirectory, [], async (handle) => {
+          await pipeline(
+            await resolved.openVerifiedStream(),
+            createWriteStream(path.join(directory, 'cut.mp4'), { fd: handle.fd, autoClose: false })
+          );
+        });
+        exported.push({ assetId: resolved.asset.id, fileName: 'cut.mp4' });
+      }
     }
     if (input.includeReferences) {
       const verifiedReferenceDirectory = await createVerifiedExportSubdirectory(verifiedExportDirectory, 'references');
@@ -1678,6 +1692,7 @@ export const createStudioMediaStore = (deps: StudioMediaStoreDeps): StudioMediaS
     persistProviderPosterFromUrlForJob,
     persistCapturedPoster,
     persistProjectOutput,
+    getLatestProjectOutput,
     resolveAsset,
     resolveProviderInput,
     exportAssetsToDirectory,

@@ -199,9 +199,25 @@ const readinessActionKeys = [
   'preview.generateThisScene',
 ] as const;
 
+const renderStateAndExportKeys = [
+  'phase.review.render.progressWithClip',
+  'phase.review.render.busyReason',
+  'phase.review.render.installFfmpeg',
+  'phase.review.render.tryAgain',
+  'phase.review.render.openProduce',
+  'phase.review.render.errors.failedClip',
+  'phase.review.render.errors.noRenderableShots',
+  'export.checkingRender',
+  'export.noRender',
+  'export.renderedAt',
+  'export.staleRender',
+  'export.latestRenderUnavailable',
+] as const;
+
 const pluralLogicalKeys = [
   'export.confirmSelectedCount',
   'export.gapWarning',
+  'phase.review.render.errors.noRenderableShots',
   'library.shotCount',
   'library.projectCount',
   'close.unsavedMessage',
@@ -281,7 +297,35 @@ function isPluralVariantKey(key: string): boolean {
   return pluralLogicalKeys.some((base) => key.startsWith(`${base}_`));
 }
 
+const truthfulAssistantDescriptions: Record<string, string> = {
+  'zh-CN': '根据创作简报生成故事板草稿。',
+  'en-US': 'Draft a storyboard from your brief.',
+  'ja-JP': 'ブリーフをもとにストーリーボードの下書きを作成します。',
+  'zh-TW': '根據創作簡報產生分鏡腳本草稿。',
+  'ko-KR': '브리프를 바탕으로 스토리보드 초안을 만듭니다.',
+  'tr-TR': 'Kısa açıklamanızdan bir storyboard taslağı oluşturun.',
+  'ru-RU': 'Создайте черновик раскадровки на основе брифа.',
+  'uk-UA': 'Створіть чернетку розкадрування на основі брифу.',
+  'pt-BR': 'Crie um rascunho de storyboard a partir do seu briefing.',
+  'de-DE': 'Erstelle aus deinem Briefing einen Storyboard-Entwurf.',
+  'es-ES': 'Crea un borrador de storyboard a partir de tu brief.',
+  'fa-IR': 'از شرح مختصر خود یک پیش‌نویس استوری‌بورد بسازید.',
+};
+
 describe('Creative Studio localization contract', () => {
+  it('describes the Write assistant truthfully in every configured locale', () => {
+    expect(Object.keys(truthfulAssistantDescriptions).toSorted()).toEqual(
+      [...i18nConfig.supportedLanguages].toSorted()
+    );
+
+    for (const locale of i18nConfig.supportedLanguages) {
+      const creativeStudio = loadConversationLocale(locale).creativeStudio;
+      const description = flattenStringLeaves(creativeStudio)['phase.write.assistantDescription'];
+
+      expect(description, `${locale}/phase.write.assistantDescription`).toBe(truthfulAssistantDescriptions[locale]);
+    }
+  });
+
   it.each(i18nConfig.supportedLanguages)(
     'keeps the %s ordinary-retry confirmation free of price-like numerals',
     (locale) => {
@@ -571,7 +615,10 @@ describe('Creative Studio localization contract', () => {
             returnDetails: true,
           });
           const expectedExactKey = `${key}${resolver.getSuffix(locale, count)}`;
-          const expectedRenderedValue = base === 'export.gapWarning' ? '03' : String(count);
+          const expectedRenderedValue =
+            base === 'export.gapWarning' || base === 'phase.review.render.errors.noRenderableShots'
+              ? '03'
+              : String(count);
           if (typeof details.res !== 'string' || !details.res.includes(expectedRenderedValue)) {
             issues.push(`${locale}.${base} did not render count ${count}`);
           }
@@ -603,6 +650,23 @@ describe('Creative Studio localization contract', () => {
       const leaves = flattenStringLeaves(creativeStudio);
 
       for (const key of stableMessageKeys) {
+        if (!leaves[key]?.trim()) {
+          issues.push(`${locale} is missing conversation.creativeStudio.${key}`);
+        }
+      }
+    }
+
+    expect(issues).toEqual([]);
+  });
+
+  it('localizes every R4 render-state and pre-export metadata message in every configured locale', () => {
+    const issues: string[] = [];
+
+    for (const locale of i18nConfig.supportedLanguages) {
+      const creativeStudio = loadConversationLocale(locale).creativeStudio;
+      const leaves = flattenStringLeaves(creativeStudio);
+
+      for (const key of renderStateAndExportKeys) {
         if (!leaves[key]?.trim()) {
           issues.push(`${locale} is missing conversation.creativeStudio.${key}`);
         }

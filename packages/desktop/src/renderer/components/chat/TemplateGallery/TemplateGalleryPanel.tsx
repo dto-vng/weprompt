@@ -14,8 +14,9 @@ import TemplateGalleryColumns from './TemplateGalleryColumns';
 /**
  * Compact popover panel shown above the SendBox (positioned by the SendBox
  * overlay slot). Pure presentational — state lives in
- * usePresentationTemplates. Templates are grouped into PPTX/HTML columns via
- * TemplateGalleryColumns and are never mixed across formats.
+ * usePresentationTemplates. Templates are grouped by artifact type via
+ * TemplateGalleryColumns — one horizontal shelf each — and are never mixed across
+ * formats.
  */
 const TemplateGalleryPanel: React.FC<{
   templates: PresentationTemplateSummary[];
@@ -64,7 +65,11 @@ const TemplateGalleryPanel: React.FC<{
           <TemplateGalleryColumns
             templates={templates}
             selectedId={selectedId}
-            size='compact'
+            // C-06: `large` gives one horizontal shelf per artifact type, matching the
+            // new-chat gallery. `compact` stacked each type vertically in its own column,
+            // so adding templates grew the panel downward into a ragged grid. This panel
+            // is wide enough for shelves, and `large` scrolls horizontally when it is not.
+            size='large'
             onSelect={onSelect}
             onRemove={onRemove}
           />

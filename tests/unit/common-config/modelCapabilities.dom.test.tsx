@@ -7,7 +7,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { IProvider } from '@/common/config/storage';
+import type { IProvider, ModelType } from '@/common/config/storage';
 
 const mocks = vi.hoisted(() => ({
   close: vi.fn(),
@@ -65,7 +65,7 @@ vi.mock('@icon-park/react', () => ({
   Info: () => <span>info</span>,
   LinkCloud: () => <span aria-hidden='true'>link</span>,
   Loading: () => <span aria-hidden='true'>loading</span>,
-  Minus: () => <span>remove-provider</span>,
+  MoreOne: () => <span>provider-more</span>,
   Plus: () => <span>add-model</span>,
   PreviewClose: () => <span aria-label='vision-disabled'>vision-disabled</span>,
   PreviewOpen: () => <span aria-hidden='true'>vision</span>,
@@ -265,7 +265,14 @@ vi.mock('@arco-design/web-react', async (importOriginal) => {
   };
 });
 
-import { supportsOpenAiApiMode, updateModelSettings } from '@/common/utils/modelCapabilities';
+import {
+  CAPABILITY_PATTERNS,
+  getBaseModelName,
+  hasSpecificModelCapability,
+  supportsOpenAiApiMode,
+  updateModelSettings,
+} from '@/common/utils/modelCapabilities';
+import { hasModelCapability } from '@/renderer/utils/model/modelCapabilities';
 import AddModelModal from '@/renderer/pages/settings/components/AddModelModal';
 import AddPlatformModal from '@/renderer/pages/settings/components/AddPlatformModal';
 import ModelModalContent from '@/renderer/components/settings/SettingsModal/contents/ModelModalContent';
@@ -655,5 +662,145 @@ describe('configured model list', () => {
         })
       );
     });
+  });
+});
+
+describe('excludeFromPrimary keeps media generators out of text model lists', () => {
+  const provider = { id: 'p1', name: 'p', platform: 'openai', models: [] } as unknown as IProvider;
+
+  // A video generator cannot serve a text turn, so offering one as a primary or
+  // app-operations model produces a request that always fails — and for context
+  // compaction it fails silently, falling back to the rules summary with nothing on
+  // screen explaining why. Image generators were already excluded; video ones were not.
+  it.each(['bytedance/seedance-2.0', 'bytedance/seedance-2.0-fast', 'google/gemini-3-pro-image', 'dall-e-3'])(
+    'excludes the media generator %s',
+    (modelName) => {
+      expect(hasSpecificModelCapability(provider, modelName, 'excludeFromPrimary')).toBe(true);
+    }
+  );
+
+  // The exclusion names specific generators rather than matching /video/, which would
+  // also catch video-understanding models — those read video and reply with text, so
+  // they belong in the list.
+  it.each(['llava-video-7b', 'kimi-k2.6', 'deepseek/deepseek-v4-flash', 'minimax/minimax-m3', 'openai/gpt-5'])(
+    'still offers the text-capable model %s',
+    (modelName) => {
+      expect(hasSpecificModelCapability(provider, modelName, 'excludeFromPrimary')).not.toBe(true);
+    }
+  );
+});
+
+describe('name-based capability inference (BUG-045 fail-open guard)', () => {
+  const provider = { id: 'p1', name: 'p', platform: 'openai', models: [] } as unknown as IProvider;
+
+  it('cannot disable the discovery-only guard through the module public surface', async () => {
+    const capabilityExports = (await import('@/common/utils/modelCapabilities')) as {
+      DISCOVERY_ONLY_CAPABILITIES?: Set<ModelType>;
+    };
+    const exposedGuard = capabilityExports.DISCOVERY_ONLY_CAPABILITIES;
+
+    exposedGuard?.clear();
+    let specificVerdict: boolean | undefined;
+    let providerVerdict: boolean | undefined;
+    try {
+      specificVerdict = hasSpecificModelCapability(provider, 'qwen-thinking', 'reasoning');
+      providerVerdict = hasModelCapability(
+        { ...provider, id: 'tamper-attempt', models: ['qwen-thinking'] },
+        'reasoning'
+      );
+    } finally {
+      exposedGuard?.add('reasoning');
+    }
+
+    expect({ providerVerdict, specificVerdict }).toEqual({
+      providerVerdict: undefined,
+      specificVerdict: undefined,
+    });
+  });
+
+  // Every one of these matches CAPABILITY_PATTERNS.reasoning (/o1-|reasoning|think/i).
+  // EPIC-003 rules that even an explicit provider-declared reasoning badge is
+  // insufficient evidence to enable reasoning controls; a regex on the model NAME
+  // is strictly weaker. Name inference must therefore never assert reasoning
+  // support — it must answer "unknown" and let the discovery seam decide.
+  const reasoningLookalikes = ['o1-preview', 'o1-mini', 'qwen-thinking', 'some-vendor-reasoning-v2', 'THINK-1'];
+
+  it.each(reasoningLookalikes)('never infers reasoning support from the model name: %s', (modelName) => {
+    // Assert the pre-condition explicitly. `undefined` is BOTH the guard's return
+    // and this module's pre-existing no-match default, so toBeUndefined() alone
+    // cannot tell them apart — a fixture that fails to match the pattern would
+    // pass vacuously and prove nothing. That is not hypothetical: an earlier
+    // revision of this list included 'deepseek-reasoner', which does not match
+    // (`reasoner` is not `reasoning`), and the case passed identically without
+    // the guard in place.
+    expect(CAPABILITY_PATTERNS.reasoning.test(getBaseModelName(modelName))).toBe(true);
+    expect(hasSpecificModelCapability(provider, modelName, 'reasoning')).toBeUndefined();
+  });
+
+  // The regex is not a superset of real reasoning models either, which is the
+  // other half of why name inference is the wrong instrument — it is wrong in
+  // both directions. These are genuine reasoning models the pattern misses.
+  it.each(['deepseek-reasoner', 'deepseek-r1'])('does not match real reasoning model %s at all', (modelName) => {
+    expect(CAPABILITY_PATTERNS.reasoning.test(getBaseModelName(modelName))).toBe(false);
+  });
+
+  it('still infers other capabilities from the name, so the guard is scoped to reasoning', () => {
+    expect(hasSpecificModelCapability(provider, 'gpt-4o', 'function_calling')).toBe(true);
+    expect(hasSpecificModelCapability(provider, 'text-embedding-3-small', 'embedding')).toBe(true);
+  });
+
+  it('keeps reasoning in ModelType so explicit tagging and display are unaffected', () => {
+    expect(CAPABILITY_PATTERNS.reasoning).toBeInstanceOf(RegExp);
+    expect(CAPABILITY_PATTERNS.reasoning.test('o1-preview')).toBe(true);
+  });
+
+  // The provider-scoped entry point is the more dangerous of the two: it uses
+  // `modelNames.some(...)`, so ONE matching model would promote every model under
+  // that provider, and the result is memoised in a module cache whose only
+  // clear() is never invoked — so a single false grant would persist for the
+  // whole process lifetime.
+  it('never infers reasoning for a whole provider because one model name matches', () => {
+    const mixed = {
+      id: 'p2',
+      name: 'mixed',
+      platform: 'openai',
+      models: ['gpt-4o', 'qwen-thinking', 'claude-sonnet-4'],
+    } as unknown as IProvider;
+
+    expect(hasModelCapability(mixed, 'reasoning')).toBeUndefined();
+  });
+
+  it('still infers other capabilities provider-wide, so the guard is scoped to reasoning', () => {
+    const p = { id: 'p3', name: 'p', platform: 'openai', models: ['gpt-4o'] } as unknown as IProvider;
+    expect(hasModelCapability(p, 'function_calling')).toBe(true);
+  });
+
+  // Deliberate: the guard sits ahead of the user-tag rung too. EPIC-003 rules
+  // that even an explicit provider-declared reasoning badge is insufficient to
+  // enable reasoning controls, so a user's own checkbox cannot grant it either
+  // — that would be the user telling themselves. Positive evidence must come
+  // from the discovery seam.
+  it('does not let an explicit user tag grant reasoning either', () => {
+    const tagged = {
+      id: 'p4',
+      name: 'tagged',
+      platform: 'openai',
+      models: ['gpt-4o'],
+      capabilities: [{ type: 'reasoning', isUserSelected: true }],
+    } as unknown as IProvider;
+
+    expect(hasModelCapability(tagged, 'reasoning')).toBeUndefined();
+  });
+
+  it('still honours an explicit user tag for capabilities that are not discovery-only', () => {
+    const tagged = {
+      id: 'p5',
+      name: 'tagged',
+      platform: 'openai',
+      models: ['some-unmatched-model'],
+      capabilities: [{ type: 'vision', isUserSelected: true }],
+    } as unknown as IProvider;
+
+    expect(hasModelCapability(tagged, 'vision')).toBe(true);
   });
 });

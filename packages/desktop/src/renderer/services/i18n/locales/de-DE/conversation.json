@@ -220,7 +220,8 @@
     "codes": {
       "TEAM_ASSISTANT_ID_REQUIRED": "Please select an assistant before creating the team.",
       "TEAM_ASSISTANT_NOT_FOUND": "Assistant {{assistantId}} is no longer available. Refresh the assistant list and choose another one.",
-      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Use assistant_id instead of {{field}}."
+      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Use assistant_id instead of {{field}}.",
+      "TEAM_MEMBER_MODEL_UNRESOLVED": "No model is available for this team member. Add or enable a model provider in Settings, then try again."
     }
   },
   "agentError": {
@@ -367,6 +368,10 @@
       "USER_LLM_PROVIDER_RATE_LIMITED": {
         "title": "Rate Limit des Modellanbieters erreicht",
         "body": "Der Anbieter drosselt derzeit Anfragen. Warte einen Moment, reduziere die Anfragehäufigkeit oder wechsle Modelle."
+      },
+      "USER_LLM_PROVIDER_QUOTA_EXHAUSTED": {
+        "title": "Kontingent des Modellanbieters aufgebraucht",
+        "body": "Das Anbieterkonto hat kein Guthaben bzw. Kontingent mehr — Warten hilft hier nicht. Laden Sie das Konto auf, prüfen Sie den Abrechnungstarif oder wechseln Sie zu einem anderen Modell."
       },
       "USER_LLM_PROVIDER_TIMEOUT": {
         "title": "Zeitüberschreitung bei Modellanbieterer Anfrage",
@@ -515,6 +520,8 @@
     "changes": {
       "tab": "Änderungen",
       "filesTab": "Dateien",
+      "previewTab": "Vorschau",
+      "browserTab": "Browser",
       "currentBranchLabel": "Aktueller Branch",
       "summary": "{{count}} Datei(en) geändert",
       "insertions": "+{{count}} Einfügungen",
@@ -636,10 +643,6 @@
     "contextWindow": "Kontextfenster",
     "percentUsed": "{{percent}} % verwendet",
     "tokenCount": "{{used}} von {{limit}} Token",
-    "localTokenUsage": "Lokale Tokennutzung",
-    "today": "Heute",
-    "weekToDate": "Woche bis heute",
-    "monthToDate": "Monat bis heute",
     "triggerLabel": "Kontextnutzung anzeigen",
     "estimated": "Geschätzt",
     "unavailable": "Kontextnutzung nicht verfügbar"
@@ -923,7 +926,7 @@
         "continueToProduce": "Weiter zu Produzieren",
         "askAssistant": "Assistenten fragen",
         "assistantTitle": "Schreibassistent",
-        "assistantDescription": "Nutze den Assistenten für Erzählstruktur, Einstellungsideen und Prompts.",
+        "assistantDescription": "Erstelle aus deinem Briefing einen Storyboard-Entwurf.",
         "textChargeDisclosure": "Der Storyboard-Entwurf verwendet dein konfiguriertes Textmodell. Der Anbieter kann die Modellnutzung berechnen.",
         "draftStoryboard": "Storyboard entwerfen",
         "addShot": "Einstellung hinzufügen",
@@ -989,10 +992,67 @@
         "openProduce": "Produzieren öffnen",
         "handoffDescription": "Die Übergabe enthält nur das Storyboard-Manifest und ausgewählte Medien. Platzhalter aus der Prüfung werden nicht exportiert.",
         "partialHandoff": "Diese Übergabe ist unvollständig, weil einigen Einstellungen ein ausgewähltes Medium fehlt.",
+        "cut": {
+          "duration": {
+            "played": "Abgespielt {{seconds}} s",
+            "untrimmed": "Quelle {{seconds}} s",
+            "render": "Gerendert {{seconds}} s"
+          },
+          "trimmed": "Getrimmt",
+          "graded": "Farbkorrigiert",
+          "clipAccessible": "Clip {{number}}, {{title}}, {{seconds}} Sekunden",
+          "dragClip": "{{title}} zum Neuanordnen ziehen",
+          "moveAnnouncement": "Clip {{clip}} wurde an Position {{position}} von {{total}} verschoben. Die Schnittreihenfolge gehört jetzt dir.",
+          "playhead": "Schnitt-Abspielkopf",
+          "secondsValue": "{{seconds}} Sekunden",
+          "trimInHandle": "Griff für In-Punkt",
+          "trimOutHandle": "Griff für Out-Punkt",
+          "inspector": "Clip-Inspektor",
+          "selectClip": "Wähle einen Clip oder Platzhalter zur Prüfung aus.",
+          "takes": "Takes",
+          "trim": "Trimmen",
+          "inPoint": "In",
+          "outPoint": "Out",
+          "trimInField": "In-Punkt in Sekunden",
+          "trimOutField": "Out-Punkt in Sekunden",
+          "setIn": "I am Abspielkopf setzen",
+          "setOut": "O am Abspielkopf setzen",
+          "frame": "Ausschnitt",
+          "scale": "Zuschnitt-Skalierung",
+          "scaleValue": "{{percent}}%",
+          "cropHint": "Pfeiltasten verschieben den Ausschnitt; mit Umschalt sind es zehn Schritte.",
+          "cropOverlay": "Zuschnittrahmen",
+          "colour": "Farbe",
+          "colourLabels": {
+            "exposure": "Belichtung",
+            "contrast": "Kontrast",
+            "saturation": "Sättigung",
+            "temperature": "Temperatur"
+          },
+          "resetClip": "Diesen Clip zurücksetzen",
+          "noUndo": "Es gibt kein Rückgängig. Beim Zurücksetzen werden Trim, Zuschnitt und Farbe auf die Standardwerte gesetzt.",
+          "divergence": "Deine Version · manuell bearbeitet",
+          "resyncTitle": "Schnittreihenfolge neu synchronisieren?",
+          "resyncDescription": "Die Storyboard-Reihenfolge wird wiederhergestellt. Trims, Zuschnitte und Farbfilter bleiben erhalten.",
+          "resyncAction": "Mit Storyboard synchronisieren",
+          "outsideTitle": "Noch nicht im Schnitt",
+          "outsideDescription": "Diese Szenen haben einen Take, liegen aber außerhalb deines manuellen Schnitts.",
+          "placeIt": "{{title}} platzieren…",
+          "placeBefore": "Vor {{number}} · {{title}}",
+          "addToEnd": "{{title}} am Ende hinzufügen",
+          "addAllToEnd": "Alle am Ende hinzufügen",
+          "volume": "Vorschau-Lautstärke"
+        },
         "render": {
+          "footer": "Schnitt rendern",
           "action": "Video rendern",
           "progress": "Video wird gerendert… {{percent}}%",
+          "progressWithClip": "Video wird gerendert… {{percent}} % · Clip {{clip}} von {{total}}",
           "cancel": "Rendern abbrechen",
+          "busyReason": "Dieses Projekt wird bereits gerendert. Warte auf den Abschluss oder brich den Vorgang im startenden Fenster ab.",
+          "installFfmpeg": "FFmpeg installieren",
+          "tryAgain": "Rendern erneut versuchen",
+          "openProduce": "Zu Produzieren",
           "missingScenes": "{{count}} Szenen haben keinen Take und erscheinen nicht im Video.",
           "missingScenes_one": "{{count}} Szene hat keinen Take und erscheint nicht im Video.",
           "missingScenes_other": "{{count}} Szenen haben keinen Take und erscheinen nicht im Video.",
@@ -1002,6 +1062,10 @@
             "busy": "Dieses Projekt wird bereits gerendert.",
             "noRenderableScenes": "Keine Szene hat einen Take zum Rendern.",
             "failed": "Das Video konnte nicht gerendert werden.",
+            "failedClip": "Clip {{clip}} von {{total}} konnte nicht gerendert werden.",
+            "noRenderableShots": "Die Einstellungen {{shots}} enthalten keine renderbaren Clips.",
+            "noRenderableShots_one": "Einstellung {{shots}} enthält keinen renderbaren Clip.",
+            "noRenderableShots_other": "Die Einstellungen {{shots}} enthalten keine renderbaren Clips.",
             "cancelled": "Video-Rendering abgebrochen."
           }
         }
@@ -1291,6 +1355,11 @@
     "export": {
       "title": "Assets exportieren",
       "body": "Exportiere das Storyboard-Manifest und das ausgewählte Asset jeder Szene.",
+      "checkingRender": "Gerenderten Schnitt prüfen…",
+      "noRender": "Noch nicht gerendert",
+      "renderedAt": "Gerendert",
+      "staleRender": "Dieser Schnitt wurde vor deinen letzten Änderungen gerendert.",
+      "latestRenderUnavailable": "Der neueste gerenderte Schnitt konnte nicht geprüft werden. Öffne Export erneut.",
       "gapWarning": "Die Einstellungen {{shots}} sind noch Platzhalter und werden nicht einbezogen.",
       "gapWarning_one": "Einstellung {{shots}} ist noch ein Platzhalter und wird nicht einbezogen.",
       "gapWarning_other": "Die Einstellungen {{shots}} sind noch Platzhalter und werden nicht einbezogen.",

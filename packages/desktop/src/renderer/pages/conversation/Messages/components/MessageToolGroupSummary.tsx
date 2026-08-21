@@ -42,7 +42,9 @@ type JournalRow =
       kind: 'narration';
       label: string;
       status: NormalizedToolStatus;
+      includeInRecap: boolean;
       isFallback?: boolean;
+      collapseDuplicateFallback?: boolean;
       fallbackDoneLabel?: string;
     }
   | { key: string; kind: 'tool'; step: CoalescedStep; status: NormalizedToolStatus };
@@ -144,7 +146,16 @@ const isToolMessage = (message: WorkJournalSourceMessage): message is ToolMessag
 
 const buildJournalRows = (
   messages: WorkJournalSourceMessage[],
-  planFallback: { running: string; done: string }
+  fallback: {
+    plan: {
+      running: string;
+      done: string;
+    };
+    thinking: {
+      running: string;
+      done: string;
+    };
+  }
 ): JournalRow[] => {
   const rows: JournalRow[] = [];
   const normalizedCallsWithSource = messages.flatMap((message, messageIndex) =>
@@ -164,9 +175,9 @@ const buildJournalRows = (
   const pushNarration = (row: Extract<JournalRow, { kind: 'narration' }>) => {
     const previous = rows[rows.length - 1];
     if (
-      row.isFallback &&
+      row.collapseDuplicateFallback &&
       previous?.kind === 'narration' &&
-      previous.isFallback &&
+      previous.collapseDuplicateFallback &&
       previous.label === row.label &&
       previous.status === row.status
     ) {
@@ -195,24 +206,28 @@ const buildJournalRows = (
         pushNarration({
           key: `plan-${message.id}-${index}`,
           kind: 'narration',
-          label: narration ?? (status === 'completed' ? planFallback.done : planFallback.running),
+          label: narration ?? (status === 'completed' ? fallback.plan.done : fallback.plan.running),
           status,
+          includeInRecap: true,
           isFallback: narration === undefined,
-          fallbackDoneLabel: narration === undefined ? planFallback.done : undefined,
+          collapseDuplicateFallback: narration === undefined,
+          fallbackDoneLabel: narration === undefined ? fallback.plan.done : undefined,
         });
       });
       continue;
     }
 
+    const status = message.content.status === 'done' ? 'completed' : 'running';
     const subject = getSafeProviderNarration(message.content.subject);
-    if (subject) {
-      pushNarration({
-        key: `thinking-${message.id}`,
-        kind: 'narration',
-        label: subject,
-        status: message.content.status === 'done' ? 'completed' : 'running',
-      });
-    }
+    pushNarration({
+      key: `thinking-${message.id}`,
+      kind: 'narration',
+      label: subject ?? (status === 'completed' ? fallback.thinking.done : fallback.thinking.running),
+      status,
+      includeInRecap: false,
+      isFallback: subject === undefined,
+      fallbackDoneLabel: subject === undefined ? fallback.thinking.done : undefined,
+    });
   }
 
   return rows;
@@ -469,8 +484,14 @@ const MessageToolGroupSummary: React.FC<{ messages: WorkJournalSourceMessage[]; 
   const sourceRows = useMemo(
     () =>
       buildJournalRows(messages, {
-        running: t('messages.toolActivity.generic.running'),
-        done: t('messages.toolActivity.generic.done'),
+        plan: {
+          running: t('messages.toolActivity.generic.running'),
+          done: t('messages.toolActivity.generic.done'),
+        },
+        thinking: {
+          running: t('conversation.thinking.label'),
+          done: t('conversation.thinking.complete'),
+        },
       }),
     [messages, t]
   );
@@ -478,20 +499,22 @@ const MessageToolGroupSummary: React.FC<{ messages: WorkJournalSourceMessage[]; 
   const recap = useMemo(
     () =>
       buildTurnWorkRecap(
-        rows.map((row) =>
-          row.kind === 'tool'
-            ? {
-                category: row.step.action.category,
-                status: row.status,
-                attempts: row.step.attempts,
-                hadError: row.step.hadError,
-              }
-            : {
-                category: 'generic',
-                status: row.status,
-                safeSubject: row.isFallback ? undefined : row.label,
-              }
-        ),
+        rows
+          .filter((row) => row.kind === 'tool' || row.includeInRecap)
+          .map((row) =>
+            row.kind === 'tool'
+              ? {
+                  category: row.step.action.category,
+                  status: row.status,
+                  attempts: row.step.attempts,
+                  hadError: row.step.hadError,
+                }
+              : {
+                  category: 'generic',
+                  status: row.status,
+                  safeSubject: row.isFallback ? undefined : row.label,
+                }
+          ),
         isActive
       ),
     [isActive, rows]

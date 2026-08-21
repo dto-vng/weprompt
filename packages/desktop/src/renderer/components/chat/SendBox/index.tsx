@@ -1060,7 +1060,8 @@ const SendBox: React.FC<{
   );
 
   // 使用共享的输入法合成处理
-  const { compositionHandlers, isComposingState, createKeyDownHandler } = useCompositionInput();
+  const { compositionHandlers, createCompositionValueSync, isComposingState, createKeyDownHandler } =
+    useCompositionInput();
 
   // 使用共享的PasteService集成
   const { onPaste, onFocus: handlePasteFocus } = usePasteService({
@@ -1830,6 +1831,9 @@ const SendBox: React.FC<{
                 overflowWrap: 'break-word',
               }}
               onChange={handleTextAreaChange}
+              // Arco suppresses onChange while an IME composition is open; this keeps
+              // `input` in step with what is already on screen. See createCompositionValueSync.
+              onInput={createCompositionValueSync(handleTextAreaChange)}
               onPaste={onPaste}
               onTouchStart={markMobileFocusIntent}
               onMouseDown={markMobileFocusIntent}

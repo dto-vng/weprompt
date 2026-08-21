@@ -1,155 +1,205 @@
-# 对话 - 模型选择器（父级 + 二级子菜单）
+# Conversation Model and Reasoning Selector
 
-> 本文档聚焦「模型选择器」的下拉交互重构。
-> 涉及范围：对话面板（单聊 + 群聊，含 Claude/Codex 等 ACP 平台与 Aion CLI/aionrs 平台）以及首页新建对话页的模型选择器。不改后端，全部在渲染层完成。
+Status: provider-neutral v1 product contract
+Applies to: active conversations, New Chat, Project New Chat, assistants,
+teams, and scheduled tasks
 
----
+## Outcome
 
-## 背景与目标
+The selector shows the selected model and only the reasoning controls that the
+exact active provider/model has proven it supports. It preserves provider-native
+labels, values, ranges, defaults, and dependencies. The UI does not infer
+capability from provider names, model names, compatibility protocols, or a
+generic reasoning badge.
 
-**现状**：模型选择器承载两组配置——「模型」和「推理强度」（thought level / reasoning effort）。当前下拉把两组竖着堆在同一个菜单里（上面一组推理强度，分隔线，下面一组模型）。
+## Source of truth
 
-**问题**：当模型列表很长时，加上推理强度那一组，整个下拉菜单被撑得很长，需要大量滚动，不好用。模型越多越明显。
+The selector consumes a versioned immutable `ModelReasoningProfile` and a
+separate `ObservedModelReasoningProfile` containing scoped current selections.
+Capability precedence is:
 
-**目标**：把下拉改成**一级菜单 + 二级子菜单**的结构。一级菜单永远只有两行（模型、推理强度），各组的完整选项收进各自的二级子菜单（hover 展开）。这样无论模型多少，一级菜单都不会被撑长。
+1. the active runtime's observed profile;
+2. an exact verified adapter profile for the provider/model;
+3. unsupported.
 
-**名词说明**：
+Unknown means non-writable. An absent, malformed, older, or future contract
+version hides reasoning controls without preventing the application or backend
+from starting.
 
-- **模型选择器**：对话输入区/面板右上角，显示当前模型与推理强度的按钮（pill），点击展开下拉。
-- **推理强度**：部分 Agent 支持的思考程度配置（如 轻度 / 中 / 高 / 极高）。并非所有 Agent 都有。
-- **一级菜单 / 二级子菜单**：点击 pill 后先看到的是一级菜单；hover 一级菜单某行后，在其一侧弹出的是二级子菜单。
+## Provider-neutral v1 contract
 
----
+```typescript
+export type CapabilitySource = {
+  kind: 'runtime' | 'adapter';
+  id: string;
+  version: string;
+  verifiedAt?: string;
+};
 
-## (F-MODEL-01) 只有模型、无推理强度 → 保持现状 [不变]
+export type ReasoningControlValue = string | boolean | number;
 
-**用户故事**：作为使用不支持推理强度的 Agent 的用户，我点击模型选择器时希望直接看到模型列表，简单直接。
+export type ReasoningSelectionValue = { kind: 'provider_default' } | { kind: 'explicit'; value: ReasoningControlValue };
 
-**正常流程**（用户视角）：
+export type ReasoningControlDescriptor = {
+  id: string;
+  semantic: 'effort' | 'mode' | 'enabled' | 'budget' | 'provider_defined';
+  input: 'enum' | 'boolean' | 'integer';
+  label: string;
+  description?: string;
+  defaultValue: ReasoningSelectionValue;
+  resolvedDefault?: ReasoningControlValue;
+  choices?: Array<{ value: ReasoningControlValue; label: string; description?: string }>;
+  minimum?: number;
+  maximum?: number;
+  step?: number;
+  unit?: string;
+  visibleWhen?: Array<{ controlId: string; equals: ReasoningControlValue }>;
+};
 
-1. 点击 pill，下拉**直接展开模型列表**（无一级/二级结构）。
-2. 选中某个模型即切换，当前模型打勾。
+export type ModelReasoningProfile =
+  | { contractVersion: 1; state: 'unsupported'; controls: []; source: CapabilitySource }
+  | {
+      contractVersion: 1;
+      state: 'fixed';
+      controls: [];
+      summary: string;
+      source: CapabilitySource;
+    }
+  | {
+      contractVersion: 1;
+      state: 'configurable';
+      controls: [ReasoningControlDescriptor, ...ReasoningControlDescriptor[]];
+      source: CapabilitySource;
+    };
 
-**验收标准**：
+export type ReasoningModelScope = {
+  backend: string;
+  providerId: string;
+  capabilityRevision: string;
+  modelId: string;
+};
 
-- [ ] 无推理强度的 Agent，下拉直接是模型列表，交互与当前版本一致。
-- [ ] 模型数量超过阈值时，列表顶部出现搜索框（见 F-MODEL-04）。
+export type ReasoningSelection = {
+  scope: ReasoningModelScope & { controlId: string };
+  value: ReasoningSelectionValue;
+};
 
----
+export type ObservedModelReasoningProfile = {
+  scope: ReasoningModelScope;
+  profile: ModelReasoningProfile;
+  selections: ReasoningSelection[];
+  activeControlIds: string[];
+};
+```
 
-## (F-MODEL-02) 有模型 + 推理强度 → 一级菜单两行 [新增]
+Provider request mappings are adapter-private. They are never accepted from or
+serialized to the renderer.
 
-**用户故事**：作为使用支持推理强度的 Agent 的用户，我点开选择器时希望先看到简洁的两行概览，而不是一长串选项。
+## User experience
 
-**正常流程**（用户视角）：
+### Unsupported
 
-1. 点击 pill，一级菜单展开，**只有两行**，自上而下：
-   - **模型**：右侧显示当前模型名 + `›` 箭头。
-   - **推理强度**：右侧显示当前强度 + `›` 箭头。
-2. 顺序固定为**模型在上、推理强度在下**，与 pill 上「模型 · 推理强度」的显示顺序一致。
-3. hover（或点击）任一行，在其一侧弹出对应的二级子菜单。
+Show no reasoning row or placeholder. Model selection continues to work.
 
-**验收标准**：
+### Fixed
 
-- [ ] 有推理强度时，一级菜单固定两行，模型在上、推理强度在下。
-- [ ] 每行显示对应的当前值和 `›` 箭头。
-- [ ] hover 一级菜单某行时该行高亮并弹出二级子菜单。
-- [ ] 一级菜单高度不随模型数量变化。
+Show a read-only reasoning summary when the selector has room to do so. Do not
+show a switch, dropdown, or numeric input and do not emit a reasoning field.
 
----
+### Configurable
 
-## (F-MODEL-03) 二级子菜单：选项列表 [新增]
+Render every control listed in authoritative `activeControlIds`, in profile
+order:
 
-**用户故事**：作为用户，我 hover 到「模型」或「推理强度」后，希望在弹出的子菜单里看到完整选项并选择。
+- `enum`: provider-supplied choices and labels;
+- `boolean`: accessible switch or On/Off choices;
+- `integer`: bounded numeric input with the advertised step and unit.
 
-**正常流程**（用户视角）：
+The existing model selector remains the acquisition surface; ACP and AionRS
+reuse one schema renderer and do not create provider-specific selector stacks.
+Model search and provider grouping remain model-list concerns and are unchanged
+by this contract.
 
-1. hover（或点击）「模型」→ 弹出模型列表；「推理强度」→ 弹出强度列表。
-2. 每个选项：当前选中项左侧打 ✓。选项若带说明，通过 **hover Tooltip** 展示（并非所有选项都有说明，用 Tooltip 保持列表对齐整齐，不做参差的副标题）。
-3. 点击某选项即切换，pill 与一级菜单的当前值同步更新。
+### Provider default
 
-**弹出方向**：
+Each configurable control includes a **Provider default** choice. This is an
+application/backend sentinel, never a provider value. Selecting it preserves
+`{ kind: 'provider_default' }` in the observed selection and causes the adapter
+to omit that control's native request field. If an evidenced resolved default is
+available, explanatory copy may describe it without changing the selection to
+an explicit value.
 
-- 子菜单默认往**左**弹出（模型选择器位于对话面板右上角，右侧空间不足）。
-- 当左侧空间也不足时，自动翻向可容纳的一侧。
+There is no universal reasoning scale. Values such as Kimi `max`, OpenAI
+`high`, ACP `xhigh`, and Sol `ultra` remain opaque and are never ranked,
+translated, or declared equivalent.
 
-**验收标准**：
+## Dependencies
 
-- [ ] hover 或点击一级行弹出对应二级子菜单，内容正确。
-- [ ] 当前项打 ✓，有说明的选项通过 hover Tooltip 展示，列表保持对齐。
-- [ ] 点击选项即切换并同步 pill / 一级菜单显示。
-- [ ] 子菜单默认向左弹出，空间不足时自动翻向另一侧，不被窗口边缘截断。
+Multiple `visibleWhen` predicates use logical AND. An explicit controller
+selection evaluates to its primitive value. A provider-default controller uses
+its verified `resolvedDefault`; if that evidence is missing or invalid, the
+dependent control is hidden and non-writable.
 
----
+The backend's `activeControlIds` is authoritative after runtime creation.
+Pre-chat may calculate the initial set from defaults using the same rule and
+must fail closed on uncertainty.
 
-## (F-MODEL-04) 模型二级子菜单：搜索 + 固定高度滚动 [新增]
+## Selection and mutation behavior
 
-**用户故事**：作为模型很多的用户，我希望能在子菜单里搜到目标模型，并且列表再长也不会撑爆屏幕。
+All values are scoped to
+`{ backend, providerId, capabilityRevision, modelId, controlId }`.
 
-**正常流程**（用户视角）：
+While model selection, capability refresh, or a reasoning mutation is pending,
+disable the affected controls. A model/provider/revision change refreshes the
+profile and full selection set atomically from the user's perspective. Late
+responses for an old generation or scope are discarded.
 
-1. 模型二级子菜单在**模型数量超过阈值（5 个）**时，顶部显示搜索框。
-2. 输入关键字即时过滤模型（按模型名匹配，忽略大小写）。
-3. 模型列表有**固定最大高度**，超出时在子菜单内部滚动，不影响菜单整体尺寸。
-4. 无匹配结果时给出空状态提示。
+A write succeeds only when the runtime returns a complete observed envelope
+under the same scope and contract version, containing:
 
-**范围一致性**：
+- the immutable profile;
+- the full scoped selection set;
+- authoritative active control IDs;
+- the requested value; and
+- every dependency-driven change.
 
-- 搜索能力跟随「模型列表」本身，而非「是否有二级菜单」。即无推理强度时（F-MODEL-01 的直接列表）同样按阈值显示搜索框，两种情况逻辑一致。
-- 推理强度选项通常很少，**不加搜索**。
+An acknowledgement, HTTP success, unchanged selection set, or partial envelope
+does not update the UI. Keep the prior observed state and show localized,
+actionable feedback.
 
-**验收标准**：
+## Persistence and launch surfaces
 
-- [ ] 模型数 > 5 时，模型列表顶部显示搜索框；≤ 5 不显示。
-- [ ] 输入即时过滤，按模型名忽略大小写匹配。
-- [ ] 模型列表固定最大高度 + 内部滚动，菜单整体尺寸不被撑大。
-- [ ] 无匹配时显示空状态。
-- [ ] F-MODEL-01 的直接模型列表遵循同一搜索显示规则。
+New Chat, Project New Chat, assistant defaults/preferences, teams, schedules,
+active conversations, restart, and resume use the same scoped selection set.
+On restore or scope change, retain values only when contract version, revision,
+control ID, schema, value, active status, and all dependencies still validate.
+Otherwise reset to provider defaults without sending an unsupported field.
 
----
+If an assistant uses Auto model selection, reasoning is also Auto until the
+runtime advertises and returns a compatible observed profile. Fixed and
+unsupported models persist no writable selection.
 
-## (F-MODEL-05) 各入口场景一致 [新增]
+## Accessibility and responsive behavior
 
-**用户故事**：作为用户，我希望不管在哪里选模型，交互都一致。
+- Use the existing Arco-based selector primitives and no raw interactive HTML.
+- Every control has a provider label, current value, disabled/pending state,
+  keyboard operation, visible focus, and an accessible name.
+- Descriptions are reachable by keyboard and assistive technology, not only
+  pointer hover.
+- Numeric controls announce bounds, step, and unit.
+- Desktop and mobile expose the same controls and state, with layout adapted to
+  available space.
 
-**覆盖入口**：
+## Acceptance criteria
 
-- **ACP 平台**（Claude / Codex 等）单聊与群聊 —— 扁平模型列表。
-- **首页新建对话页** —— ACP agent 扁平模型列表；aionrs 走 provider 分组（见 F-MODEL-06）。
-- **Aion CLI（aionrs）平台** —— 见 F-MODEL-06（模型按 provider 分组）。
-
-**正常流程**（用户视角）：
-
-1. 各入口共用同一套一级/二级菜单结构、搜索/滚动逻辑与向左弹出方向。
-2. 位于面板右上角的选择器，二级子菜单一律向左弹出。
-
-**验收标准**：
-
-- [ ] ACP 单聊、群聊、首页三处交互一致。
-- [ ] 二级子菜单弹出方向正确、不被窗口边缘截断。
-
----
-
-## (F-MODEL-06) Aion CLI 平台：模型按 provider 分组 [新增]
-
-**用户故事**：作为使用 Aion CLI 的用户，我的模型是按 provider（如 Anthropic / OpenAI）组织的，我希望在二级子菜单里仍按 provider 分组查看，同时能搜索。
-
-**正常流程**（用户视角）：
-
-1. 一级/二级结构与其它入口一致：一级两行（模型、推理强度），hover 弹出二级。
-2. 模型二级子菜单里**保留 provider 分组标题**（不显示健康状态圆点，各入口样式统一）。
-3. 顶部搜索框**跨所有分组过滤**模型名；只显示有命中的分组，无命中时显示空状态。
-4. 搜索框按总模型数超过阈值时显示。
-
-**验收标准**：
-
-- [ ] Aion CLI 模型二级子菜单按 provider 分组（不显示健康圆点）。
-- [ ] 搜索跨分组过滤，仅显示命中的分组，无命中显示空状态。
-- [ ] 一级两行结构与向左弹出与其它入口一致。
-
----
-
-## 待讨论模块
-
-- **搜索组件复用**：搜索框计划复用已抽离的 `AionInlineSearchInput`（下拉列表专用轻量搜索框，见 PR #3532）。开发时该组件尚未合并到主干，已按其相同接口内联一份等价组件（同名同路径），待 #3532 合并后可直接合并、无需改调用方。
-- **搜索阈值**：当前定为模型数 > 5 才显示搜索框。后续可根据反馈调整。
+- [ ] Unsupported, malformed, and unknown-version profiles expose no setter.
+- [ ] Fixed profiles are informational and emit no reasoning field.
+- [ ] Arbitrary enum values pass through without a renderer allowlist.
+- [ ] Boolean and bounded integer controls enforce their exact schemas.
+- [ ] Multiple controls and AND dependencies behave identically pre-chat and at runtime.
+- [ ] Provider default omits the native field while remaining observed as provider default.
+- [ ] Model/provider/revision changes cannot leak stale values or controls.
+- [ ] Every successful write returns and installs the complete observed envelope.
+- [ ] ACP runtime labels/options remain authoritative; AionRS profiles are exact-model adapter data.
+- [ ] Public payloads contain no request mapping, native field/path, credentials, endpoints, or provider bodies.
+- [ ] The canonical fixtures in `docs/design/provider-reasoning-capability-matrix.md` pass AionRS, AionCore, and WePrompt conformance suites unchanged.

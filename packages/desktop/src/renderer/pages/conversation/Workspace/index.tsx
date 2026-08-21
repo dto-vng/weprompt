@@ -25,6 +25,7 @@ import { Message } from '@arco-design/web-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { useWorkspaceFilesPane } from './filesPaneContext';
 import { useNavigate } from 'react-router-dom';
 import FileChangeList from './components/FileChangeList';
 import PasteConfirmModal from './components/PasteConfirmModal';
@@ -80,6 +81,7 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { openPreview } = usePreviewContext();
+  const { activeView: paneActiveView, containers: paneContainers } = useWorkspaceFilesPane();
   const conversationContext = useConversationContextSafe();
   const loadedSkills = conversationContext?.loadedSkills ?? [];
   const loadedMcpStatuses =
@@ -199,7 +201,11 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
   // public contract. Default to false when the prop is unavailable (e.g.
   // tests that render the panel outside a conversation).
   const isTemporaryWorkspace = isTemporaryWorkspaceProp ?? false;
-  const isChangesPanelActive = projectMenuOpen && activeProjectPanel === 'changes';
+  // Built when changes are on screen in EITHER surface. This used to read flyout state
+  // alone, which meant the pane's Changes tab could never have had anything to show —
+  // and the refresh effect below is gated on the same flag, so it would not have
+  // refreshed for the pane either.
+  const isChangesPanelActive = (projectMenuOpen && activeProjectPanel === 'changes') || paneActiveView === 'changes';
 
   // Get workspace display name using shared utility
   const workspaceDisplayName = useMemo(
@@ -545,9 +551,29 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
     />
   );
 
+  // C-01: the file tree also appears in ChatLayout's right pane, alongside the Project
+  // flyout rather than instead of it. Portalling the SAME `filesPanel` keeps one source of
+  // truth — expansion, selection and file operations all stay owned by this instance, so
+  // the two surfaces can never disagree. `filesPanel` is presentational, so rendering it
+  // twice is safe.
+  const filesPanePortal = paneContainers.files ? createPortal(filesPanel, paneContainers.files) : null;
+  const changesPanePortal =
+    paneContainers.changes && changesPanel ? createPortal(changesPanel, paneContainers.changes) : null;
+  const contextPanePortal =
+    paneContainers.context && contextPanel ? createPortal(contextPanel, paneContainers.context) : null;
+  // The tabbed pane hosts Files, Changes and Context, so the Project flyout would be a second
+  // entry point to the same three panels. `paneActiveView` is non-null ONLY when ChatLayout
+  // mounted that pane (the project-menu presentation) — the `panel` presentation Teams uses has
+  // no provider, so its flyout is untouched. This component must still render: the pane's panels
+  // are portals out of THIS instance, and its drag-import and paste handlers wrap the chat.
+  const paneHostsWorkspacePanels = paneActiveView !== null;
+
   return (
     <>
       {shouldRenderLocalMessageContext && messageContext}
+      {filesPanePortal}
+      {changesPanePortal}
+      {contextPanePortal}
       <div
         className='chat-workspace size-full flex flex-col relative'
         tabIndex={0}
@@ -632,7 +658,7 @@ const ChatWorkspace: React.FC<WorkspaceProps> = ({
           closeContextMenu={modalsHook.closeContextMenu}
         />
 
-        {projectMenuSlot ? createPortal(projectMenu, projectMenuSlot) : projectMenu}
+        {paneHostsWorkspacePanels ? null : projectMenuSlot ? createPortal(projectMenu, projectMenuSlot) : projectMenu}
       </div>
     </>
   );

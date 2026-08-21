@@ -14,6 +14,10 @@ import type { PresentationTemplateSummary } from '@/common/types/office/presenta
 import type { ManagedPresentationSubmission } from '@/common/types/platform/presentationSubmission';
 import AionrsSendBox from '@/renderer/pages/conversation/platforms/aionrs/AionrsSendBox';
 import type { AionrsModelSelection } from '@/renderer/pages/conversation/platforms/aionrs/useAionrsModelSelection';
+import {
+  clearActiveContextBudget,
+  getActiveContextBudget,
+} from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 
 type AionrsMessageStateMock = {
   thought: {
@@ -144,13 +148,11 @@ const {
         ratio: number | null;
         status: 'healthy' | 'watch' | 'compress' | 'too_large';
       };
-      localUsage: { today: number; weekToDate: number; monthToDate: number };
     } | null,
   },
   sendBoxProps: {
     current: null as {
       tokenUsage?: unknown;
-      localUsage?: unknown;
       context_limit?: unknown;
       prefix?: React.ReactNode;
       tools?: React.ReactNode;
@@ -312,7 +314,6 @@ vi.mock('@/renderer/components/agent/ContextUsageIndicator', () => ({
       ratio: number | null;
       status: 'healthy' | 'watch' | 'compress' | 'too_large';
     };
-    localUsage: { today: number; weekToDate: number; monthToDate: number };
   }) => {
     contextUsageIndicatorProps.current = props;
     return <span data-testid='context-usage-indicator' />;
@@ -403,9 +404,6 @@ vi.mock('@/renderer/pages/conversation/Messages/hooks', () => ({
 }));
 vi.mock('@/renderer/hooks/context/LayoutContext', () => ({
   useLayoutContext: () => ({ isMobile: false }),
-}));
-vi.mock('@/renderer/hooks/useLocalTokenUsage', () => ({
-  useLocalTokenUsage: () => ({ today: 120, weekToDate: 560, monthToDate: 1_240 }),
 }));
 vi.mock('@/renderer/hooks/chat/useAutoTitle', () => ({
   useAutoTitle: () => ({
@@ -640,6 +638,7 @@ const modelSelection = {
 
 describe('AionrsSendBox', () => {
   beforeEach(() => {
+    clearActiveContextBudget('conv-1');
     vi.clearAllMocks();
     sessionStorage.clear();
     aionrsMessageState.current = createAionrsMessageState();
@@ -1473,8 +1472,119 @@ describe('AionrsSendBox', () => {
     expect(sendMessageInvokeMock).not.toHaveBeenCalled();
   });
 
-  it('routes a prompt-only managed initial message through the persistent queue with stable ids', async () => {
+  it('keeps the create-project first message stored until runtime and queue readiness are available', async () => {
+    const storageKey = 'aionrs_initial_message_conv-1';
+    const initialMessage = JSON.stringify({ input: 'Build the project BRD.', files: ['/brief.md'] });
+    const runtimeReady = createDeferred<{ recovered: boolean; config_options: never[]; runtime: null }>();
+    ensureConversationRuntimeMock.mockReturnValueOnce(runtimeReady.promise);
+    runtimeViewState.current = {
+      ...createRuntimeViewState(),
+      hydrated: false,
+      canSendMessage: false,
+    };
+    sendMessageInvokeMock.mockResolvedValueOnce({ msg_id: 'msg-1', turn_id: 'turn-1', runtime: null });
+    sessionStorage.setItem(storageKey, initialMessage);
+
+    const { rerender } = render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => expect(ensureConversationRuntimeMock).toHaveBeenCalledWith('conv-1'));
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(storageKey)).toBe(initialMessage);
+
+    await act(async () => {
+      runtimeReady.resolve({ recovered: false, config_options: [], runtime: null });
+      await runtimeReady.promise;
+    });
+    expect(sendMessageInvokeMock).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(storageKey)).toBe(initialMessage);
+
+    runtimeViewState.current = createRuntimeViewState();
+    rerender(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => expect(sendMessageInvokeMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('consumes the create-project first message only after the backend accepts the turn', async () => {
+    const storageKey = 'aionrs_initial_message_conv-1';
+    const processedKey = 'aionrs_initial_processed_conv-1';
+    const initialMessage = JSON.stringify({ input: 'Build the project BRD.', files: ['/brief.md'] });
+    const accepted = createDeferred<{ msg_id: string; turn_id: string; runtime: null }>();
+    sendMessageInvokeMock.mockReturnValueOnce(accepted.promise);
+    sessionStorage.setItem(storageKey, initialMessage);
+
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => expect(sendMessageInvokeMock).toHaveBeenCalledTimes(1));
+    expect(sessionStorage.getItem(storageKey)).toBe(initialMessage);
+    expect(sessionStorage.getItem(processedKey)).toBeNull();
+
+    await act(async () => {
+      accepted.resolve({ msg_id: 'msg-1', turn_id: 'turn-1', runtime: null });
+      await accepted.promise;
+    });
+
+    await waitFor(() => expect(sessionStorage.getItem(storageKey)).toBeNull());
+    expect(sessionStorage.getItem(processedKey)).toBe('1');
+    expect(markSendAcceptedMock).toHaveBeenCalledWith('turn-1', null, 'msg-1');
+  });
+
+  it('preserves a failed create-project first message and retries it after remount', async () => {
+    const storageKey = 'aionrs_initial_message_conv-1';
+    const processedKey = 'aionrs_initial_processed_conv-1';
+    const initialMessage = JSON.stringify({ input: 'Build the project BRD.', files: ['/brief.md'] });
+    sendMessageInvokeMock
+      .mockRejectedValueOnce(new Error('backend unavailable'))
+      .mockResolvedValueOnce({ msg_id: 'msg-2', turn_id: 'turn-2', runtime: null });
+    sessionStorage.setItem(storageKey, initialMessage);
+
+    const firstRender = render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => expect(messageErrorMock).toHaveBeenCalledWith('workspace failed'));
+    expect(sessionStorage.getItem(storageKey)).toBe(initialMessage);
+    expect(sessionStorage.getItem(processedKey)).toBeNull();
+
+    firstRender.unmount();
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    await waitFor(() => expect(sendMessageInvokeMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(sessionStorage.getItem(storageKey)).toBeNull());
+    expect(sessionStorage.getItem(processedKey)).toBe('1');
+  });
+
+  it('does not double-submit the create-project first message across rerenders or remounts while acceptance is pending', async () => {
+    const storageKey = 'aionrs_initial_message_conv-1';
+    const initialMessage = JSON.stringify({ input: 'Build the project BRD.', files: ['/brief.md'] });
+    const accepted = createDeferred<{ msg_id: string; turn_id: string; runtime: null }>();
+    sendMessageInvokeMock.mockReturnValueOnce(accepted.promise);
+    sessionStorage.setItem(storageKey, initialMessage);
+
+    const firstRender = render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    await waitFor(() => expect(sendMessageInvokeMock).toHaveBeenCalledTimes(1));
+
+    firstRender.rerender(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    firstRender.rerender(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+    firstRender.unmount();
+    render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    expect(sendMessageInvokeMock).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.getItem(storageKey)).toBe(initialMessage);
+
+    await act(async () => {
+      accepted.resolve({ msg_id: 'msg-1', turn_id: 'turn-1', runtime: null });
+      await accepted.promise;
+    });
+
+    await waitFor(() => expect(sessionStorage.getItem(storageKey)).toBeNull());
+  });
+
+  it('routes a prompt-only managed initial message through the persistent queue while the runtime is busy', async () => {
     featureEnabledState.current = true;
+    runtimeViewState.current = {
+      ...createRuntimeViewState(),
+      canSendMessage: false,
+      isProcessing: true,
+      state: 'running',
+    };
     sessionStorage.setItem(
       'aionrs_initial_message_conv-1',
       JSON.stringify({
@@ -1505,6 +1615,7 @@ describe('AionrsSendBox', () => {
     expect(initial.queueItemId).toMatch(/^[0-9a-f-]{36}$/i);
     expect(initial.clientRequestId).toMatch(/^[0-9a-f-]{36}$/i);
     expect(sessionStorage.getItem('aionrs_initial_processed_conv-1')).toBe('1');
+    expect(presentationControllerMock.claimHead).not.toHaveBeenCalled();
     expect(sendMessageInvokeMock).not.toHaveBeenCalled();
   });
 
@@ -2003,12 +2114,34 @@ describe('AionrsSendBox', () => {
         ratio: 12_000 / 204_800,
         status: 'healthy',
       },
-      localUsage: { today: 120, weekToDate: 560, monthToDate: 1_240 },
     });
     expect(screen.getByRole('button', { name: 'send' })).toBeInTheDocument();
     expect(sendBoxProps.current).not.toHaveProperty('tokenUsage');
     expect(sendBoxProps.current).not.toHaveProperty('localUsage');
     expect(sendBoxProps.current).not.toHaveProperty('context_limit');
+  });
+
+  it('publishes, updates, and clears the composer budget synchronously for sibling surfaces', () => {
+    aionrsMessageState.current = {
+      ...createAionrsMessageState(),
+      tokenUsage: { total_tokens: 110_000 },
+    };
+
+    const { rerender, unmount } = render(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    expect(getActiveContextBudget('conv-1')).toEqual(contextUsageIndicatorProps.current?.budget);
+
+    aionrsMessageState.current = {
+      ...createAionrsMessageState(),
+      tokenUsage: { total_tokens: 220_000 },
+    };
+    rerender(<AionrsSendBox conversation_id='conv-1' modelSelection={modelSelection} />);
+
+    expect(getActiveContextBudget('conv-1')).toEqual(contextUsageIndicatorProps.current?.budget);
+    expect(getActiveContextBudget('conv-1')?.totalTokens).toBe(220_000);
+
+    unmount();
+    expect(getActiveContextBudget('conv-1')).toBeUndefined();
   });
 
   it('renders an estimated context usage meter when AionRS runtime usage is unavailable', () => {

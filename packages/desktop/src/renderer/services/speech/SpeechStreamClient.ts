@@ -15,7 +15,6 @@
  *   → `{"type":"done"}` (server closes after), or `{"type":"error","code","msg"}` then close.
  */
 
-import { getWsProtocols, withLocalTokenQuery } from '@/common/adapter/httpBridge';
 import { STREAM_SAMPLE_RATE } from './pcmRecorder';
 
 // ---------------------------------------------------------------------------
@@ -111,12 +110,7 @@ export const getSpeechStreamUrl = (): string => {
     const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${proto}//${window.location.host}/api/stt/stream`;
   }
-  // The per-launch secret rides in `Sec-WebSocket-Protocol` (applied by the
-  // socket factory below). It is ALSO appended to the query as a fallback:
-  // some backend builds authenticate this GET-upgrade endpoint from the query
-  // rather than the subprotocol, so sending both keeps STT working across
-  // backends without a reconnect regression.
-  return withLocalTokenQuery(`ws://127.0.0.1:${getBackendPort()}/api/stt/stream`);
+  return `ws://127.0.0.1:${getBackendPort()}/api/stt/stream`;
 };
 
 // ---------------------------------------------------------------------------
@@ -124,8 +118,7 @@ export const getSpeechStreamUrl = (): string => {
 // ---------------------------------------------------------------------------
 
 const defaultCreateSocket = (url: string): WebSocketLike => {
-  const protocols = getWsProtocols();
-  const socket = protocols.length > 0 ? new WebSocket(url, protocols) : new WebSocket(url);
+  const socket = new WebSocket(url);
   socket.binaryType = 'arraybuffer';
   return socket;
 };

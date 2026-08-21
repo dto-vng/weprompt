@@ -11,7 +11,7 @@ import { Plus } from '@icon-park/react';
 import classNames from 'classnames';
 import type { SiderTooltipProps } from '@renderer/utils/ui/siderTooltip';
 import styles from '../Sider.module.css';
-import { ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
+import { NAV_ICON_HOVER, ROW_FOCUS_RING, activateOnEnterOrSpace } from '@/renderer/utils/ui/rowActivation';
 
 interface SiderToolbarProps {
   isMobile: boolean;
@@ -30,7 +30,7 @@ const SiderToolbar: React.FC<SiderToolbarProps> = ({ isMobile, collapsed, siderT
           <div
             className={classNames(
               ROW_FOCUS_RING,
-              'w-full h-34px flex items-center justify-center cursor-pointer transition-colors text-t-primary rd-8px hover:bg-fill-3 active:bg-fill-4',
+              'group w-full h-34px flex items-center justify-center cursor-pointer transition-colors text-t-primary rd-8px hover:bg-fill-3 active:bg-fill-4',
               styles.newChatTrigger
             )}
             onClick={onNewChat}
@@ -43,7 +43,7 @@ const SiderToolbar: React.FC<SiderToolbarProps> = ({ isMobile, collapsed, siderT
               theme='outline'
               size='16'
               fill='currentColor'
-              className={classNames('block leading-none', styles.newChatIcon)}
+              className={classNames('block leading-none', styles.newChatIcon, NAV_ICON_HOVER)}
               style={{ lineHeight: 0 }}
             />
           </div>
@@ -68,7 +68,7 @@ const SiderToolbar: React.FC<SiderToolbarProps> = ({ isMobile, collapsed, siderT
           aria-label={t('conversation.welcome.newConversation')}
           onKeyDown={activateOnEnterOrSpace(onNewChat)}
         >
-          <span className='size-22px rd-6px bg-[rgba(var(--primary-6),0.12)] border border-solid border-[rgba(var(--primary-6),0.24)] text-primary group-hover:bg-[rgba(var(--primary-6),0.2)] group-hover:border-[rgba(var(--primary-6),0.32)] flex items-center justify-center shrink-0 transition-colors'>
+          <span className={classNames('size-22px flex items-center justify-center shrink-0', NAV_ICON_HOVER)}>
             <Plus
               theme='outline'
               size='14'

@@ -10,7 +10,7 @@ import type { AvailableCommand, TMessage } from '@/common/chat/chatLib';
 import { mapAcpCommandsToSlashCommands } from '@/common/chat/slash/acpMapping';
 import type { SlashCommandItem } from '@/common/chat/slash/types';
 import type { IResponseMessage } from '@/common/adapter/ipcBridge';
-import type { TokenUsageData } from '@/common/config/storage';
+import type { TChatConversation, TokenUsageData } from '@/common/config/storage';
 import { useMergeLiveMessage } from '@/renderer/pages/conversation/Messages/hooks';
 import { logStreamTerminalObserved } from '@/renderer/pages/conversation/runtime/useConversationRuntimeView';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
@@ -37,6 +37,25 @@ export type UseAcpMessageReturn = {
 };
 
 const slashCommandsInFlight = new Map<string, Promise<SlashCommandItem[]>>();
+const usageWriteTails = new Map<string, Promise<void>>();
+
+const enqueueUsageWrite = (conversationId: string, extra: TChatConversation['extra']): void => {
+  const previous = usageWriteTails.get(conversationId) ?? Promise.resolve();
+  const write = previous
+    .catch(() => {})
+    .then(async () => {
+      await ipcBridge.conversation.update.invoke({
+        id: conversationId,
+        updates: { extra },
+        merge_extra: true,
+      });
+    })
+    .catch(() => {});
+  usageWriteTails.set(conversationId, write);
+  void write.finally(() => {
+    if (usageWriteTails.get(conversationId) === write) usageWriteTails.delete(conversationId);
+  });
+};
 
 function fetchAcpSlashCommands(conversation_id: string): Promise<SlashCommandItem[]> {
   const existing = slashCommandsInFlight.get(conversation_id);
@@ -78,6 +97,7 @@ export const useAcpMessage = (
   const [aiProcessing, setAiProcessing] = useState(false); // New loading state for AI response
   const [tokenUsage, setTokenUsage] = useState<TokenUsageData | null>(null);
   const [context_limit, setContextLimit] = useState<number>(0);
+  const persistedContextUsageFramesRef = useRef(new Set<string>());
   const [slashCommands, setSlashCommands] = useState<SlashCommandItem[]>([]);
   const onTerminalRef = useRef(options?.onTerminal);
 
@@ -147,6 +167,26 @@ export const useAcpMessage = (
       }
     };
   }, []);
+
+  const persistUsageReport = useCallback(
+    (message: IResponseMessage, usedTokens: number, contextLimit?: number) => {
+      const turnIdentity = message.turn_id || message.msg_id;
+      const usageEventId = turnIdentity ? `${conversation_id}:${turnIdentity}` : null;
+      const providerUsage = message.provider_usage;
+      const frameIdentity = `${usageEventId ?? message.msg_id}:${usedTokens}:${contextLimit ?? 'unknown'}:${
+        providerUsage?.input_tokens ?? 'absent'
+      }:${providerUsage?.output_tokens ?? 'absent'}`;
+      if (persistedContextUsageFramesRef.current.has(frameIdentity)) return;
+      persistedContextUsageFramesRef.current.add(frameIdentity);
+
+      const extra: TChatConversation['extra'] = {
+        last_token_usage: { total_tokens: usedTokens },
+        ...(contextLimit === undefined ? {} : { last_context_limit: contextLimit }),
+      } as TChatConversation['extra'];
+      enqueueUsageWrite(conversation_id, extra);
+    },
+    [conversation_id]
+  );
 
   // Clean up throttle timer
   useEffect(() => {
@@ -418,10 +458,15 @@ export const useAcpMessage = (
         case 'acp_context_usage': {
           // This payload is a context snapshot, not turn usage for the local ledger.
           const usageData = message.data as { used?: unknown; size?: unknown } | null;
-          if (typeof usageData?.used === 'number' && Number.isFinite(usageData.used) && usageData.used >= 0) {
+          if (typeof usageData?.used === 'number' && Number.isSafeInteger(usageData.used) && usageData.used >= 0) {
             setTokenUsage({ total_tokens: usageData.used });
+            const validContextLimit =
+              typeof usageData.size === 'number' && Number.isSafeInteger(usageData.size) && usageData.size > 0
+                ? usageData.size
+                : undefined;
+            persistUsageReport(message, usageData.used, validContextLimit);
           }
-          if (typeof usageData?.size === 'number' && Number.isFinite(usageData.size) && usageData.size > 0) {
+          if (typeof usageData?.size === 'number' && Number.isSafeInteger(usageData.size) && usageData.size > 0) {
             setContextLimit(usageData.size);
           }
           break;
@@ -490,6 +535,7 @@ export const useAcpMessage = (
       setRunning,
       setAiProcessing,
       setAcpStatus,
+      persistUsageReport,
     ]
   );
 
@@ -506,6 +552,7 @@ export const useAcpMessage = (
     setTokenUsage(null);
     setContextLimit(0);
     setSlashCommands([]);
+    persistedContextUsageFramesRef.current.clear();
     hasContentInTurnRef.current = false;
     turnFinishedRef.current = false;
     hasThinkingMessageRef.current = false;

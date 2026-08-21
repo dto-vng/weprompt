@@ -354,9 +354,6 @@
   "modelNotFoundAfterUrlChange": "Modell {{model}} wurde unter der neuen Adresse nicht gefunden; wähle es erneut aus, wenn es nicht funktioniert.",
   "apiKey": "API-Schlüssel",
   "deleteModelConfirm": "Bist du sicher, dass du dieses Modell löschen möchtest?",
-  "deleteAllModelConfirm": "Bist du sicher, dass du alle Modelle löschen möchtest?",
-  "modelCount": "Modell",
-  "apiKeyCount": "API-Schlüssel",
   "pleaseEnterBaseUrlAndApiKey": "Bitte Basis-URL und API-Schlüssel eingeben",
   "pleaseEnterApiKey": "Bitte API-Schlüssel eingeben",
   "pleaseEnterBaseUrl": "Bitte Basis-URL eingeben",
@@ -877,8 +874,59 @@
   "includePrereleaseUpdates": "Vorveröffentlichungs-/Entwicklungs-Builds einschließen",
   "saveModelConfigFailed": "Modellkonfiguration speichern fehlgeschlagen",
   "healthCheck": "Gesundheitsprüfung",
-  "clearStatus": "Status löschen",
-  "healthStatusCleared": "Gesundheitsstatus gelöscht",
+  "modelRow": {
+    "latency": "{{latency}} ms",
+    "neverChecked": "Nie geprüft",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "Modell entfernen",
+    "deleteAppOperationsWarning": "Dieses Modell ist für App-Vorgänge festgelegt. Nach dem Löschen bleibt diese Einstellung nicht verfügbar, bis Sie ein anderes Modell wählen."
+  },
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "{{count}} Modelle",
+    "modelCount_one": "{{count}} Modell",
+    "modelCount_other": "{{count}} Modelle",
+    "apiKeyCount": "{{count}} Schlüssel",
+    "apiKeyCount_one": "{{count}} Schlüssel",
+    "apiKeyCount_other": "{{count}} Schlüssel",
+    "healthChecked": "{{checked}} von {{total}} geprüft",
+    "healthNotChecked": "Nicht geprüft",
+    "healthFailing": "{{count}} fehlerhaft",
+    "healthFailing_one": "{{count}} fehlerhaft",
+    "healthFailing_other": "{{count}} fehlerhaft",
+    "deleteConfirmTitle": "Anbieter löschen",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "Löscht den Anbieter, seine API-Schlüssel und alle von ihm konfigurierten Modelle. Bestehende Chats behalten das Modell, mit dem sie begonnen wurden.",
+    "clearHealth": "Statusverlauf löschen",
+    "clearHealthConfirmTitle": "Statusverlauf löschen",
+    "clearHealthConfirmBody": "Verwirft die aufgezeichneten Prüfergebnisse für {{provider}}. Führen Sie eine Prüfung aus, um sie erneut zu messen.",
+    "healthCleared": "Statusverlauf für {{provider}} gelöscht.",
+    "deleteAppOperationsWarning": "Dieser Anbieter ist für App-Vorgänge festgelegt. Nach dem Löschen bleibt diese Einstellung nicht verfügbar, bis Sie ein anderes Modell wählen.",
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "Aktivieren oder deaktivieren"
+  },
+  "providerHealth": {
+    "configuredInferenceUnavailable": "Konfiguriert · Inferenz nicht verfügbar.",
+    "setupNeedsAttention": "Die Einrichtung muss geprüft werden.",
+    "overload": {
+      "action": "Der Anbieter ist vorübergehend überlastet. Versuchen Sie es später erneut."
+    },
+    "rateLimit": {
+      "action": "Warten Sie, bis das Anbieterlimit zurückgesetzt ist, und versuchen Sie es erneut."
+    },
+    "quota": {
+      "action": "Das Anbieterkonto hat kein Guthaben bzw. Kontingent mehr. Laden Sie es auf oder wechseln Sie den Anbieter und versuchen Sie es erneut."
+    },
+    "setup": {
+      "action": "Prüfen Sie die Anmeldedaten und Konfiguration des Anbieters und versuchen Sie es erneut."
+    },
+    "connectivity": {
+      "action": "Prüfen Sie Netzwerk, Proxy und Base URL und versuchen Sie es erneut."
+    },
+    "provider": {
+      "action": "Der Anbieter konnte die Inferenzprüfung nicht abschließen. Versuchen Sie es später erneut."
+    }
+  },
   "latency": "Latenz",
   "customAcpAgent": "Benutzerdefinierte ACP-Agenten",
   "addCustomAgent": "Hinzufügen",
@@ -1349,31 +1397,44 @@
   "mcpNoTools": "Dieser Server stellt keine Tools bereit",
   "appOperationsModel": {
     "title": "Modell für App-Vorgänge",
-    "description": "Wird unabhängig von Chatmodellen für die Hintergrund-Kontextverarbeitung und zukünftige appweite Assistenz verwendet.",
+    "panelLabel": "App-Vorgänge",
+    "panelInfo": "WePrompt nutzt dies für eigene Hintergrundaufgaben – derzeit, um lange Unterhaltungen zusammenzufassen, damit sie fortgesetzt werden können. Ihre Chats bleiben unverändert.",
+    "popoverSubtitle": "Nur für Hintergrundarbeit. Eine Änderung wirkt sich nicht auf Ihre Unterhaltungen aus.",
     "selectionLabel": "Auswahl",
     "auto": "Automatisch",
     "fixed": "Festgelegt",
-    "resolvedModelLabel": "Aufgelöstes Modell",
-    "healthLabel": "Status",
-    "usedByLabel": "Verwendet von",
-    "contextCompaction": "Kontextkomprimierung",
-    "saving": "Wird gespeichert…",
+    "autoExplainer": "WePrompt wählt das beste geeignete Modell und ermittelt es neu, wenn sich Anbieter ändern.",
+    "modelLabel": "Modell",
+    "managedByAuto": "Wird automatisch verwaltet",
+    "kept": "Beibehalten",
+    "switchToAuto": "Zu Automatisch wechseln",
+    "pickAnother": "Anderes auswählen",
+    "checkNow": "Jetzt prüfen",
+    "openSettings": "Modell für App-Vorgänge ändern",
+    "contextCompaction": "Lange Chats zusammenfassen",
+    "usedByCompaction": "Wird zum Zusammenfassen langer Chats verwendet",
+    "setupRequiredImpact": "Kein geeignetes Textmodell konfiguriert. Bis Sie eines hinzufügen, werden lange Unterhaltungen mit einer einfachen Regel statt mit einem Modell zusammengefasst.",
     "loadFailed": "Die Einstellungen für App-Vorgänge konnten nicht geladen werden.",
     "saveFailed": "Das Modell für App-Vorgänge konnte nicht gespeichert werden.",
+    "saveFailedToast": "Speichern fehlgeschlagen. Wählen Sie erneut, um es nochmals zu versuchen.",
     "checkFailed": "Die Integritätsprüfung für App-Vorgänge ist fehlgeschlagen.",
     "backendUpdateRequired": "Aktualisieren Sie WePrompt, um das Modell für App-Vorgänge zu konfigurieren.",
-    "checkResult": {
-      "ready": "Fehlerfrei · {{checked}}",
-      "setupRequired": "Einrichtung erforderlich · {{checked}}",
-      "unavailable": "Prüfung fehlgeschlagen · {{checked}}",
-      "checkedJustNow": "gerade geprüft",
-      "checkedAt": "geprüft am {{time}}"
+    "backendUpdateRequiredDetail": "Das Backend dieses Builds stellt die Einstellung nicht bereit. Unterhaltungen sind nicht betroffen.",
+    "checkTime": {
+      "never": "Noch nicht geprüft",
+      "justNow": "Gerade geprüft",
+      "today": "Heute um {{time}} geprüft",
+      "date": "Am {{date}} um {{time}} geprüft"
     },
     "status": {
       "ready": "Bereit",
-      "checking": "Wird überprüft",
+      "checking": "Wird überprüft…",
       "setupRequired": "Einrichtung erforderlich",
-      "unavailable": "Nicht verfügbar"
+      "unavailable": "Nicht verfügbar",
+      "loading": "Wird geladen…",
+      "saving": "Wird gespeichert…",
+      "saveFailed": "Speichern fehlgeschlagen",
+      "loadFailed": "Laden fehlgeschlagen"
     },
     "reason": {
       "noEligibleModel": "Fügen Sie ein Textmodell mit gültigen Anmeldedaten hinzu oder aktivieren Sie es.",

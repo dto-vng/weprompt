@@ -362,9 +362,6 @@
   "modelNotFoundAfterUrlChange": "모델 {{model}}을(를) 새 주소에서 찾을 수 없습니다. 사용할 수 없는 경우 다시 선택하세요.",
   "apiKey": "API 키",
   "deleteModelConfirm": "이 모델을 삭제하시겠습니까?",
-  "deleteAllModelConfirm": "모든 모델을 삭제하시겠습니까?",
-  "modelCount": "모델",
-  "apiKeyCount": "API 키",
   "pleaseEnterBaseUrlAndApiKey": "기본 URL과 API 키를 입력하세요",
   "pleaseEnterApiKey": "API 키를 입력하세요",
   "pleaseEnterBaseUrl": "기본 URL을 입력하세요",
@@ -873,8 +870,56 @@
   "includePrereleaseUpdates": "프리릴리즈/dev 빌드 포함",
   "saveModelConfigFailed": "모델 구성 저장 실패",
   "healthCheck": "상태 확인",
-  "clearStatus": "상태 지우기",
-  "healthStatusCleared": "상태가 초기화되었습니다",
+  "modelRow": {
+    "latency": "{{latency}} ms",
+    "neverChecked": "점검한 적 없음",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "모델 삭제",
+    "deleteAppOperationsWarning": "이 모델은 앱 작업에 고정되어 있습니다. 삭제하면 다른 모델을 선택할 때까지 해당 설정을 사용할 수 없습니다."
+  },
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "모델 {{count}}개",
+    "modelCount_other": "모델 {{count}}개",
+    "apiKeyCount": "키 {{count}}개",
+    "apiKeyCount_other": "키 {{count}}개",
+    "healthChecked": "{{total}}개 중 {{checked}}개 확인됨",
+    "healthNotChecked": "확인 안 됨",
+    "healthFailing": "{{count}}개 실패",
+    "healthFailing_other": "{{count}}개 실패",
+    "deleteConfirmTitle": "제공자 삭제",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "제공자와 해당 API 키 및 구성된 모든 모델을 삭제합니다. 기존 대화는 시작할 때 사용한 모델을 그대로 유지합니다.",
+    "clearHealth": "상태 기록 지우기",
+    "clearHealthConfirmTitle": "상태 기록 지우기",
+    "clearHealthConfirmBody": "{{provider}}에 기록된 상태 점검 결과를 버립니다. 다시 측정하려면 상태 점검을 실행하세요.",
+    "healthCleared": "{{provider}}의 상태 기록을 지웠습니다.",
+    "deleteAppOperationsWarning": "이 제공자는 앱 작업에 고정되어 있습니다. 삭제하면 다른 모델을 선택할 때까지 해당 설정을 사용할 수 없습니다.",
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "사용 또는 사용 안 함"
+  },
+  "providerHealth": {
+    "configuredInferenceUnavailable": "구성됨 · 추론을 사용할 수 없습니다.",
+    "setupNeedsAttention": "설정을 확인해야 합니다.",
+    "overload": {
+      "action": "공급자가 일시적으로 과부하 상태입니다. 나중에 다시 시도하세요."
+    },
+    "rateLimit": {
+      "action": "공급자 한도가 재설정된 후 다시 시도하세요."
+    },
+    "quota": {
+      "action": "공급자 계정의 크레딧 또는 할당량이 소진되었습니다. 충전하거나 다른 공급자로 전환한 후 다시 시도하세요."
+    },
+    "setup": {
+      "action": "공급자 자격 증명과 구성을 확인한 후 다시 시도하세요."
+    },
+    "connectivity": {
+      "action": "네트워크, 프록시 및 Base URL을 확인한 후 다시 시도하세요."
+    },
+    "provider": {
+      "action": "공급자가 추론 확인을 완료하지 못했습니다. 나중에 다시 시도하세요."
+    }
+  },
   "latency": "지연 시간",
   "customAcpAgent": "사용자 정의 ACP 에이전트",
   "addCustomAgent": "추가",
@@ -1351,31 +1396,44 @@
   "mcpNoTools": "이 서버는 도구를 제공하지 않습니다",
   "appOperationsModel": {
     "title": "앱 작업 모델",
-    "description": "채팅 모델과 독립적으로 백그라운드 컨텍스트 처리와 향후 앱 전반의 지원에 사용됩니다.",
+    "panelLabel": "앱 작업",
+    "panelInfo": "WePrompt가 자체 백그라운드 작업에 사용하는 모델입니다. 현재는 길어진 대화를 요약해 계속 이어갈 수 있게 합니다. 각 채팅에서 쓰는 모델에는 영향을 주지 않습니다.",
+    "popoverSubtitle": "백그라운드 작업에만 사용됩니다. 변경해도 대화에는 영향을 주지 않습니다.",
     "selectionLabel": "선택",
     "auto": "자동",
     "fixed": "고정",
-    "resolvedModelLabel": "확인된 모델",
-    "healthLabel": "상태",
-    "usedByLabel": "사용 대상",
-    "contextCompaction": "컨텍스트 압축",
-    "saving": "저장 중…",
+    "autoExplainer": "WePrompt가 사용 가능한 최적의 모델을 선택하고 제공업체가 변경되면 다시 확인합니다.",
+    "modelLabel": "모델",
+    "managedByAuto": "자동 모드에서 관리",
+    "kept": "유지됨",
+    "switchToAuto": "자동으로 전환",
+    "pickAnother": "다른 모델 선택",
+    "checkNow": "지금 확인",
+    "openSettings": "앱 작업 모델 변경",
+    "contextCompaction": "긴 대화 요약",
+    "usedByCompaction": "긴 대화 요약에 사용",
+    "setupRequiredImpact": "사용할 수 있는 텍스트 모델이 없습니다. 추가하기 전까지 긴 대화는 모델이 아닌 기본 규칙으로 요약됩니다.",
     "loadFailed": "앱 작업 설정을 불러올 수 없습니다.",
     "saveFailed": "앱 작업 모델을 저장할 수 없습니다.",
+    "saveFailedToast": "저장하지 못했습니다. 다시 선택하면 재시도합니다.",
     "checkFailed": "앱 작업 상태 확인에 실패했습니다.",
     "backendUpdateRequired": "앱 작업 모델을 구성하려면 WePrompt를 업데이트하세요.",
-    "checkResult": {
-      "ready": "정상 · {{checked}}",
-      "setupRequired": "설정 필요 · {{checked}}",
-      "unavailable": "확인 실패 · {{checked}}",
-      "checkedJustNow": "방금 확인함",
-      "checkedAt": "{{time}}에 확인함"
+    "backendUpdateRequiredDetail": "이 빌드의 백엔드는 해당 설정을 제공하지 않습니다. 대화에는 영향이 없습니다.",
+    "checkTime": {
+      "never": "아직 확인하지 않음",
+      "justNow": "방금 확인함",
+      "today": "오늘 {{time}}에 확인함",
+      "date": "{{date}} {{time}}에 확인함"
     },
     "status": {
       "ready": "준비됨",
-      "checking": "확인 중",
+      "checking": "확인 중…",
       "setupRequired": "설정 필요",
-      "unavailable": "사용할 수 없음"
+      "unavailable": "사용할 수 없음",
+      "loading": "불러오는 중…",
+      "saving": "저장 중…",
+      "saveFailed": "저장 실패",
+      "loadFailed": "불러오기 실패"
     },
     "reason": {
       "noEligibleModel": "유효한 자격 증명이 있는 텍스트 모델을 추가하거나 활성화하세요.",

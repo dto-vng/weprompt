@@ -129,7 +129,14 @@ const AgentCard: React.FC<AgentCardProps> = (props) => {
         <Avatar
           size={32}
           shape='square'
-          style={{ flexShrink: 0, backgroundColor: avatar.kind === 'image' ? 'transparent' : 'var(--color-fill-2)' }}
+          // Image logos sit on --agent-logo-surface: transparent in light, a near-white
+          // tile in dark. Several vendor logos are bare dark glyphs drawn for light
+          // backgrounds and vanish against the dark page without it.
+          style={{
+            flexShrink: 0,
+            backgroundColor: avatar.kind === 'image' ? 'var(--agent-logo-surface)' : 'var(--color-fill-2)',
+            border: avatar.kind === 'image' ? '1px solid var(--agent-logo-border)' : undefined,
+          }}
         >
           {avatar.kind === 'image' ? (
             <img src={avatar.value} alt={agent.name} className='h-full w-full object-contain' />

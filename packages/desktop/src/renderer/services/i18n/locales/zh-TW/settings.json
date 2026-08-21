@@ -362,9 +362,6 @@
   "modelNotFoundAfterUrlChange": "模型 {{model}} 在新位址未找到，如不可用請重新選擇。",
   "apiKey": "API Key",
   "deleteModelConfirm": "是否刪除該模型？",
-  "deleteAllModelConfirm": "是否刪除所有模型？",
-  "modelCount": "模型",
-  "apiKeyCount": "API Key",
   "pleaseEnterBaseUrlAndApiKey": "請輸入base url和api key",
   "pleaseEnterApiKey": "請輸入 API Key",
   "pleaseEnterBaseUrl": "請輸入 Base URL",
@@ -885,8 +882,56 @@
   "includePrereleaseUpdates": "包含預發佈/dev 版本",
   "saveModelConfigFailed": "儲存模型設定失敗",
   "healthCheck": "健康檢測",
-  "clearStatus": "清除狀態",
-  "healthStatusCleared": "健康狀態已清除",
+  "modelRow": {
+    "latency": "{{latency}} 毫秒",
+    "neverChecked": "從未檢測",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "刪除模型",
+    "deleteAppOperationsWarning": "此模型已被固定用於應用程式操作。刪除後，該設定將無法使用，直到你選擇另一個模型。"
+  },
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "{{count}} 個模型",
+    "modelCount_other": "{{count}} 個模型",
+    "apiKeyCount": "{{count}} 個金鑰",
+    "apiKeyCount_other": "{{count}} 個金鑰",
+    "healthChecked": "已檢測 {{checked}}/{{total}}",
+    "healthNotChecked": "未檢測",
+    "healthFailing": "{{count}} 個異常",
+    "healthFailing_other": "{{count}} 個異常",
+    "deleteConfirmTitle": "刪除供應商",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "將刪除該供應商及其 API 金鑰和所設定的全部模型。既有對話仍會保留建立時使用的模型。",
+    "clearHealth": "清除健康狀態",
+    "clearHealthConfirmTitle": "清除健康狀態",
+    "clearHealthConfirmBody": "將捨棄 {{provider}} 已記錄的健康檢測結果。重新執行健康檢測即可再次量測。",
+    "healthCleared": "已清除 {{provider}} 的健康狀態。",
+    "deleteAppOperationsWarning": "此供應商已被固定用於應用程式操作。刪除後，該設定將無法使用，直到你選擇另一個模型。",
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "啟用或停用"
+  },
+  "providerHealth": {
+    "configuredInferenceUnavailable": "已設定 · 推論暫時無法使用。",
+    "setupNeedsAttention": "設定需要處理。",
+    "overload": {
+      "action": "服務供應商暫時過載，請稍後再試。"
+    },
+    "rateLimit": {
+      "action": "請等待服務供應商限額重設後再試。"
+    },
+    "quota": {
+      "action": "該服務商帳戶額度或餘額已用盡。請儲值或切換服務商後再試。"
+    },
+    "setup": {
+      "action": "請檢查服務供應商憑證和設定後再試。"
+    },
+    "connectivity": {
+      "action": "請檢查網路、代理和 Base URL 後再試。"
+    },
+    "provider": {
+      "action": "服務供應商未能完成推論檢測，請稍後再試。"
+    }
+  },
   "latency": "延遲",
   "customAcpAgent": "自訂 ACP 代理",
   "addCustomAgent": "新增",
@@ -1351,31 +1396,44 @@
   "mcpNoTools": "該伺服器未提供任何工具",
   "appOperationsModel": {
     "title": "應用程式操作模型",
-    "description": "用於背景上下文處理和未來的全應用程式輔助，獨立於聊天模型。",
+    "panelLabel": "應用程式操作",
+    "panelInfo": "WePrompt 用它處理自身的背景工作——目前是在對話過長時進行摘要，讓對話能夠繼續。這不會影響各個聊天所用的模型。",
+    "popoverSubtitle": "僅用於背景工作。變更它不會影響你的對話。",
     "selectionLabel": "選擇",
     "auto": "自動",
     "fixed": "固定",
-    "resolvedModelLabel": "已解析模型",
-    "healthLabel": "狀態",
-    "usedByLabel": "用於",
-    "contextCompaction": "上下文壓縮",
-    "saving": "正在儲存…",
+    "autoExplainer": "WePrompt 會挑選最合適的可用模型，並在提供者變更時重新解析。",
+    "modelLabel": "模型",
+    "managedByAuto": "由自動模式管理",
+    "kept": "已保留",
+    "switchToAuto": "切換為自動",
+    "pickAnother": "另選一個",
+    "checkNow": "立即檢查",
+    "openSettings": "變更應用程式操作模型",
+    "contextCompaction": "摘要長對話",
+    "usedByCompaction": "用於摘要長對話",
+    "setupRequiredImpact": "尚未設定可用的文字模型。在你新增之前，長對話會使用基本規則進行摘要，而非模型。",
     "loadFailed": "無法載入應用程式操作設定。",
     "saveFailed": "無法儲存應用程式操作模型。",
+    "saveFailedToast": "儲存失敗。重新選擇即可重試。",
     "checkFailed": "應用程式操作健康狀態檢查失敗。",
     "backendUpdateRequired": "請更新 WePrompt 以設定應用程式操作模型。",
-    "checkResult": {
-      "ready": "健康 · {{checked}}",
-      "setupRequired": "需要設定 · {{checked}}",
-      "unavailable": "檢查失敗 · {{checked}}",
-      "checkedJustNow": "剛剛檢查",
-      "checkedAt": "檢查於 {{time}}"
+    "backendUpdateRequiredDetail": "此版本的後端未提供該設定。對話不受影響。",
+    "checkTime": {
+      "never": "尚未檢查",
+      "justNow": "剛剛檢查",
+      "today": "今天 {{time}} 檢查",
+      "date": "{{date}} {{time}} 檢查"
     },
     "status": {
       "ready": "就緒",
-      "checking": "正在檢查",
+      "checking": "正在檢查…",
       "setupRequired": "需要設定",
-      "unavailable": "無法使用"
+      "unavailable": "無法使用",
+      "loading": "正在載入…",
+      "saving": "正在儲存…",
+      "saveFailed": "儲存失敗",
+      "loadFailed": "載入失敗"
     },
     "reason": {
       "noEligibleModel": "請新增或啟用具有有效憑證的文字模型。",

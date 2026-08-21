@@ -352,9 +352,6 @@
   "modelNotFoundAfterUrlChange": "El modelo {{model}} no se encontró en la nueva dirección; vuelve a seleccionarlo si no funciona.",
   "apiKey": "Clave API",
   "deleteModelConfirm": "¿Estás seguro de que deseas eliminar este modelo?",
-  "deleteAllModelConfirm": "¿Estás seguro de que deseas eliminar todos los modelos?",
-  "modelCount": "Modelo",
-  "apiKeyCount": "Clave API",
   "pleaseEnterBaseUrlAndApiKey": "Por favor ingresa la URL base y la clave API",
   "pleaseEnterApiKey": "Por favor ingresa la clave API",
   "pleaseEnterBaseUrl": "Por favor ingresa la URL base",
@@ -875,8 +872,62 @@
   "includePrereleaseUpdates": "Incluir versiones previas/de desarrollo",
   "saveModelConfigFailed": "Error al guardar la configuración del modelo",
   "healthCheck": "Verificación de salud",
-  "clearStatus": "Limpiar estado",
-  "healthStatusCleared": "Estado de salud limpiado",
+  "modelRow": {
+    "latency": "{{latency}} ms",
+    "neverChecked": "Nunca comprobado",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "Eliminar modelo",
+    "deleteAppOperationsWarning": "Este modelo está fijado para las operaciones de la aplicación. Al eliminarlo, ese ajuste quedará no disponible hasta que elijas otro modelo."
+  },
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "{{count}} modelos",
+    "modelCount_one": "{{count}} modelo",
+    "modelCount_many": "{{count}} modelos",
+    "modelCount_other": "{{count}} modelos",
+    "apiKeyCount": "{{count}} claves",
+    "apiKeyCount_one": "{{count}} clave",
+    "apiKeyCount_many": "{{count}} claves",
+    "apiKeyCount_other": "{{count}} claves",
+    "healthChecked": "{{checked}} de {{total}} comprobados",
+    "healthNotChecked": "Sin comprobar",
+    "healthFailing": "{{count}} con errores",
+    "healthFailing_one": "{{count}} con error",
+    "healthFailing_many": "{{count}} con errores",
+    "healthFailing_other": "{{count}} con errores",
+    "deleteConfirmTitle": "Eliminar proveedor",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "Elimina el proveedor, sus claves de API y todos los modelos que configura. Los chats existentes conservan el modelo con el que se iniciaron.",
+    "clearHealth": "Borrar estado de comprobación",
+    "clearHealthConfirmTitle": "Borrar estado de comprobación",
+    "clearHealthConfirmBody": "Descarta los resultados de comprobación registrados de {{provider}}. Ejecuta una comprobación para volver a medirlos.",
+    "healthCleared": "Estado de comprobación de {{provider}} borrado.",
+    "deleteAppOperationsWarning": "Este proveedor está fijado para las operaciones de la aplicación. Al eliminarlo, ese ajuste quedará no disponible hasta que elijas otro modelo.",
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "Activar o desactivar"
+  },
+  "providerHealth": {
+    "configuredInferenceUnavailable": "Configurado · inferencia no disponible.",
+    "setupNeedsAttention": "La configuración requiere atención.",
+    "overload": {
+      "action": "El proveedor está sobrecargado temporalmente. Inténtalo de nuevo más tarde."
+    },
+    "rateLimit": {
+      "action": "Espera a que se restablezca el límite del proveedor e inténtalo de nuevo."
+    },
+    "quota": {
+      "action": "La cuenta del proveedor se ha quedado sin cuota o saldo. Añade crédito o cambia de proveedor y vuelve a intentarlo."
+    },
+    "setup": {
+      "action": "Revisa las credenciales y la configuración del proveedor e inténtalo de nuevo."
+    },
+    "connectivity": {
+      "action": "Revisa la red, el proxy y la Base URL e inténtalo de nuevo."
+    },
+    "provider": {
+      "action": "El proveedor no pudo completar la comprobación de inferencia. Inténtalo más tarde."
+    }
+  },
   "latency": "Latencia",
   "customAcpAgent": "Agentes ACP personalizados",
   "addCustomAgent": "Agregar",
@@ -1349,31 +1400,44 @@
   "mcpNoTools": "Este servidor no expone ninguna herramienta",
   "appOperationsModel": {
     "title": "Modelo para operaciones de la aplicación",
-    "description": "Se usa para el contexto en segundo plano y la futura asistencia en toda la aplicación, independientemente de los modelos de chat.",
+    "panelLabel": "Operaciones de la aplicación",
+    "panelInfo": "WePrompt lo usa para su propio trabajo en segundo plano: por ahora, resumir conversaciones largas para que puedan continuar. Tus chats no se ven afectados.",
+    "popoverSubtitle": "Solo para trabajo en segundo plano. Cambiarlo no afecta a tus conversaciones.",
     "selectionLabel": "Selección",
     "auto": "Automático",
     "fixed": "Fijo",
-    "resolvedModelLabel": "Modelo resuelto",
-    "healthLabel": "Estado",
-    "usedByLabel": "Usado por",
-    "contextCompaction": "Compactación de contexto",
-    "saving": "Guardando…",
+    "autoExplainer": "WePrompt elige el mejor modelo apto y lo vuelve a resolver cuando cambian los proveedores.",
+    "modelLabel": "Modelo",
+    "managedByAuto": "Gestionado por el modo automático",
+    "kept": "Conservado",
+    "switchToAuto": "Cambiar a automático",
+    "pickAnother": "Elegir otro",
+    "checkNow": "Comprobar ahora",
+    "openSettings": "Cambiar el modelo para operaciones de la aplicación",
+    "contextCompaction": "Resumir conversaciones largas",
+    "usedByCompaction": "Se usa para resumir conversaciones largas",
+    "setupRequiredImpact": "No hay ningún modelo de texto apto configurado. Hasta que añadas uno, las conversaciones largas se resumen con una regla básica en lugar de un modelo.",
     "loadFailed": "No se pudo cargar la configuración de operaciones de la aplicación.",
     "saveFailed": "No se pudo guardar el modelo para operaciones de la aplicación.",
+    "saveFailedToast": "No se pudo guardar. Vuelve a elegir para reintentarlo.",
     "checkFailed": "La comprobación de estado de las operaciones de la aplicación falló.",
     "backendUpdateRequired": "Actualiza WePrompt para configurar el modelo para operaciones de la aplicación.",
-    "checkResult": {
-      "ready": "Saludable · {{checked}}",
-      "setupRequired": "Configuración necesaria · {{checked}}",
-      "unavailable": "Comprobación fallida · {{checked}}",
-      "checkedJustNow": "comprobado ahora mismo",
-      "checkedAt": "comprobado el {{time}}"
+    "backendUpdateRequiredDetail": "El backend de esta versión no ofrece este ajuste. Las conversaciones no se ven afectadas.",
+    "checkTime": {
+      "never": "Sin comprobar todavía",
+      "justNow": "Comprobado ahora mismo",
+      "today": "Comprobado hoy, {{time}}",
+      "date": "Comprobado el {{date}}, {{time}}"
     },
     "status": {
       "ready": "Listo",
-      "checking": "Comprobando",
+      "checking": "Comprobando…",
       "setupRequired": "Se requiere configuración",
-      "unavailable": "No disponible"
+      "unavailable": "No disponible",
+      "loading": "Cargando…",
+      "saving": "Guardando…",
+      "saveFailed": "Error al guardar",
+      "loadFailed": "Error al cargar"
     },
     "reason": {
       "noEligibleModel": "Agrega o habilita un modelo de texto con credenciales válidas.",

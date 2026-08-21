@@ -17,6 +17,27 @@
   "imageLoadFailed": "图片加载失败",
   "scrollToBottom": "滚动到底部",
   "reasoning": "推理过程",
+  "templateReview": {
+    "reviewing": "正在审核主题…",
+    "disclosure": "主题内容会保留在本地，并用于之后的模板化发送。",
+    "confirm": "安装到模板库",
+    "installing": "正在安装…",
+    "installed": "已安装到模板库",
+    "requestFailed": "无法审核该主题。未安装任何内容。",
+    "failure": {
+      "INVALID_REQUEST": "模板审核请求无效。未安装任何内容。",
+      "RUN_NOT_FOUND": "找不到演示文稿任务。未安装任何内容。",
+      "RUN_FORBIDDEN": "此演示文稿任务不属于当前对话。未安装任何内容。",
+      "SCOPE_UNAVAILABLE": "当前对话的工作区不可用。未安装任何内容。",
+      "TEAM_SCOPE_UNSUPPORTED": "团队对话暂不支持模板审核。未安装任何内容。",
+      "CANDIDATE_OUTSIDE_WORKSPACE": "主题文件位于当前对话工作区之外。未安装任何内容。",
+      "CANDIDATE_UNSUPPORTED": "该主题文件不是受支持的 THEME.md。未安装任何内容。",
+      "CANDIDATE_TOO_LARGE": "主题文件过大。未安装任何内容。",
+      "CANDIDATE_CHANGED": "主题内容在您审核后发生了变化。未安装任何内容。",
+      "CONFIRMATION_NOT_MINTED": "此审核已失效。请重新审核主题后再安装。未安装任何内容。",
+      "INSTALL_FAILED": "无法安装该主题。未安装任何内容。"
+    }
+  },
   "availableCommands": "{{count}} 个可用命令",
   "atFile.hint": "输入以搜索文件",
   "atFile.menuLabel": "文件提及",

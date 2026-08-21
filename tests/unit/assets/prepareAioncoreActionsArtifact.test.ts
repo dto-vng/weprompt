@@ -4,12 +4,38 @@ import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 
 const {
+  ACCEPTED_AIONCORE_SOURCE_COMMIT,
+  assertAcceptedActionsRun,
   getActionsArtifactName,
   getActionsArtifactMissingMessage,
   prepareAioncore,
 } = require('../../../packages/shared-scripts/src/prepare-aioncore');
+const { acceptedMigrationLineage } = require('../../../packages/shared-scripts/src/verify-bundled-aioncore-resources');
 
 const posixFakeToolchainIt = process.platform === 'win32' ? it.skip : it;
+
+/**
+ * These four cases build a fake POSIX toolchain on disk and run the real resolver over it.
+ * Measured in isolation on a quiet machine: 4.7s, 3.5s, 6.4s and 6.3s — the other twelve cases
+ * in this file take under a millisecond. The 10s global testTimeout leaves too little headroom
+ * to survive full-suite parallelism, where all four exceeded it reproducibly (2 runs of 2).
+ *
+ * 30s was tried first and was still not enough: the 6.4s case exceeded it once in three
+ * full-suite runs. These cases are I/O bound, so a generous ceiling costs nothing and only
+ * prevents false failures — the assertions are untouched by it. Do not lower this back toward
+ * the global default without re-measuring under full-suite load.
+ */
+const FAKE_TOOLCHAIN_TIMEOUT_MS = 120_000;
+
+// Verbatim `git ls-remote https://github.com/khoapnt-vng/aioncore.git refs/tags/v0.1.54 refs/tags/v0.1.54^{}`
+// output, captured 2026-08-21: the tag object line, then the peeled commit line
+// that ACCEPTED_AIONCORE_SOURCE_COMMIT pins. Kept as real wire output rather than
+// a hand-shaped single line — the previous fixture paired the peeled commit with
+// the unpeeled ref name, a shape `git ls-remote` never emits.
+const publishedAioncoreRefs =
+  '9bf46ba71eb1e71f7e41a3615d8eae19e0a6d497\trefs/tags/v0.1.54\n' +
+  '9bd693b3b43cdb1003061de0e4f62259ab6f42ae\trefs/tags/v0.1.54^{}\n';
+const resolvePublishedAioncoreRefs = () => publishedAioncoreRefs;
 
 function writeFile(filePath: string, contents = 'x') {
   mkdirSync(dirname(filePath), { recursive: true });
@@ -51,6 +77,12 @@ printf 'archive' > "$out"
   writeExecutable(
     join(binDir, 'gh'),
     `#!/usr/bin/env bash
+if [[ "$*" != *'/artifacts?per_page=100'* ]]; then
+  cat <<'JSON'
+{"status":"completed","conclusion":"success","head_sha":"${ACCEPTED_AIONCORE_SOURCE_COMMIT}"}
+JSON
+  exit 0
+fi
 cat <<'JSON'
 {"artifacts":[{"id":123,"name":"aioncore-manual-linux-x64","archive_download_url":"https://example.invalid/artifact.zip"}]}
 JSON
@@ -90,6 +122,9 @@ cat > "$out/aioncore" <<'SH'
 exit 0
 SH
 chmod +x "$out/aioncore"
+cat > "$out/migration-lineage.json" <<'JSON'
+${JSON.stringify(acceptedMigrationLineage, null, 2)}
+JSON
 `
   );
 
@@ -116,9 +151,67 @@ function useIsolatedTmpdir(root: string): () => void {
 afterEach(() => {
   delete process.env.AIONUI_BACKEND_RUN_ID;
   delete process.env.AIONUI_BACKEND_LOCAL_BINARY;
+  delete process.env.AIONUI_BACKEND_LOCAL_LINEAGE;
 });
 
 describe('prepare-aioncore GitHub Actions artifact resolver', () => {
+  // Scope note (BUG-040): injected ref output verifies gate behavior without
+  // claiming that a fixture proves real-world provenance. Production obtains
+  // this independent input from git ls-remote on the publishing host.
+  it('accepts a completed successful run whose head is the pinned source commit', () => {
+    expect(
+      assertAcceptedActionsRun(
+        {
+          conclusion: 'success',
+          head_sha: ACCEPTED_AIONCORE_SOURCE_COMMIT,
+          status: 'completed',
+        },
+        'unknown',
+        resolvePublishedAioncoreRefs
+      )
+    ).toEqual({
+      conclusion: 'success',
+      headSha: ACCEPTED_AIONCORE_SOURCE_COMMIT,
+      status: 'completed',
+    });
+  });
+
+  it('rejects an echoed accepted commit when the publishing host does not advertise it', () => {
+    const unrelatedPublishedRefs = '7061136ee8159d6e2768cabfa40b22d49351e74b\trefs/heads/main\n';
+
+    expect(() =>
+      assertAcceptedActionsRun(
+        {
+          conclusion: 'success',
+          head_sha: ACCEPTED_AIONCORE_SOURCE_COMMIT,
+          status: 'completed',
+        },
+        '27319522909',
+        () => unrelatedPublishedRefs
+      )
+    ).toThrow(/does not resolve on publishing host/);
+  });
+
+  it.each([
+    [
+      'a different source commit',
+      { conclusion: 'success', head_sha: '7061136ee8159d6e2768cabfa40b22d49351e74b', status: 'completed' },
+      /does not match accepted source commit/,
+    ],
+    [
+      'an unfinished run',
+      { conclusion: null, head_sha: ACCEPTED_AIONCORE_SOURCE_COMMIT, status: 'in_progress' },
+      /is not completed successfully/,
+    ],
+    [
+      'a failed run',
+      { conclusion: 'failure', head_sha: ACCEPTED_AIONCORE_SOURCE_COMMIT, status: 'completed' },
+      /is not completed successfully/,
+    ],
+  ])('rejects %s', (_case, run, expectedMessage) => {
+    expect(() => assertAcceptedActionsRun(run, 'unknown', resolvePublishedAioncoreRefs)).toThrow(expectedMessage);
+  });
+
   it.each([
     ['win32', 'x64', 'aioncore-manual-windows-x64'],
     ['win32', 'arm64', 'aioncore-manual-windows-arm64'],
@@ -150,85 +243,132 @@ describe('prepare-aioncore GitHub Actions artifact resolver', () => {
 
   // These cases execute a temporary POSIX shell-script aioncore binary. Windows
   // coverage for contract rejection lives in the verifier/local-bundle tests.
-  posixFakeToolchainIt('hard fails Actions artifact input when prepared managed resources lack contract', () => {
-    const tmp = mkdtempSync(join(tmpdir(), 'aionui-actions-gate-'));
-    const fakeBin = createFakeToolchain(tmp);
-    const previousPath = process.env.PATH;
-    process.env.PATH = `${fakeBin}${delimiter}${previousPath || ''}`;
-    process.env.AIONUI_BACKEND_RUN_ID = '123';
-    const restoreTmpdir = useIsolatedTmpdir(tmp);
+  posixFakeToolchainIt(
+    'hard fails Actions artifact input when prepared managed resources lack contract',
+    () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'aionui-actions-gate-'));
+      const fakeBin = createFakeToolchain(tmp);
+      const previousPath = process.env.PATH;
+      process.env.PATH = `${fakeBin}${delimiter}${previousPath || ''}`;
+      process.env.AIONUI_BACKEND_RUN_ID = '123';
+      const restoreTmpdir = useIsolatedTmpdir(tmp);
 
-    try {
-      expect(() =>
-        prepareAioncore({
-          projectRoot: join(tmp, 'project'),
-          platform: 'linux',
-          arch: 'x64',
-          version: 'v0.1.46',
-        })
-      ).toThrow(/managed-resources\/manifest\.json/);
-    } finally {
-      if (previousPath === undefined) delete process.env.PATH;
-      else process.env.PATH = previousPath;
-      restoreTmpdir();
-      rmSync(tmp, { recursive: true, force: true });
-    }
-  });
+      try {
+        expect(() =>
+          prepareAioncore({
+            projectRoot: join(tmp, 'project'),
+            platform: 'linux',
+            arch: 'x64',
+            version: 'v0.1.46',
+            resolveAioncoreRefs: resolvePublishedAioncoreRefs,
+          })
+        ).toThrow(/managed-resources\/manifest\.json/);
+      } finally {
+        if (previousPath === undefined) delete process.env.PATH;
+        else process.env.PATH = previousPath;
+        restoreTmpdir();
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    },
+    FAKE_TOOLCHAIN_TIMEOUT_MS
+  );
 
-  posixFakeToolchainIt('hard fails GitHub release download input when prepared managed resources lack contract', () => {
-    const tmp = mkdtempSync(join(tmpdir(), 'aionui-download-gate-'));
-    const fakeBin = createFakeToolchain(tmp);
-    const previousPath = process.env.PATH;
-    process.env.PATH = `${fakeBin}${delimiter}${previousPath || ''}`;
-    // Bypass the pinned-digest gate (covered by verifyAioncoreArtifactDigest tests)
-    // so this test reaches the managed-resources contract check it targets.
-    const previousSkipVerify = process.env.AIONUI_SKIP_AIONCORE_VERIFY;
-    process.env.AIONUI_SKIP_AIONCORE_VERIFY = '1';
-    const restoreTmpdir = useIsolatedTmpdir(tmp);
+  posixFakeToolchainIt(
+    'hard fails GitHub release download input when prepared managed resources lack contract',
+    () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'aionui-download-gate-'));
+      const fakeBin = createFakeToolchain(tmp);
+      const previousPath = process.env.PATH;
+      process.env.PATH = `${fakeBin}${delimiter}${previousPath || ''}`;
+      // Bypass the pinned-digest gate (covered by verifyAioncoreArtifactDigest tests)
+      // so this test reaches the managed-resources contract check it targets.
+      const previousSkipVerify = process.env.AIONUI_SKIP_AIONCORE_VERIFY;
+      process.env.AIONUI_SKIP_AIONCORE_VERIFY = '1';
+      const restoreTmpdir = useIsolatedTmpdir(tmp);
 
-    try {
-      expect(() =>
-        prepareAioncore({
-          projectRoot: join(tmp, 'project'),
-          platform: 'linux',
-          arch: 'x64',
-          version: 'v0.1.46',
-        })
-      ).toThrow(/managed-resources\/manifest\.json/);
-    } finally {
-      if (previousPath === undefined) delete process.env.PATH;
-      else process.env.PATH = previousPath;
-      if (previousSkipVerify === undefined) delete process.env.AIONUI_SKIP_AIONCORE_VERIFY;
-      else process.env.AIONUI_SKIP_AIONCORE_VERIFY = previousSkipVerify;
-      restoreTmpdir();
-      rmSync(tmp, { recursive: true, force: true });
-    }
-  });
+      try {
+        expect(() =>
+          prepareAioncore({
+            projectRoot: join(tmp, 'project'),
+            platform: 'linux',
+            arch: 'x64',
+            version: 'v0.1.46',
+          })
+        ).toThrow(/managed-resources\/manifest\.json/);
+      } finally {
+        if (previousPath === undefined) delete process.env.PATH;
+        else process.env.PATH = previousPath;
+        if (previousSkipVerify === undefined) delete process.env.AIONUI_SKIP_AIONCORE_VERIFY;
+        else process.env.AIONUI_SKIP_AIONCORE_VERIFY = previousSkipVerify;
+        restoreTmpdir();
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    },
+    FAKE_TOOLCHAIN_TIMEOUT_MS
+  );
 
-  posixFakeToolchainIt('hard fails local binary fallback when prepared managed resources lack contract', () => {
-    const tmp = mkdtempSync(join(tmpdir(), 'aionui-local-binary-gate-'));
-    const localBinary = join(tmp, 'aioncore');
-    writeExecutable(localBinary, '#!/usr/bin/env bash\nexit 0\n');
-    const fakeBin = createFakeToolchain(tmp, { curlFails: true });
-    const previousPath = process.env.PATH;
-    process.env.PATH = `${fakeBin}${delimiter}${previousPath || ''}`;
-    process.env.AIONUI_BACKEND_LOCAL_BINARY = localBinary;
-    const restoreTmpdir = useIsolatedTmpdir(tmp);
+  posixFakeToolchainIt(
+    'hard fails local binary fallback when prepared managed resources lack contract',
+    () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'aionui-local-binary-gate-'));
+      const localBinary = join(tmp, 'aioncore');
+      const localLineage = join(tmp, 'migration-lineage.json');
+      writeExecutable(localBinary, '#!/usr/bin/env bash\nexit 0\n');
+      writeFile(localLineage, `${JSON.stringify(acceptedMigrationLineage, null, 2)}\n`);
+      const fakeBin = createFakeToolchain(tmp, { curlFails: true });
+      const previousPath = process.env.PATH;
+      process.env.PATH = `${fakeBin}${delimiter}${previousPath || ''}`;
+      process.env.AIONUI_BACKEND_LOCAL_BINARY = localBinary;
+      process.env.AIONUI_BACKEND_LOCAL_LINEAGE = localLineage;
+      const restoreTmpdir = useIsolatedTmpdir(tmp);
 
-    try {
-      expect(() =>
-        prepareAioncore({
-          projectRoot: join(tmp, 'project'),
-          platform: 'linux',
-          arch: 'x64',
-          version: 'v0.1.46',
-        })
-      ).toThrow(/managed-resources\/manifest\.json/);
-    } finally {
-      if (previousPath === undefined) delete process.env.PATH;
-      else process.env.PATH = previousPath;
-      restoreTmpdir();
-      rmSync(tmp, { recursive: true, force: true });
-    }
-  });
+      try {
+        expect(() =>
+          prepareAioncore({
+            projectRoot: join(tmp, 'project'),
+            platform: 'linux',
+            arch: 'x64',
+            version: 'v0.1.46',
+          })
+        ).toThrow(/managed-resources\/manifest\.json/);
+      } finally {
+        if (previousPath === undefined) delete process.env.PATH;
+        else process.env.PATH = previousPath;
+        restoreTmpdir();
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    },
+    FAKE_TOOLCHAIN_TIMEOUT_MS
+  );
+
+  posixFakeToolchainIt(
+    'fails closed when local binary fallback has no lineage provenance',
+    () => {
+      const tmp = mkdtempSync(join(tmpdir(), 'aionui-local-binary-lineage-'));
+      const localBinary = join(tmp, 'aioncore');
+      writeExecutable(localBinary, '#!/usr/bin/env bash\nexit 0\n');
+      const fakeBin = createFakeToolchain(tmp, { curlFails: true });
+      const previousPath = process.env.PATH;
+      process.env.PATH = `${fakeBin}${delimiter}${previousPath || ''}`;
+      process.env.AIONUI_BACKEND_LOCAL_BINARY = localBinary;
+      const restoreTmpdir = useIsolatedTmpdir(tmp);
+
+      try {
+        expect(() =>
+          prepareAioncore({
+            projectRoot: join(tmp, 'project'),
+            platform: 'linux',
+            arch: 'x64',
+            version: 'v0.1.46',
+          })
+        ).toThrow(/AIONUI_BACKEND_LOCAL_LINEAGE/);
+      } finally {
+        if (previousPath === undefined) delete process.env.PATH;
+        else process.env.PATH = previousPath;
+        restoreTmpdir();
+        rmSync(tmp, { recursive: true, force: true });
+      }
+    },
+    FAKE_TOOLCHAIN_TIMEOUT_MS
+  );
 });

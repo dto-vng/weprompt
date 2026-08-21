@@ -34,6 +34,18 @@ type AssistantSelectionAreaProps = {
   assistants: Assistant[];
   localeKey: string;
   maxVisibleAssistants?: number;
+  /**
+   * `hero` is the standalone new-chat page: a capsule that hugs its pills and
+   * centres under a centred title, on its own `--color-guid-agent-bar` surface.
+   *
+   * `inline` is the project-home card, where the bar sits directly above a
+   * full-bleed composer inside ~378px of card. Hugging and centring there
+   * leaves it stranded — 225px of capsule floating in a 378px column, in a
+   * third surface colour that matches neither the composer below nor the card
+   * around it. Inline takes the composer's full width and its `--bg-2`
+   * surface, so the two read as one control.
+   */
+  variant?: 'hero' | 'inline';
   onSelectAssistant: (assistantId: string) => void;
 };
 
@@ -42,6 +54,7 @@ const AssistantSelectionArea: React.FC<AssistantSelectionAreaProps> = ({
   assistants,
   localeKey,
   maxVisibleAssistants = 4,
+  variant = 'hero',
   onSelectAssistant,
 }) => {
   const { t } = useTranslation();
@@ -248,13 +261,18 @@ const AssistantSelectionArea: React.FC<AssistantSelectionAreaProps> = ({
     </div>
   );
 
+  const isInline = variant === 'inline';
+
   return (
-    <div ref={containerRef} className='mt-18px mb-16px w-full'>
-      <div className='flex w-full justify-center'>
+    <div ref={containerRef} className={`w-full ${isInline ? 'mb-8px' : 'mt-18px mb-16px'}`}>
+      <div className={`flex w-full ${isInline ? '' : 'justify-center'}`}>
         <div
           ref={barRef}
-          className='relative inline-flex max-w-full items-center rounded-999px px-6px py-6px'
-          style={{ background: 'var(--color-guid-agent-bar, var(--aou-2))' }}
+          data-assistant-bar-variant={variant}
+          className={`relative items-center rounded-999px px-6px py-6px ${
+            isInline ? 'flex w-full min-w-0 max-w-full' : 'inline-flex max-w-full'
+          }`}
+          style={{ background: isInline ? 'var(--bg-2)' : 'var(--color-guid-agent-bar, var(--aou-2))' }}
           onMouseEnter={hasOverflow ? handleBarMouseEnter : undefined}
           onMouseLeave={hasOverflow ? handleBarMouseLeave : undefined}
         >

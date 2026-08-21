@@ -88,6 +88,16 @@ const VALID_PAYLOADS = {
   },
   'presentation-templates.list': undefined,
   'presentation-templates.import-spec': { file_path: '/tmp/theme.json' },
+  // Conversation ids minted by the running app are short ids, never RFC-4122 uuids.
+  'presentation-templates.describe-spec': {
+    conversation_id: 'f90e8348',
+    file_path: '/tmp/workspace/THEME.md',
+  },
+  'presentation-templates.import-spec-bound': {
+    conversation_id: 'f90e8348',
+    file_path: '/tmp/workspace/THEME.md',
+    expected_sha256: 'a'.repeat(64),
+  },
   'presentation-templates.remove': { id: 'template-1' },
   'presentation-templates.scratch.allocate': {
     conversation_id: 'conversation-1',
@@ -135,7 +145,10 @@ const VALID_PAYLOADS = {
     expected_owner_revision: 2,
   },
   'presentation-runs.start': {
-    conversation_id: '2be7b8fc-6af5-42b8-aed5-03644735c730',
+    // Measured from the running app (route `#/conversation/1af97a0d`, and
+    // `session_id: '8f165203'` on the turn-completed payload): conversation ids
+    // are short hex. A uuid here is what let BUG-048 hide behind a green suite.
+    conversation_id: '1af97a0d',
     client_request_id: 'c9426c09-4352-4c7c-88ca-039bfcaaf0d8',
     input: 'Create a concise board update',
     selected_template_id: 'business-review',
@@ -247,6 +260,13 @@ const VALID_PAYLOADS = {
       },
     },
   },
+  'creative-studio.place-cut-scenes': {
+    projectId: 'project_1',
+    expectedRevision: 1,
+    cutId: 'cut_1',
+    sceneIds: ['scene_1'],
+    beforeClipId: null,
+  },
   'creative-studio.delete-project': { projectId: 'project_1', expectedRevision: 1 },
   'creative-studio.update-scene': {
     projectId: 'project_1',
@@ -284,6 +304,7 @@ const VALID_PAYLOADS = {
     expectedRevision: 1,
   },
   'creative-studio.choose-and-export-assets': { projectId: 'project_1', includeReferences: true },
+  'creative-studio.get-latest-render': { projectId: 'project_1' },
   'creative-studio.render-cut': { projectId: 'project_1' },
   'creative-studio.cancel-render': { projectId: 'project_1' },
   'creative-studio.fit-storyboard': {
@@ -614,8 +635,18 @@ const INVALID_PAYLOADS = [
   ],
   [
     'presentation-sources.get-source-owner',
-    'malformed owner UUID',
-    { owner: { owner_type: 'conversation', conversation_id: 'conversation-1' } },
+    // Was 'malformed owner UUID' with `conversation-1`, which BUG-048 established
+    // is a perfectly ordinary conversation id — the app mints short ids, not
+    // uuids. What a conversation owner still may not be is path-shaped: the id
+    // reaches a `sessionStorage` key and, before BUG-052 escaped them, URL path
+    // segments.
+    'path-shaped owner conversation id',
+    { owner: { owner_type: 'conversation', conversation_id: '../foreign' } },
+  ],
+  [
+    'presentation-sources.get-source-owner',
+    'empty owner conversation id',
+    { owner: { owner_type: 'conversation', conversation_id: '' } },
   ],
   [
     'presentation-sources.get-source-owner',
@@ -1691,6 +1722,45 @@ describe('native bridge payload schemas', () => {
 
   it('has exactly one schema for every manifested native provider', () => {
     expect(Object.keys(nativeBridgePayloadSchemas)).toEqual(NATIVE_BRIDGE_PROVIDER_KEYS);
+  });
+
+  it.each(['presentation-templates.describe-spec', 'presentation-templates.import-spec-bound'] as const)(
+    'manifests and validates the hash-bound template provider %s',
+    (providerKey) => {
+      expect(NATIVE_BRIDGE_PROVIDER_KEYS).toContain(providerKey);
+      expect(() =>
+        parseNativeBridgePayload(providerKey as NativeBridgeProviderKey, VALID_PAYLOADS[providerKey])
+      ).not.toThrow();
+    }
+  );
+
+  // Regression: the template review card sends the id of the conversation it renders in, and those
+  // ids are short ids. A uuid-shaped schema rejected every real payload and hung the card forever.
+  it.each([
+    ['presentation-templates.describe-spec', 'f9e26b84'],
+    ['presentation-templates.describe-spec', 'df17cd9c'],
+    ['presentation-templates.import-spec-bound', 'fb5ff0cc'],
+    ['presentation-templates.import-spec-bound', 'ede9a3b7'],
+  ] as const)(
+    'accepts the short conversation id shape the app actually mints for %s',
+    (providerKey, conversationId) => {
+      const payload = { ...VALID_PAYLOADS[providerKey], conversation_id: conversationId };
+
+      expect(() => parseNativeBridgePayload(providerKey as NativeBridgeProviderKey, payload)).not.toThrow();
+    }
+  );
+
+  it.each([
+    ['presentation-templates.describe-spec', 'empty', ''],
+    ['presentation-templates.describe-spec', 'over-length', 'a'.repeat(257)],
+    ['presentation-templates.import-spec-bound', 'empty', ''],
+    ['presentation-templates.import-spec-bound', 'over-length', 'a'.repeat(257)],
+  ] as const)('still rejects %s with an %s conversation id', (providerKey, _reason, conversationId) => {
+    const payload = { ...VALID_PAYLOADS[providerKey], conversation_id: conversationId };
+
+    expect(() => parseNativeBridgePayload(providerKey as NativeBridgeProviderKey, payload)).toThrow(
+      INVALID_NATIVE_BRIDGE_PAYLOAD_MESSAGE
+    );
   });
 
   it('has exactly one request and response schema for every renderer-owned query', () => {

@@ -1,5 +1,9 @@
 import type { TChatConversation } from '@/common/config/storage';
 import ContextHandoffPanel from '@/renderer/pages/conversation/contextHandoff/ContextHandoffPanel';
+import {
+  clearActiveContextBudget,
+  publishActiveContextBudget,
+} from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -187,6 +191,7 @@ const conversation: TChatConversation = {
 
 describe('ContextHandoffPanel', () => {
   beforeEach(() => {
+    clearActiveContextBudget('conversation-1');
     mocks.addToSendBox.mockClear();
     mocks.createWithConversation.mockClear();
     mocks.emit.mockClear();
@@ -342,31 +347,29 @@ describe('ContextHandoffPanel', () => {
     expect(screen.queryByText('conversation.contextHandoff.status.failed')).not.toBeInTheDocument();
   });
 
-  it('shows a budget percentage for an aionrs conversation using the per-model fallback window', async () => {
-    mocks.getConversationOrNull.mockResolvedValue({
-      ...conversation,
-      extra: {
-        backend: 'aionrs',
-        context_handoff: conversation.extra.context_handoff,
-        // No last_context_limit — aionrs conversations never receive one from the backend.
-        last_token_usage: { total_tokens: 9_000 },
-        workspace: '/workspace',
-      },
-      model: {
-        ...conversation.model,
-        use_model: 'minimax-m2.5',
-      },
+  // C-29 removed the budget row and gauge from this panel: the composer already renders a live
+  // `Context …%` indicator, so the panel was showing a duplicate. Two tests previously pinned the
+  // rendered percentage and the progressbar here — a per-model fallback window, and preferring the
+  // active composer budget over recomputing from a partial message page.
+  //
+  // Both were asserting through this component's DOM, and that surface is gone. The budget
+  // *computation* still runs (it feeds `last_budget_status` telemetry) but is no longer observable
+  // here, so its coverage belongs with the composer indicator rather than this panel. What remains
+  // testable here is that the duplicate does not come back.
+  it('renders no budget readout, since the composer owns that indicator', async () => {
+    publishActiveContextBudget('conversation-1', {
+      source: 'estimated',
+      totalTokens: 110_000,
+      contextLimit: 1_000_000,
+      ratio: 0.11,
+      status: 'healthy',
     });
 
     render(<ContextHandoffPanel conversationId='conversation-1' workspace='/workspace' />);
 
     await screen.findByRole('button', { name: /Context\.md/ });
-
-    expect(screen.queryByText('--')).not.toBeInTheDocument();
-    expect(screen.getByText(/%$/)).toBeInTheDocument();
-    await waitFor(() =>
-      expect(Number(screen.getByRole('progressbar').getAttribute('aria-valuenow'))).toBeGreaterThan(0)
-    );
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    expect(screen.queryByText(/%$/)).not.toBeInTheDocument();
   });
 
   it('shows updating immediately while the always-mounted controller is compacting', async () => {

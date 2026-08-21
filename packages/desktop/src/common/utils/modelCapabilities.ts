@@ -24,7 +24,12 @@ export const CAPABILITY_PATTERNS: Record<ModelType, RegExp> = {
   reasoning: /o1-|reasoning|think/i,
   embedding: /(?:^text-|embed|bge-|e5-|LLM2Vec|retrieval|uae-|gte-|jina-clip|jina-embeddings|voyage-)/i,
   rerank: /(?:rerank|re-rank|re-ranker|re-ranking|retrieval|retriever)/i,
-  excludeFromPrimary: /dall-e|flux|stable-diffusion|midjourney|flash-image|image|embed|rerank/i,
+  // Video generators belong here for the same reason image generators do: they cannot
+  // serve a text turn, so offering them as a primary or app-operations model produces a
+  // request that always fails. Named generators only — a bare /video/ would also catch
+  // video-understanding models, which are text-capable and belong in the list.
+  excludeFromPrimary:
+    /dall-e|flux|stable-diffusion|midjourney|flash-image|image|embed|rerank|seedance|sora-|veo-|kling-|runway-/i,
 };
 
 /**
@@ -96,6 +101,37 @@ export const updateModelSettings = (
 };
 
 /**
+ * Capabilities that CANNOT be answered by this module at all, by any heuristic.
+ *
+ * Every other capability here is resolved from evidence of decreasing strength:
+ * an explicit user tag, then a per-provider rule, then a regex over the model
+ * name (note `_platformModel` is unused below — name matching ignores the
+ * provider entirely). For vision or function-calling that ladder is fine; a
+ * wrong guess degrades a list filter.
+ *
+ * Reasoning is different. EPIC-003 rules that even an explicit
+ * provider-declared reasoning badge is insufficient evidence to enable
+ * reasoning controls — positive evidence must come from the capability
+ * discovery seam. Every rung of the ladder above is therefore too weak: a user
+ * checkbox is the user telling themselves, and a name regex is weaker still, so
+ * a model merely named `*-thinking` would grant the feature with no backend
+ * consulted. Guarding only the regex would leave the other two rungs open.
+ *
+ * These capabilities resolve to `undefined` ("unknown") — never `true`, and
+ * never `false`. `undefined` preserves the tri-state vocabulary: callers must
+ * seek positive evidence from the discovery seam, and nobody is told the
+ * capability is definitively absent.
+ *
+ * This does NOT remove `reasoning` from {@link ModelType}: storing and
+ * displaying a reasoning tag is unaffected. It only stops this module being
+ * treated as authority for whether reasoning controls may be enabled.
+ */
+const DISCOVERY_ONLY_CAPABILITY: ModelType = 'reasoning';
+
+/** Whether capability support must come from the capability discovery seam. */
+export const isDiscoveryOnlyCapability = (type: ModelType): boolean => type === DISCOVERY_ONLY_CAPABILITY;
+
+/**
  * Check whether a specific model within a provider has a given capability.
  * Returns true (supported), false (excluded), or undefined (unknown).
  */
@@ -104,6 +140,8 @@ export const hasSpecificModelCapability = (
   modelName: string,
   type: ModelType
 ): boolean | undefined => {
+  if (isDiscoveryOnlyCapability(type)) return undefined;
+
   const baseModelName = getBaseModelName(modelName);
   const exclusions = CAPABILITY_EXCLUSIONS[type];
   const pattern = CAPABILITY_PATTERNS[type];

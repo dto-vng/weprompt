@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { localTokenAuthHeaders } from '@/common/adapter/httpBridge';
+
 const MAX_FRAME_BYTES = 256 * 1024;
 const MAX_PENDING_TUPLES = 32;
 const MAX_SEEN_TUPLES = 64;
@@ -226,7 +228,8 @@ export class PresentationRuntimeEventClient {
     const url = `ws://127.0.0.1:${credentials.port}/ws`;
     const socket = this.options.createSocket(url, {
       maxPayload: MAX_FRAME_BYTES,
-      headers: { Authorization: `Bearer ${credentials.token}` },
+      // Built through the shared helper so the two construction sites cannot drift.
+      headers: localTokenAuthHeaders(credentials.token),
     });
     this.socket = socket;
     socket.on('open', () => {

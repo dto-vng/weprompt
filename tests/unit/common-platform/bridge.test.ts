@@ -53,6 +53,25 @@ const loadSerializingBridge = async () => {
   return { bridge };
 };
 
+/**
+ * BUG-047: before this, a provider that threw left its caller pending forever.
+ * The catch logged and emitted nothing, so the `subscribe.callback-*` listener
+ * `invoke` waits on never fired. Every provider channel in the app was
+ * affected, and it is why BUG-046 presented as an invisible hang for nine days
+ * instead of a loud error.
+ *
+ * `Promise.race` against a timer, not a bare await: a regression here does not
+ * fail an assertion, it hangs the test until vitest kills the file.
+ */
+const settlesWithin = <T>(promise: Promise<T>, label: string) =>
+  Promise.race([
+    promise.then(
+      (value) => ({ state: 'resolved' as const, value }),
+      (error: unknown) => ({ state: 'rejected' as const, error })
+    ),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${label} never settled`)), 1000)),
+  ]);
+
 describe('local bridge', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -120,6 +139,51 @@ describe('local bridge', () => {
 
     expect(console.error).toHaveBeenCalledWith('[bridge] Provider "test.failure" failed:', error);
     expect(outbound.some(({ name }) => name === 'subscribe.callback-test.failurerequest-1')).toBe(false);
+  });
+
+  it('rejects the caller when a provider throws, instead of leaving it pending', async () => {
+    const { bridge } = await loadSerializingBridge();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const endpoint = bridge.buildProvider<string, void>('test.throwing');
+    endpoint.provider(() => Promise.reject(new Error('provider exploded')));
+
+    const outcome = await settlesWithin(endpoint.invoke(), 'invoke');
+
+    expect(outcome.state).toBe('rejected');
+    expect((outcome as { error: Error }).error.message).toContain('provider exploded');
+  });
+
+  it('names the provider in the rejection, so a hang-turned-error is traceable', async () => {
+    const { bridge } = await loadSerializingBridge();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const endpoint = bridge.buildProvider<string, void>('test.named-failure');
+    endpoint.provider(() => Promise.reject(new Error('inner cause')));
+
+    await expect(endpoint.invoke()).rejects.toThrow(/test\.named-failure/);
+  });
+
+  it('settles the caller even when a provider rejects with a non-Error', async () => {
+    const { bridge } = await loadSerializingBridge();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const endpoint = bridge.buildProvider<string, void>('test.string-failure');
+    endpoint.provider(() => Promise.reject('just a string'));
+
+    const outcome = await settlesWithin(endpoint.invoke(), 'invoke');
+
+    expect(outcome.state).toBe('rejected');
+  });
+
+  it('leaves no error listener behind after a successful call', async () => {
+    const { bridge, getIncoming } = await loadLoopbackBridge();
+    const endpoint = bridge.buildProvider<string, void>('test.clean');
+    endpoint.provider(() => 'ok');
+
+    await expect(endpoint.invoke()).resolves.toBe('ok');
+
+    // Both channels are disposed on settle; a leaked listener would accumulate
+    // one per call for the lifetime of the process.
+    expect(bridge.hasListener('subscribe.callback-test.clean')).toBe(false);
+    expect(getIncoming()).toBeDefined();
   });
 
   it('routes renderer-owned queries through the subscribe protocol', async () => {

@@ -20,6 +20,7 @@ import ProjectInstructionsCard from './components/ProjectInstructionsCard';
 import ProjectKnowledgeCard from './components/ProjectKnowledgeCard';
 import ProjectNewChatComposer from './components/ProjectNewChatComposer';
 import { useProjectChats } from './hooks/useProjectChats';
+import { useProjectHubLayout } from './hooks/useProjectHubLayout';
 import { useProjectHome } from './hooks/useProjectHome';
 
 /**
@@ -50,6 +51,7 @@ const ProjectHomePage: React.FC = () => {
   const chats = useProjectChats(project);
   const layout = useLayoutContext();
   const isMobile = Boolean(layout?.isMobile);
+  const { hubRef, isHubStacked } = useProjectHubLayout();
 
   if (notFound || !project) {
     return (
@@ -71,7 +73,11 @@ const ProjectHomePage: React.FC = () => {
       <div data-testid='project-header-slot' className={styles.headerSlot}>
         <ProjectHeader project={project} />
       </div>
-      <div className={classNames(styles.hub, isMobile && styles.hubMobile)}>
+      <div
+        ref={hubRef}
+        data-testid='project-hub'
+        className={classNames(styles.hub, (isMobile || isHubStacked) && styles.hubMobile)}
+      >
         <div className={styles.main}>
           <div data-testid='project-composer-slot'>
             <ProjectNewChatComposer project={project} />

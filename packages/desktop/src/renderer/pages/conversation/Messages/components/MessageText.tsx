@@ -23,8 +23,12 @@ import HorizontalFileList from '@renderer/components/media/HorizontalFileList';
 import MarkdownView from '@renderer/components/Markdown';
 import { splitThinkContent, hasThinkTags } from '@renderer/utils/chat/thinkTagFilter';
 import { stripSkillSuggest, hasSkillSuggest } from '@renderer/utils/chat/skillSuggestParser';
-import { parseTemplatedSend } from '@/renderer/utils/chat/templatedSendParser';
-import { TemplateMessageCard } from '@/renderer/components/chat/TemplateGallery';
+import {
+  parseAssistantDirectiveSend,
+  parseTemplateReviewAnnouncement,
+  parseTemplatedSend,
+} from '@/renderer/utils/chat/templatedSendParser';
+import { TemplateMessageCard, TemplateReviewCard } from '@/renderer/components/chat/TemplateGallery';
 
 /**
  * Format a timestamp for message display.
@@ -252,7 +256,21 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
     () => (isUserMessage ? parseTemplatedSend(text, files) : null),
     [isUserMessage, text, files]
   );
-  const visibleText = templatedSend ? templatedSend.userText : text;
+  const assistantDirectiveSend = useMemo(
+    () => (isUserMessage && templatedSend === null ? parseAssistantDirectiveSend(text) : null),
+    [isUserMessage, templatedSend, text]
+  );
+  const templateReview = useMemo(
+    () => (!isUserMessage ? parseTemplateReviewAnnouncement(text) : null),
+    [isUserMessage, text]
+  );
+  const visibleText = templatedSend
+    ? templatedSend.userText
+    : assistantDirectiveSend
+      ? assistantDirectiveSend.userText
+      : templateReview
+        ? templateReview.visibleText
+        : text;
   const visibleFiles = templatedSend ? templatedSend.userFiles : files;
   const { data, json } = useFormatContent(visibleText);
   const shouldRevealStream = isStreaming && !isUserMessage && !json;
@@ -364,6 +382,9 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
           </div>
         )}
         {templatedSend && <TemplateMessageCard templateId={templatedSend.templateId} />}
+        {templateReview && conversationContext?.conversation_id && (
+          <TemplateReviewCard conversationId={conversationContext.conversation_id} filePath={templateReview.filePath} />
+        )}
         {/* The model's reasoning, kept and shown in grey above the answer (never erased). */}
         {!isUserMessage && !json && reasoning.trim() && (
           <div className='w-full mb-8px' data-testid='message-reasoning'>

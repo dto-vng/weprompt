@@ -294,6 +294,37 @@ describe('CreativeStudioService', () => {
     });
   });
 
+  it('reports the newest verified cut file and its render time without exposing a storage path', async () => {
+    const renderedCut: StudioAsset = {
+      id: 'render_1',
+      projectId: 'project_1',
+      sceneId: null,
+      mediaKind: 'video',
+      mimeType: 'video/mp4',
+      managedAsset: { collection: 'assets', fileName: 'render_1.mp4' },
+      byteSize: 512,
+      sha256: 'a'.repeat(64),
+      createdAt: '2026-08-07T04:05:06.000Z',
+    };
+    const getLatestProjectOutput = vi.fn(async () => renderedCut);
+    const renderService = createCreativeStudioService({
+      store,
+      onProjectUpdated,
+      storyboardPlanner: makePlanner(),
+      mediaStore: {
+        importReferenceFromPath: vi.fn(),
+        exportAssetsToDirectory: vi.fn(),
+        getLatestProjectOutput,
+      },
+    });
+
+    await expect(renderService.getLatestRender({ projectId: 'project_1' })).resolves.toEqual({
+      fileName: 'cut.mp4',
+      renderedAt: renderedCut.createdAt,
+    });
+    expect(getLatestProjectOutput).toHaveBeenCalledExactlyOnceWith('project_1');
+  });
+
   it('rejects a stale Brief binding revision without replacing the persisted conversation id', async () => {
     const project = await service.createProject(makeInput());
     await service.bindBriefConversation({
@@ -426,6 +457,7 @@ describe('CreativeStudioService', () => {
       mediaStore: {
         importReferenceFromPath: vi.fn(),
         exportAssetsToDirectory: vi.fn(),
+        getLatestProjectOutput: vi.fn(async () => null),
         persistCapturedPoster,
       },
     });
@@ -574,6 +606,109 @@ describe('CreativeStudioService', () => {
       expect(updated.revision).toBe(seeded.revision + 1);
       expect(stored?.cuts?.[cutId]?.clips[clipId]).toMatchObject(edit.clips[clipId]!);
       expect(stored?.activeCutId).toBe(cutId);
+    });
+
+    it('stores identity colour edits without zero-value filters', async () => {
+      const harness = await createCutHarness();
+      const seeded = await harness.store.updateProject(harness.project.id, (current) => {
+        const next = structuredClone(current);
+        addTake(next, 'scene_1', 'take_1', 5);
+        return next;
+      });
+      const opened = (await harness.service.getProject(seeded.id))!;
+      const cutId = opened.activeCutId!;
+      const edit = editableCut(opened.cuts![cutId]!);
+      const clipId = edit.clipOrder[0]!;
+      edit.clips[clipId] = {
+        ...edit.clips[clipId]!,
+        filters: [
+          { id: 'exposure', amount: 0 },
+          { id: 'contrast', amount: 0 },
+          { id: 'saturation', amount: 0 },
+          { id: 'temperature', amount: 0 },
+        ],
+      };
+
+      await harness.service.updateCut({
+        projectId: seeded.id,
+        expectedRevision: seeded.revision,
+        cutId,
+        cut: edit,
+      });
+
+      expect((await harness.store.getProject(seeded.id))?.cuts?.[cutId]?.clips[clipId]?.filters).toEqual([]);
+    });
+
+    it('keeps a new canonical take outside a manual cut until a guarded placement adds it', async () => {
+      const harness = await createCutHarness();
+      const withThirdScene = await harness.service.updateScene({
+        projectId: harness.project.id,
+        expectedRevision: harness.project.revision,
+        sceneId: 'scene_3',
+        scene: makeScene('scene_3'),
+      });
+      const seeded = await harness.store.updateProject(withThirdScene.id, (current) => {
+        const next = structuredClone(current);
+        addTake(next, 'scene_1', 'take_1', 5);
+        addTake(next, 'scene_2', 'take_2', 5);
+        addTake(next, 'scene_3', 'take_3', 5, false);
+        return next;
+      });
+      const opened = (await harness.service.getProject(seeded.id))!;
+      const cutId = opened.activeCutId!;
+      const manualEdit = editableCut(opened.cuts![cutId]!);
+      manualEdit.orderMode = 'manual';
+      manualEdit.clipOrder.reverse();
+      const manual = await harness.service.updateCut({
+        projectId: seeded.id,
+        expectedRevision: seeded.revision,
+        cutId,
+        cut: manualEdit,
+      });
+
+      const withNewTake = await harness.service.selectAsset({
+        projectId: seeded.id,
+        expectedRevision: manual.revision,
+        sceneId: 'scene_3',
+        assetId: 'take_3',
+      });
+      const manualCut = withNewTake.cuts![cutId]!;
+      expect(manualCut.clipOrder.map((clipId) => manualCut.clips[clipId]?.sceneId)).toEqual(['scene_2', 'scene_1']);
+
+      type PlacementService = typeof harness.service & {
+        placeCutScenes(input: {
+          projectId: string;
+          expectedRevision: number;
+          cutId: string;
+          sceneIds: string[];
+          beforeClipId: string | null;
+        }): Promise<StudioRendererProject>;
+      };
+      if (!('placeCutScenes' in harness.service)) {
+        expect.fail('expected a guarded cut placement command');
+      }
+      const placed = await (harness.service as PlacementService).placeCutScenes({
+        projectId: seeded.id,
+        expectedRevision: withNewTake.revision,
+        cutId,
+        sceneIds: ['scene_3'],
+        beforeClipId: manualCut.clipOrder[0]!,
+      });
+      const placedCut = placed.cuts![cutId]!;
+
+      expect(placedCut.orderMode).toBe('manual');
+      expect(placedCut.clipOrder.map((clipId) => placedCut.clips[clipId]?.sceneId)).toEqual([
+        'scene_3',
+        'scene_2',
+        'scene_1',
+      ]);
+      expect(placedCut.clips[placedCut.clipOrder[0]!]).toMatchObject({
+        assetId: 'take_3',
+        sourceInSeconds: null,
+        sourceOutSeconds: null,
+        crop: null,
+        filters: [],
+      });
     });
 
     it('projects persisted cuts with deep-cloned orders, crops, and filters', async () => {
@@ -777,6 +912,35 @@ describe('CreativeStudioService', () => {
       });
 
       expect(updated.cuts?.[cutId]?.orderMode).toBe('storyboard');
+    });
+
+    it('marks a storyboard cut manual when a clip edit diverges from it', async () => {
+      const harness = await createCutHarness();
+      const seeded = await harness.store.updateProject(harness.project.id, (current) => {
+        const next = structuredClone(current);
+        addTake(next, 'scene_1', 'take_1', 5);
+        return next;
+      });
+      const opened = (await harness.service.getProject(seeded.id))!;
+      const cutId = opened.activeCutId!;
+      const edit = editableCut(opened.cuts![cutId]!);
+      const clipId = edit.clipOrder[0]!;
+      edit.clips[clipId] = {
+        ...edit.clips[clipId]!,
+        sourceInSeconds: 0.5,
+        sourceOutSeconds: 4.5,
+        crop: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+        filters: [{ id: 'temperature', amount: -0.25 }],
+      };
+
+      const updated = await harness.service.updateCut({
+        projectId: seeded.id,
+        expectedRevision: seeded.revision,
+        cutId,
+        cut: edit,
+      });
+
+      expect(updated.cuts?.[cutId]?.orderMode).toBe('manual');
     });
 
     it('passes the caller revision through the guarded cut path and rejects stale writes closed', async () => {

@@ -220,7 +220,8 @@
     "codes": {
       "TEAM_ASSISTANT_ID_REQUIRED": "Please select an assistant before creating the team.",
       "TEAM_ASSISTANT_NOT_FOUND": "Assistant {{assistantId}} is no longer available. Refresh the assistant list and choose another one.",
-      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Use assistant_id instead of {{field}}."
+      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Use assistant_id instead of {{field}}.",
+      "TEAM_MEMBER_MODEL_UNRESOLVED": "No model is available for this team member. Add or enable a model provider in Settings, then try again."
     }
   },
   "agentError": {
@@ -347,6 +348,10 @@
       "USER_LLM_PROVIDER_RATE_LIMITED": {
         "title": "Se alcanzó el límite de velocidad del proveedor",
         "body": "El proveedor está limitando temporalmente las solicitudes. Espera un momento, reduce la frecuencia de solicitudes o cambia de modelo."
+      },
+      "USER_LLM_PROVIDER_QUOTA_EXHAUSTED": {
+        "title": "Cuota del proveedor de modelos agotada",
+        "body": "La cuenta del proveedor se ha quedado sin saldo o cuota, así que esperar no servirá. Añade crédito a la cuenta, revisa su plan de facturación o cambia a otro modelo."
       },
       "USER_LLM_PROVIDER_TIMEOUT": {
         "title": "Tiempo de espera del proveedor agotado",
@@ -515,6 +520,8 @@
     "changes": {
       "tab": "Cambios",
       "filesTab": "Archivos",
+      "previewTab": "Vista previa",
+      "browserTab": "Navegador",
       "currentBranchLabel": "Rama actual",
       "summary": "{{count}} archivo(s) modificado(s)",
       "insertions": "+{{count}} inserciones",
@@ -636,10 +643,6 @@
     "contextWindow": "Ventana de contexto",
     "percentUsed": "{{percent}} % usado",
     "tokenCount": "{{used}} de {{limit}} tokens",
-    "localTokenUsage": "Uso local de tokens",
-    "today": "Hoy",
-    "weekToDate": "Semana hasta la fecha",
-    "monthToDate": "Mes hasta la fecha",
     "triggerLabel": "Mostrar uso del contexto",
     "estimated": "Estimado",
     "unavailable": "Uso del contexto no disponible"
@@ -924,7 +927,7 @@
         "continueToProduce": "Continuar a Producir",
         "askAssistant": "Preguntar al asistente",
         "assistantTitle": "Asistente de escritura",
-        "assistantDescription": "Usa el asistente para desarrollar la estructura de la historia, ideas de planos y prompts.",
+        "assistantDescription": "Crea un borrador de storyboard a partir de tu brief.",
         "textChargeDisclosure": "El borrador del guion gráfico usa el modelo de texto configurado. El proveedor puede cobrar por el uso del modelo.",
         "draftStoryboard": "Crear borrador del guion gráfico",
         "addShot": "Añadir plano",
@@ -993,10 +996,67 @@
         "openProduce": "Abrir Producir",
         "handoffDescription": "La entrega contiene únicamente el manifiesto del guion gráfico y el contenido seleccionado. Las claquetas de revisión no se exportan.",
         "partialHandoff": "Esta entrega es parcial porque algunos planos no tienen contenido seleccionado.",
+        "cut": {
+          "duration": {
+            "played": "Reproducido {{seconds}} s",
+            "untrimmed": "Original {{seconds}} s",
+            "render": "Renderiza {{seconds}} s"
+          },
+          "trimmed": "Recortado",
+          "graded": "Etalonado",
+          "clipAccessible": "Clip {{number}}, {{title}}, {{seconds}} segundos",
+          "dragClip": "Arrastra {{title}} para reordenar",
+          "moveAnnouncement": "El clip {{clip}} se movió a la posición {{position}} de {{total}}. El orden del montaje ahora es tuyo.",
+          "playhead": "Cabezal del montaje",
+          "secondsValue": "{{seconds}} segundos",
+          "trimInHandle": "Control de entrada",
+          "trimOutHandle": "Control de salida",
+          "inspector": "Inspector del clip",
+          "selectClip": "Selecciona un clip o una claqueta para inspeccionarlo.",
+          "takes": "Tomas",
+          "trim": "Recorte",
+          "inPoint": "Entrada",
+          "outPoint": "Salida",
+          "trimInField": "Punto de entrada en segundos",
+          "trimOutField": "Punto de salida en segundos",
+          "setIn": "Fijar I en el cabezal",
+          "setOut": "Fijar O en el cabezal",
+          "frame": "Encuadre",
+          "scale": "Escala del recorte",
+          "scaleValue": "{{percent}}%",
+          "cropHint": "Las flechas desplazan el recorte; mantén Mayús para avanzar diez pasos.",
+          "cropOverlay": "Marco de recorte",
+          "colour": "Color",
+          "colourLabels": {
+            "exposure": "Exposición",
+            "contrast": "Contraste",
+            "saturation": "Saturación",
+            "temperature": "Temperatura"
+          },
+          "resetClip": "Restablecer este clip",
+          "noUndo": "No se puede deshacer. Restablecer este clip devuelve el recorte, el encuadre y el color a sus valores predeterminados.",
+          "divergence": "Tu versión · editada a mano",
+          "resyncTitle": "¿Volver a sincronizar el orden?",
+          "resyncDescription": "Se recuperará el orden del storyboard. Se conservarán los recortes, encuadres y filtros de color.",
+          "resyncAction": "Sincronizar con el storyboard",
+          "outsideTitle": "Aún no está en el montaje",
+          "outsideDescription": "Estas escenas tienen una toma, pero están fuera de tu montaje manual.",
+          "placeIt": "Colocar {{title}}…",
+          "placeBefore": "Antes de {{number}} · {{title}}",
+          "addToEnd": "Añadir {{title}} al final",
+          "addAllToEnd": "Añadir todo al final",
+          "volume": "Volumen de la vista previa"
+        },
         "render": {
+          "footer": "Renderizar montaje",
           "action": "Renderizar vídeo",
           "progress": "Renderizando vídeo… {{percent}}%",
+          "progressWithClip": "Renderizando vídeo… {{percent}}% · Clip {{clip}} de {{total}}",
           "cancel": "Cancelar renderizado",
+          "busyReason": "Este proyecto ya se está renderizando. Espera a que termine o cancélalo desde la ventana que lo inició.",
+          "installFfmpeg": "Instalar FFmpeg",
+          "tryAgain": "Reintentar renderizado",
+          "openProduce": "Ir a Producir",
           "missingScenes": "{{count}} escenas no tienen toma y no aparecerán en el vídeo.",
           "missingScenes_one": "{{count}} escena no tiene toma y no aparecerá en el vídeo.",
           "missingScenes_other": "{{count}} escenas no tienen toma y no aparecerán en el vídeo.",
@@ -1006,6 +1066,11 @@
             "busy": "Este proyecto ya se está renderizando.",
             "noRenderableScenes": "Ninguna escena tiene una toma para renderizar.",
             "failed": "No se pudo renderizar el vídeo.",
+            "failedClip": "No se pudo renderizar el clip {{clip}} de {{total}}.",
+            "noRenderableShots": "Los planos {{shots}} no tienen clips renderizables.",
+            "noRenderableShots_one": "El plano {{shots}} no tiene clips renderizables.",
+            "noRenderableShots_many": "Los planos {{shots}} no tienen clips renderizables.",
+            "noRenderableShots_other": "Los planos {{shots}} no tienen clips renderizables.",
             "cancelled": "Renderizado de vídeo cancelado."
           }
         }
@@ -1303,6 +1368,11 @@
     "export": {
       "title": "Exportar recursos",
       "body": "Exporta el manifiesto del guion gráfico y el recurso seleccionado de cada escena.",
+      "checkingRender": "Comprobando el montaje renderizado…",
+      "noRender": "Aún no renderizado",
+      "renderedAt": "Renderizado",
+      "staleRender": "Este montaje se renderizó antes de tus últimos cambios.",
+      "latestRenderUnavailable": "No se pudo comprobar el último montaje renderizado. Vuelve a abrir Exportar.",
       "gapWarning": "Los planos {{shots}} siguen siendo claquetas y no se incluirán.",
       "gapWarning_one": "El plano {{shots}} sigue siendo una claqueta y no se incluirá.",
       "gapWarning_many": "Los planos {{shots}} siguen siendo claquetas y no se incluirán.",

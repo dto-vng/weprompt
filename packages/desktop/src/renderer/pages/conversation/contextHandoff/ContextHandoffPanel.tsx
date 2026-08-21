@@ -10,11 +10,15 @@ import { useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
 import { usePreviewContext } from '@/renderer/pages/conversation/Preview';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
 import { emitter, useAddEventListener } from '@/renderer/utils/emitter';
-import { Button, Input, Message, Modal, Progress, Space, Tooltip, Typography } from '@arco-design/web-react';
+import { Button, Input, Message, Modal, Space, Tooltip, Typography } from '@arco-design/web-react';
 import { Add, Attention, Delete, Edit, FileText, Pin } from '@icon-park/react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { resolveConversationContextBudgetSnapshot } from './contextBudget';
+import {
+  getActiveContextBudget,
+  resolveConversationContextBudgetSnapshot,
+  subscribeActiveContextBudget,
+} from './contextBudget';
 import { buildContextHandoffExtraPatch } from './contextConversationUpdate';
 import { resolveContextFile } from './contextFile';
 import { buildContextMarkdown } from './contextMarkdown';
@@ -47,18 +51,6 @@ type PinDraft = {
 type AionrsConversation = Extract<TChatConversation, { type: 'aionrs' }>;
 
 const EMPTY_PIN_DRAFT: PinDraft = { title: '', content: '' };
-
-const formatBudgetRatio = (ratio: number | null): string => {
-  if (ratio === null) return '--';
-  const percent = ratio * 100;
-  if (percent > 0 && percent < 1) return '<1%';
-  return `${Math.round(percent)}%`;
-};
-
-const budgetPercent = (ratio: number | null): number => {
-  if (ratio === null) return 0;
-  return Math.min(100, Math.max(0, Math.round(ratio * 100)));
-};
 
 const isAionrsConversation = (conversation: TChatConversation | null): conversation is AionrsConversation => {
   return conversation?.type === 'aionrs';
@@ -149,7 +141,7 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
   const hasContextError = !isCompacting && currentContextFile.status === 'failed';
   const contextErrorMessage = t(getContextErrorKey(currentContextFile.last_error_code));
   const contextFileName = currentContextFile.context_file_name || resolveContextFile(workspace).fileName;
-  const budget = useMemo(
+  const fallbackBudget = useMemo(
     () =>
       resolveConversationContextBudgetSnapshot({
         conversation,
@@ -159,6 +151,13 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
       }),
     [conversation, loadedMcpStatuses, loadedSkills, messages]
   );
+  const subscribeToActiveBudget = useCallback(
+    (listener: () => void) => subscribeActiveContextBudget(conversationId, listener),
+    [conversationId]
+  );
+  const getActiveBudgetSnapshot = useCallback(() => getActiveContextBudget(conversationId), [conversationId]);
+  const activeBudget = useSyncExternalStore(subscribeToActiveBudget, getActiveBudgetSnapshot, getActiveBudgetSnapshot);
+  const budget = activeBudget ?? fallbackBudget;
 
   const updateContextHandoff = useCallback(
     async (source: AionrsConversation, updates: Partial<TContextHandoffExtra>) => {
@@ -336,24 +335,6 @@ const ContextHandoffPanel: React.FC<ContextHandoffPanelProps> = ({
               </span>
             </Tooltip>
           )}
-        </div>
-        <div className='context-handoff-budget'>
-          <div className='context-handoff-budget-label'>
-            <span>{t('conversation.contextHandoff.budgetLabel')}</span>
-            <span>
-              {budget.ratio === null
-                ? '--'
-                : budget.source === 'estimated'
-                  ? `${t('conversation.contextUsage.estimated')} · ${formatBudgetRatio(budget.ratio)}`
-                  : formatBudgetRatio(budget.ratio)}
-            </span>
-          </div>
-          <Progress
-            percent={budgetPercent(budget.ratio)}
-            showText={false}
-            size='small'
-            color={`rgb(var(--${budget.status === 'too_large' ? 'danger' : budget.status === 'compress' ? 'warning' : 'primary'}-6))`}
-          />
         </div>
       </div>
 

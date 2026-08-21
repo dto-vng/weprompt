@@ -297,6 +297,68 @@ describe('AssistantSelectionArea', () => {
 
     expect(screen.getByTestId('preset-pill-bare-aionrs')).toBeInTheDocument();
   });
+
+  /**
+   * Measured in the running app at a 1209px window, project home, dark theme.
+   * The composer column was 394→772; the hero bar hugged its single visible
+   * pill at 470→696 and painted `--color-guid-agent-bar` (#1e2536) — a third
+   * surface, matching neither the composer below it (#161c27) nor the card
+   * around it (#232324). Stranded in 378px of card, that reads as a floating
+   * island rather than part of the composer.
+   *
+   * jsdom gives every element a zero width, so the span itself cannot be
+   * asserted here; the classes and the surface variable that produce it can.
+   * That is weaker than a rendered measurement and is the strongest guard
+   * this layer offers.
+   */
+  const renderBar = (variant?: 'hero' | 'inline') => {
+    const { container } = render(
+      <AssistantSelectionArea
+        selectedAssistantId='bare-aionrs'
+        assistants={assistants()}
+        localeKey='en-US'
+        variant={variant}
+        onSelectAssistant={vi.fn()}
+      />
+    );
+
+    const bar = container.querySelector<HTMLElement>('[data-assistant-bar-variant]');
+    if (!bar) throw new Error('assistant bar not rendered');
+    return { bar, row: bar.parentElement as HTMLElement, outer: bar.parentElement?.parentElement as HTMLElement };
+  };
+
+  it('defaults to the hero bar: hugs its pills, centres, and keeps its own surface', () => {
+    const { bar, row } = renderBar();
+
+    expect(bar.dataset.assistantBarVariant).toBe('hero');
+    // classList, not a substring match: `max-w-full` contains `w-full`.
+    expect(bar.classList.contains('inline-flex')).toBe(true);
+    expect(bar.classList.contains('w-full')).toBe(false);
+    expect(row.classList.contains('justify-center')).toBe(true);
+    expect(bar.style.background).toBe('var(--color-guid-agent-bar, var(--aou-2))');
+  });
+
+  it('spans the full column on the inline surface so it lines up with the composer beneath it', () => {
+    const { bar, row } = renderBar('inline');
+
+    expect(bar.classList.contains('w-full')).toBe(true);
+    expect(bar.classList.contains('inline-flex')).toBe(false);
+    expect(row.classList.contains('justify-center')).toBe(false);
+    // `w-full` alone is not enough: the bar is a flex item, and `min-width: auto`
+    // lets it grow past the column to its content's min-content width. Measured
+    // at an 880px window, where the project-home grid crushes this card to 43px,
+    // the bar sat at 394→449 against a 394→437 composer until these were added.
+    expect(bar.classList.contains('min-w-0')).toBe(true);
+    expect(bar.classList.contains('max-w-full')).toBe(true);
+    // Same variable the composer shell paints itself with (`.guidInputCardWrap`),
+    // so the bar and the input read as one control instead of two surfaces.
+    expect(bar.style.background).toBe('var(--bg-2)');
+  });
+
+  it('drops the hero top margin inline, where the card body already provides the gap', () => {
+    expect(renderBar('inline').outer.classList.contains('mt-18px')).toBe(false);
+    expect(renderBar().outer.classList.contains('mt-18px')).toBe(true);
+  });
 });
 
 function assistants(): Assistant[] {

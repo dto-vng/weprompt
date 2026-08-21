@@ -6,6 +6,16 @@
 
 import { ipcBridge } from '@/common';
 import type { TChatConversation } from '@/common/config/storage';
+
+/**
+ * Creative Studio creates its own conversations to drive the Brief phase, stamping
+ * `studio_project_id` on them. They belong to the Studio surface, which owns their
+ * lifecycle and navigation — listing them in the chat sidebar too puts a second,
+ * lossier entry point in front of work Studio already presents properly. Filtered
+ * here rather than in `useConversations`, which also feeds the Project home list.
+ */
+const isStudioConversation = (conversation?: TChatConversation): boolean =>
+  Boolean(conversation?.extra?.studio_project_id);
 import AionModal from '@/renderer/components/base/AionModal';
 import DirectorySelectionModal from '@/renderer/components/settings/DirectorySelectionModal';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
@@ -13,7 +23,10 @@ import { useCronJobsMap } from '@/renderer/pages/cron';
 import { restrictToVerticalAxis } from '@/renderer/utils/ui/dndModifiers';
 import { ProjectCreateModal } from '@/renderer/pages/conversation/projects/ProjectCreateModal';
 import { buildProjectSidebarGroups } from '@/renderer/pages/conversation/projects/projectGrouping';
-import { resolveProjectClickTarget } from '@/renderer/pages/conversation/projects/projectNavigation';
+import {
+  buildProjectHomePath,
+  resolveProjectClickTarget,
+} from '@/renderer/pages/conversation/projects/projectNavigation';
 import { createProject, updateProject } from '@/renderer/pages/conversation/projects/projectStorage';
 import { useProjects } from '@/renderer/pages/conversation/projects/useProjects';
 import { emitter } from '@/renderer/utils/emitter';
@@ -42,9 +55,20 @@ import type { ConversationRowProps, WorkspaceGroupedHistoryProps } from './types
  * so both kinds of sidebar row present their actions identically. `!flex`
  * beats `.arco-btn`'s own `display` so the icon actually centres.
  */
-const PROJECT_ROW_ACTION_CLASS =
-  '!flex items-center justify-center !w-20px !h-20px !min-w-20px !p-0 !rounded-4px !text-t-secondary hover:!text-t-primary sider-action-btn';
-const PROJECT_DISCLOSURE_CLASS = `${PROJECT_ROW_ACTION_CLASS} focus-visible:[outline:2px_solid_rgb(var(--primary-6))] focus-visible:outline-offset-2`;
+// 22px, matching the sider section-label '+' buttons. At 20px the 14px icon centres
+// 3px from the button edge instead of 4px, so the icons landed 1px apart even once
+// their containers were aligned — the residue of the 5px gap this fixed.
+const PROJECT_ROW_ACTION_BASE =
+  '!flex items-center justify-center !w-22px !h-22px !min-w-22px !p-0 !rounded-4px !text-t-secondary hover:!text-t-primary';
+const PROJECT_ROW_ACTION_CLASS = `${PROJECT_ROW_ACTION_BASE} sider-action-btn`;
+/**
+ * The disclosure chevron deliberately omits `sider-action-btn`. That class paints an
+ * opaque backing so a row's HOVER actions mask the title they overlay; the chevron is
+ * always visible and overlays nothing, so the backing just rendered a filled box next
+ * to the bare section-label '+' buttons it is sized to match. It keeps the hover and
+ * focus treatment, and only loses the resting fill.
+ */
+const PROJECT_DISCLOSURE_CLASS = `${PROJECT_ROW_ACTION_BASE} focus-visible:[outline:2px_solid_rgb(var(--primary-6))] focus-visible:outline-offset-2`;
 
 const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
   onSessionClick,
@@ -79,6 +103,35 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
     collapsedSections,
     toggleSection,
   } = useConversations();
+
+  const visiblePinnedConversations = useMemo(
+    () => pinnedConversations.filter((conversation) => !isStudioConversation(conversation)),
+    [pinnedConversations]
+  );
+
+  // A Studio conversation can sit directly in a timeline section or inside a workspace
+  // group, so both shapes are filtered; a group emptied by the filter is dropped rather
+  // than left as a header with nothing beneath it.
+  const visibleTimelineSections = useMemo(
+    () =>
+      timelineSections
+        .map((section) => ({
+          ...section,
+          items: section.items.flatMap((item) => {
+            if (item.type === 'conversation') {
+              return isStudioConversation(item.conversation) ? [] : [item];
+            }
+            if (!item.workspaceGroup) return [item];
+            const conversations = item.workspaceGroup.conversations.filter(
+              (conversation) => !isStudioConversation(conversation)
+            );
+            if (conversations.length === 0) return [];
+            return [{ ...item, workspaceGroup: { ...item.workspaceGroup, conversations } }];
+          }),
+        }))
+        .filter((section) => section.items.length > 0),
+    [timelineSections]
+  );
 
   const SectionLabel = useCallback(
     ({ sectionKey, label, trailing }: { sectionKey: string; label: string; trailing?: React.ReactNode }) => {
@@ -179,7 +232,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
   });
 
   const { sensors, handleDragEnd, isDragEnabled } = useDragAndDrop({
-    pinnedConversations,
+    pinnedConversations: visiblePinnedConversations,
     batchMode,
     collapsed,
   });
@@ -275,11 +328,11 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
   };
 
   // Collect all sortable IDs for the pinned section
-  const pinnedIds = useMemo(() => pinnedConversations.map((c) => c.id), [pinnedConversations]);
+  const pinnedIds = useMemo(() => visiblePinnedConversations.map((c) => c.id), [visiblePinnedConversations]);
 
   const projectGroups = useMemo(
-    () => buildProjectSidebarGroups(projects, timelineSections),
-    [projects, timelineSections]
+    () => buildProjectSidebarGroups(projects, visibleTimelineSections),
+    [projects, visibleTimelineSections]
   );
 
   const navigateToProjectChat = useCallback(
@@ -375,13 +428,13 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
   // Conversations section: keep timeline grouping (today/yesterday/...) but only show non-workspace conversations.
   const conversationOnlySections = useMemo(
     () =>
-      timelineSections
+      visibleTimelineSections
         .map((section) => ({
           ...section,
           items: section.items.filter((item) => item.type === 'conversation' && item.conversation),
         }))
         .filter((section) => section.items.length > 0),
-    [timelineSections]
+    [visibleTimelineSections]
   );
 
   const batchSelectionPanel =
@@ -559,7 +612,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
         onCreated={(project) => {
           refreshProjects();
           setProjectCreateVisible(false);
-          navigateToProjectChat(project.workspace, project.id);
+          void navigate(buildProjectHomePath(project.id));
         }}
       />
 
@@ -571,13 +624,13 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
           modifiers={[restrictToVerticalAxis]}
           onDragEnd={handleDragEnd}
         >
-          {pinnedConversations.length > 0 && (
+          {visiblePinnedConversations.length > 0 && (
             <div className='min-w-0'>
               {!collapsed && <SectionLabel sectionKey='pinned' label={t('conversation.history.pinnedSection')} />}
               {!collapsedSections.has('pinned') && (
                 <SortableContext items={pinnedIds} strategy={verticalListSortingStrategy}>
                   <div className='min-w-0'>
-                    {pinnedConversations.map((conversation) => {
+                    {visiblePinnedConversations.map((conversation) => {
                       const props = getConversationRowProps(conversation);
                       return isDragEnabled ? (
                         <SortableConversationRow key={conversation.id} {...props} />
@@ -779,7 +832,7 @@ const WorkspaceGroupedHistory: React.FC<WorkspaceGroupedHistoryProps> = ({
 
         {/* L1: Conversations section — peer to projects, internally split by timeline */}
         {(conversationOnlySections.length > 0 ||
-          (timelineSections.length === 0 && pinnedConversations.length === 0)) && (
+          (visibleTimelineSections.length === 0 && visiblePinnedConversations.length === 0)) && (
           <div className='min-w-0'>
             {!collapsed && (
               <SectionLabel

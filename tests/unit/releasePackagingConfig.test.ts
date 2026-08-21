@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -8,6 +8,63 @@ import { gte, major } from 'semver';
 
 const projectRoot = resolve(__dirname, '../..');
 const itWithBash = spawnSync('bash', ['--version'], { encoding: 'utf8' }).status === 0 ? it : it.skip;
+
+type PresentationTemplateInventoryEntry = {
+  id: string;
+  format: 'html' | 'pptx' | 'docx';
+  packagedReferenceFile: string | null;
+};
+
+type PresentationTemplateInventoryModule = {
+  readPresentationTemplateInventory: (manifestPath: string) => PresentationTemplateInventoryEntry[];
+  expectedPresentationTemplateFiles: (inventory: PresentationTemplateInventoryEntry[]) => string[];
+  assertPresentationTemplateResources: (options: {
+    inventory: PresentationTemplateInventoryEntry[];
+    resourcesDirectory: string;
+  }) => string[];
+};
+
+const REQUIRED_PRESENTATION_TEMPLATE_INVENTORY: PresentationTemplateInventoryEntry[] = [
+  { id: 'editorial-field-report', format: 'html', packagedReferenceFile: null },
+  { id: 'simple-light', format: 'html', packagedReferenceFile: null },
+  { id: 'simple-dark', format: 'html', packagedReferenceFile: null },
+  { id: 'market-trends-report', format: 'html', packagedReferenceFile: null },
+  { id: 'business-review', format: 'pptx', packagedReferenceFile: 'business-review.pptx' },
+  { id: 'project-kickoff', format: 'pptx', packagedReferenceFile: 'project-kickoff.pptx' },
+  { id: 'monthly-steerco', format: 'pptx', packagedReferenceFile: 'monthly-steerco.pptx' },
+  { id: 'connected-ops', format: 'pptx', packagedReferenceFile: 'connected-ops.pptx' },
+  { id: 'business-report', format: 'docx', packagedReferenceFile: 'business-report.docx' },
+  { id: 'decision-memo', format: 'docx', packagedReferenceFile: 'decision-memo.docx' },
+  { id: 'operations-guide', format: 'docx', packagedReferenceFile: 'operations-guide.docx' },
+  { id: 'proposal-sow', format: 'docx', packagedReferenceFile: 'proposal-sow.docx' },
+];
+
+const EXPECTED_PRESENTATION_TEMPLATE_FILES = REQUIRED_PRESENTATION_TEMPLATE_INVENTORY.flatMap((entry) =>
+  entry.packagedReferenceFile ? [entry.packagedReferenceFile] : []
+);
+
+function loadPresentationTemplateInventoryModule(): PresentationTemplateInventoryModule {
+  const projectRequire = createRequire(resolve(projectRoot, 'package.json'));
+  return projectRequire(
+    resolve(projectRoot, 'packages/shared-scripts/src/presentation-template-inventory.js')
+  ) as PresentationTemplateInventoryModule;
+}
+
+function createInventoryManifest(contents: unknown): { root: string; manifestPath: string } {
+  const root = mkdtempSync(resolve(tmpdir(), 'weprompt-template-inventory-'));
+  const manifestPath = resolve(root, 'manifest.json');
+  writeFileSync(manifestPath, `${JSON.stringify(contents, null, 2)}\n`);
+  return { root, manifestPath };
+}
+
+function createPresentationTemplateResources(): string {
+  const root = mkdtempSync(resolve(tmpdir(), 'weprompt-template-resources-'));
+  writeFileSync(resolve(root, 'manifest.json'), `${JSON.stringify(REQUIRED_PRESENTATION_TEMPLATE_INVENTORY)}\n`);
+  for (const fileName of EXPECTED_PRESENTATION_TEMPLATE_FILES) {
+    writeFileSync(resolve(root, fileName), fileName);
+  }
+  return root;
+}
 
 function readProjectFile(path: string): string {
   return readFileSync(resolve(projectRoot, path), 'utf8');
@@ -38,6 +95,308 @@ function yamlBlock(content: string, key: string): string {
 }
 
 describe('release packaging configuration', () => {
+  describe('built-in presentation template inventory', () => {
+    it('defines all builtin ids with exact format and packaged reference pairs', () => {
+      const { readPresentationTemplateInventory } = loadPresentationTemplateInventoryModule();
+      const inventory = readPresentationTemplateInventory(
+        resolve(projectRoot, 'packages/desktop/resources/presentation-templates/manifest.json')
+      );
+
+      expect(inventory).toEqual(REQUIRED_PRESENTATION_TEMPLATE_INVENTORY);
+    });
+
+    it('copies the desktop template resources to the packaged presentation-templates directory', () => {
+      const config = readProjectFile('packages/desktop/electron-builder.yml');
+
+      expect(config).toMatch(
+        /^\s+- from: packages\/desktop\/resources\/presentation-templates\s*\n\s+to: presentation-templates$/m
+      );
+      expect(config).not.toMatch(/^\s+- from: resources\/presentation-templates$/m);
+    });
+
+    it('derives the exact eight binary references from the inventory', () => {
+      const { expectedPresentationTemplateFiles } = loadPresentationTemplateInventoryModule();
+
+      expect(expectedPresentationTemplateFiles(REQUIRED_PRESENTATION_TEMPLATE_INVENTORY)).toEqual(
+        EXPECTED_PRESENTATION_TEMPLATE_FILES
+      );
+    });
+
+    it('keeps the source resource directory identical to the declared binary inventory', () => {
+      const { readPresentationTemplateInventory, assertPresentationTemplateResources } =
+        loadPresentationTemplateInventoryModule();
+      const resourcesDirectory = resolve(projectRoot, 'packages/desktop/resources/presentation-templates');
+      const inventory = readPresentationTemplateInventory(resolve(resourcesDirectory, 'manifest.json'));
+
+      expect(assertPresentationTemplateResources({ inventory, resourcesDirectory })).toEqual(
+        EXPECTED_PRESENTATION_TEMPLATE_FILES
+      );
+    });
+
+    it.each([
+      {
+        caseName: 'duplicate ids',
+        inventory: [
+          { id: 'duplicate', format: 'html', packagedReferenceFile: null },
+          { id: 'duplicate', format: 'pptx', packagedReferenceFile: 'duplicate.pptx' },
+        ],
+        message: /duplicate template id/i,
+      },
+      {
+        caseName: 'duplicate packaged files',
+        inventory: [
+          { id: 'first', format: 'pptx', packagedReferenceFile: 'shared.pptx' },
+          { id: 'second', format: 'pptx', packagedReferenceFile: 'shared.pptx' },
+        ],
+        message: /duplicate packaged reference file/i,
+      },
+      {
+        caseName: 'duplicate packaged files that differ only by case',
+        inventory: [
+          { id: 'first', format: 'pptx', packagedReferenceFile: 'shared.pptx' },
+          { id: 'second', format: 'pptx', packagedReferenceFile: 'SHARED.pptx' },
+        ],
+        message: /duplicate packaged reference file/i,
+      },
+      {
+        caseName: 'a PPTX entry with a DOCX extension',
+        inventory: [{ id: 'wrong-extension', format: 'pptx', packagedReferenceFile: 'wrong-extension.docx' }],
+        message: /must use the \.pptx extension/i,
+      },
+      {
+        caseName: 'a DOCX entry with a PPTX extension',
+        inventory: [{ id: 'wrong-extension', format: 'docx', packagedReferenceFile: 'wrong-extension.pptx' }],
+        message: /must use the \.docx extension/i,
+      },
+      {
+        caseName: 'an HTML entry with a packaged reference',
+        inventory: [{ id: 'html-with-reference', format: 'html', packagedReferenceFile: 'unexpected.pptx' }],
+        message: /html.*null/i,
+      },
+    ])('rejects $caseName', ({ inventory, message }) => {
+      const { readPresentationTemplateInventory } = loadPresentationTemplateInventoryModule();
+      const { root, manifestPath } = createInventoryManifest(inventory);
+
+      try {
+        expect(() => readPresentationTemplateInventory(manifestPath)).toThrow(message);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it.each(['../escape.pptx', 'nested/escape.pptx', 'nested\\escape.pptx', '/escape.pptx', 'C:\\escape.pptx'])(
+      'rejects non-basename packaged reference %s',
+      (packagedReferenceFile) => {
+        const { readPresentationTemplateInventory } = loadPresentationTemplateInventoryModule();
+        const { root, manifestPath } = createInventoryManifest([
+          { id: 'unsafe-path', format: 'pptx', packagedReferenceFile },
+        ]);
+
+        try {
+          expect(() => readPresentationTemplateInventory(manifestPath)).toThrow(/basename/i);
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      }
+    );
+
+    it.each(['Uppercase.pptx', 'under_score.pptx', 'r\u00e9sum\u00e9.pptx', 'colon:name.pptx'])(
+      'rejects non-portable packaged reference %s',
+      (packagedReferenceFile) => {
+        const { readPresentationTemplateInventory } = loadPresentationTemplateInventoryModule();
+        const { root, manifestPath } = createInventoryManifest([
+          { id: 'non-portable-reference', format: 'pptx', packagedReferenceFile },
+        ]);
+
+        try {
+          expect(() => readPresentationTemplateInventory(manifestPath)).toThrow();
+        } finally {
+          rmSync(root, { recursive: true, force: true });
+        }
+      }
+    );
+
+    it.each([
+      { format: 'pptx', packagedReferenceFile: 'con.pptx' },
+      { format: 'docx', packagedReferenceFile: 'aux.docx' },
+      { format: 'pptx', packagedReferenceFile: 'com1.pptx' },
+      { format: 'docx', packagedReferenceFile: 'lpt9.docx' },
+    ] as const)('rejects reserved packaged reference $packagedReferenceFile', ({ format, packagedReferenceFile }) => {
+      const { readPresentationTemplateInventory } = loadPresentationTemplateInventoryModule();
+      const { root, manifestPath } = createInventoryManifest([
+        { id: 'reserved-reference', format, packagedReferenceFile },
+      ]);
+
+      try {
+        expect(() => readPresentationTemplateInventory(manifestPath)).toThrow();
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it.each([
+      { caseName: 'a non-array root', manifest: { templates: [] }, message: /json array/i },
+      {
+        caseName: 'an unsupported format',
+        manifest: [{ id: 'unsupported', format: 'pdf', packagedReferenceFile: null }],
+        message: /unsupported format/i,
+      },
+      {
+        caseName: 'an unexpected entry field',
+        manifest: [{ id: 'extra-field', format: 'html', packagedReferenceFile: null, extra: true }],
+        message: /exactly.*id.*format.*packagedReferenceFile/i,
+      },
+    ])('rejects strict-schema violation: $caseName', ({ manifest, message }) => {
+      const { readPresentationTemplateInventory } = loadPresentationTemplateInventoryModule();
+      const { root, manifestPath } = createInventoryManifest(manifest);
+
+      try {
+        expect(() => readPresentationTemplateInventory(manifestPath)).toThrow(message);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects malformed inventory JSON', () => {
+      const { readPresentationTemplateInventory } = loadPresentationTemplateInventoryModule();
+      const root = mkdtempSync(resolve(tmpdir(), 'weprompt-template-inventory-'));
+      const manifestPath = resolve(root, 'manifest.json');
+      writeFileSync(manifestPath, '{');
+
+      try {
+        expect(() => readPresentationTemplateInventory(manifestPath)).toThrow(/invalid json/i);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it('accepts only the exact binary files declared by the inventory', () => {
+      const { assertPresentationTemplateResources } = loadPresentationTemplateInventoryModule();
+      const resourcesDirectory = createPresentationTemplateResources();
+
+      try {
+        expect(
+          assertPresentationTemplateResources({
+            inventory: REQUIRED_PRESENTATION_TEMPLATE_INVENTORY,
+            resourcesDirectory,
+          })
+        ).toEqual(EXPECTED_PRESENTATION_TEMPLATE_FILES);
+      } finally {
+        rmSync(resourcesDirectory, { recursive: true, force: true });
+      }
+    });
+
+    it.each(EXPECTED_PRESENTATION_TEMPLATE_FILES)('rejects resources missing %s', (missingFile) => {
+      const { assertPresentationTemplateResources } = loadPresentationTemplateInventoryModule();
+      const resourcesDirectory = createPresentationTemplateResources();
+      rmSync(resolve(resourcesDirectory, missingFile));
+
+      try {
+        expect(() =>
+          assertPresentationTemplateResources({
+            inventory: REQUIRED_PRESENTATION_TEMPLATE_INVENTORY,
+            resourcesDirectory,
+          })
+        ).toThrow(new RegExp(`missing.*${missingFile.replace('.', '\\.')}`, 'i'));
+      } finally {
+        rmSync(resourcesDirectory, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects extra binary reference files', () => {
+      const { assertPresentationTemplateResources } = loadPresentationTemplateInventoryModule();
+      const resourcesDirectory = createPresentationTemplateResources();
+      writeFileSync(resolve(resourcesDirectory, 'unexpected.pptx'), 'unexpected');
+
+      try {
+        expect(() =>
+          assertPresentationTemplateResources({
+            inventory: REQUIRED_PRESENTATION_TEMPLATE_INVENTORY,
+            resourcesDirectory,
+          })
+        ).toThrow(/extra.*unexpected\.pptx/i);
+      } finally {
+        rmSync(resourcesDirectory, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects a nested undeclared binary without following the directory', () => {
+      const { assertPresentationTemplateResources } = loadPresentationTemplateInventoryModule();
+      const resourcesDirectory = createPresentationTemplateResources();
+      const unexpectedDirectory = resolve(resourcesDirectory, 'nested-binaries');
+      mkdirSync(unexpectedDirectory);
+      writeFileSync(resolve(unexpectedDirectory, 'hidden.pptx'), 'unexpected');
+
+      try {
+        expect(() =>
+          assertPresentationTemplateResources({
+            inventory: REQUIRED_PRESENTATION_TEMPLATE_INVENTORY,
+            resourcesDirectory,
+          })
+        ).toThrow(/unexpected director.*nested-binaries/i);
+      } finally {
+        rmSync(resourcesDirectory, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects an unexpected empty child directory', () => {
+      const { assertPresentationTemplateResources } = loadPresentationTemplateInventoryModule();
+      const resourcesDirectory = createPresentationTemplateResources();
+      mkdirSync(resolve(resourcesDirectory, 'unexpected-directory'));
+
+      try {
+        expect(() =>
+          assertPresentationTemplateResources({
+            inventory: REQUIRED_PRESENTATION_TEMPLATE_INVENTORY,
+            resourcesDirectory,
+          })
+        ).toThrow(/unexpected director.*unexpected-directory/i);
+      } finally {
+        rmSync(resourcesDirectory, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects a directory in place of an expected reference file', () => {
+      const { assertPresentationTemplateResources } = loadPresentationTemplateInventoryModule();
+      const resourcesDirectory = createPresentationTemplateResources();
+      const expectedFile = resolve(resourcesDirectory, EXPECTED_PRESENTATION_TEMPLATE_FILES[0]);
+      rmSync(expectedFile);
+      mkdirSync(expectedFile);
+
+      try {
+        expect(() =>
+          assertPresentationTemplateResources({
+            inventory: REQUIRED_PRESENTATION_TEMPLATE_INVENTORY,
+            resourcesDirectory,
+          })
+        ).toThrow(/regular file/i);
+      } finally {
+        rmSync(resourcesDirectory, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects a symlink in place of an expected reference file', () => {
+      const { assertPresentationTemplateResources } = loadPresentationTemplateInventoryModule();
+      const resourcesDirectory = createPresentationTemplateResources();
+      const expectedFile = resolve(resourcesDirectory, EXPECTED_PRESENTATION_TEMPLATE_FILES[0]);
+      const symlinkTarget = resolve(resourcesDirectory, 'reference-target');
+      rmSync(expectedFile);
+      writeFileSync(symlinkTarget, 'target');
+      symlinkSync(symlinkTarget, expectedFile, 'file');
+
+      try {
+        expect(() =>
+          assertPresentationTemplateResources({
+            inventory: REQUIRED_PRESENTATION_TEMPLATE_INVENTORY,
+            resourcesDirectory,
+          })
+        ).toThrow(/symlink/i);
+      } finally {
+        rmSync(resourcesDirectory, { recursive: true, force: true });
+      }
+    });
+  });
+
   it('keeps packaging and updater code on the fixed compatible builder runtime', () => {
     const rootPackage = readProjectJson<{
       dependencies: Record<string, string>;
@@ -167,6 +526,12 @@ describe('release packaging configuration', () => {
     expect(macBlock).toContain('    - zip');
   });
 
+  it('authorizes mac retries from the artifact build lifecycle hook', () => {
+    const config = readProjectFile('packages/desktop/electron-builder.yml');
+
+    expect(config).toContain('artifactBuildStarted: scripts/afterSign.js');
+  });
+
   it('does not build Windows zip artifacts', () => {
     const config = readProjectFile('packages/desktop/electron-builder.yml');
     const winBlock = yamlBlock(config, 'win');
@@ -275,6 +640,21 @@ describe('release packaging configuration', () => {
     expect(workflow).toContain('Contents/MacOS/WePrompt');
     expect(workflow).not.toContain('Forge-*-win-*.exe');
     expect(workflow).not.toContain('Contents/MacOS/Forge');
+  });
+
+  it('runs lineage recovery acceptance on architecture-matched native package runners', () => {
+    const manualWorkflow = readProjectFile('.github/workflows/build-manual.yml');
+    const releaseWorkflow = readProjectFile('.github/workflows/build-and-release.yml');
+    const reusableWorkflow = readProjectFile('.github/workflows/_build-reusable.yml');
+
+    for (const workflow of [manualWorkflow, releaseWorkflow]) {
+      expect(workflow).toContain('"platform":"macos-arm64","os":"macos-15"');
+      expect(workflow).toContain('"platform":"macos-x64","os":"macos-15-intel"');
+    }
+    expect(reusableWorkflow).toContain('Verify native migration-lineage recovery');
+    expect(reusableWorkflow).toContain('process.arch !== process.env.EXPECTED_ARCH');
+    expect(reusableWorkflow).toContain('E2E_PACKAGED: 1');
+    expect(reusableWorkflow).toContain('--grep "migration-lineage rejection"');
   });
 
   it('keeps desktop release assets on WePrompt names without renaming web-cli artifacts', () => {

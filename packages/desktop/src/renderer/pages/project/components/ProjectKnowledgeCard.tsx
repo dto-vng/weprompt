@@ -93,6 +93,16 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
   // An embed pass already under way owns the queue; a second wave of retries
   // would only stack up behind it.
   const busy = sources.some((source) => source.status === 'indexing' || !!source.progress);
+  /**
+   * With no embedding-capable model, an embed pass resolves no model and returns
+   * having changed nothing — by design, and logged as such in the main process. The
+   * request succeeds, so nothing raises and no toast appears, and the card re-renders
+   * identically: from the user's side the button simply does nothing. Gate the two
+   * actions that can only embed, and leave `Add an embedding model` as the live one.
+   * Retry on a FAILED source is not gated — that re-indexes, which works without
+   * embeddings.
+   */
+  const embeddingUnavailable = summary?.semantic === 'off';
 
   const handleAdd = async (): Promise<void> => {
     try {
@@ -303,20 +313,24 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
                   {t('conversation.projectHome.knowledgeStatusNotEmbedded')}
                 </Tag>
               </Tooltip>
-              <Button
-                type='text'
-                size='mini'
-                onClick={(event) => {
-                  event.stopPropagation();
-                  report(
-                    retrySource(source.id),
-                    'conversation.projectHome.knowledgeRetryFailed',
-                    'Failed to retry knowledge source:'
-                  );
-                }}
-              >
-                {t('conversation.projectHome.knowledgeRetry')}
-              </Button>
+              <Tooltip content={t('conversation.projectHome.knowledgeSemanticOff')} disabled={!embeddingUnavailable}>
+                <Button
+                  type='text'
+                  size='mini'
+                  disabled={embeddingUnavailable}
+                  data-testid={`knowledge-retry-embed-${source.id}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    report(
+                      retrySource(source.id),
+                      'conversation.projectHome.knowledgeRetryFailed',
+                      'Failed to retry knowledge source:'
+                    );
+                  }}
+                >
+                  {t('conversation.projectHome.knowledgeRetry')}
+                </Button>
+              </Tooltip>
             </span>
           );
         }
@@ -558,15 +572,17 @@ const ProjectKnowledgeCard: React.FC<ProjectKnowledgeCardProps> = ({ project }) 
                 </span>
               )}
               {pendingEmbedSources.length > 0 && (
-                <Button
-                  type='text'
-                  size='mini'
-                  disabled={busy}
-                  data-testid='knowledge-embed-all'
-                  onClick={() => void handleEmbedAll()}
-                >
-                  {t('conversation.projectHome.knowledgeEmbedAll')}
-                </Button>
+                <Tooltip content={t('conversation.projectHome.knowledgeSemanticOff')} disabled={!embeddingUnavailable}>
+                  <Button
+                    type='text'
+                    size='mini'
+                    disabled={busy || embeddingUnavailable}
+                    data-testid='knowledge-embed-all'
+                    onClick={() => void handleEmbedAll()}
+                  >
+                    {t('conversation.projectHome.knowledgeEmbedAll')}
+                  </Button>
+                </Tooltip>
               )}
             </div>
           )}

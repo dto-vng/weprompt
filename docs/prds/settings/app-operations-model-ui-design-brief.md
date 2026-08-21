@@ -51,15 +51,31 @@ If a Fixed provider or model becomes missing, disabled, unauthenticated, or unhe
 
 A missing or unhealthy app operations model does not stop normal chats. Empty and error states should explain what is affected without presenting the entire application as broken.
 
+**What actually happens when no model resolves:** context compaction falls back to a **rules-based
+snapshot** — `useContextCompaction.ts` sets `source = 'rules'` and builds a structured snapshot (goal,
+current state, decisions, artifacts, …) via `buildFallbackContextSnapshot`. It does **not** merely trim
+the conversation. Copy in this surface must say "rules-based summary", never "trimming".
+
 ### Prefer progressive disclosure
 
 Show the current selection, effective model, health, and consumer in the main view. Detailed failure explanations can sit below the health row or inside a compact alert; provider configuration stays in the existing Models experience.
 
 ## Placement
 
+> **Superseded by direction 1c (owner-approved).** The block is no longer a section at the top of the
+> page body. It is a status panel in the **Settings > Models header** — at the end of the header action
+> row at wide widths, and a full-width one-line strip under the header actions below 900px — so the page
+> body starts with providers immediately. Everything mutable moved into a popover opened from the panel.
+> The rest of this section's intent (one responsive composition, unchanged provider flows) still holds.
+
 Place the new section at the top of **Settings > Models**, below the existing page/modal header and above the provider list or provider empty state.
 
-It must remain visible when no providers are configured. The existing provider cards, Add Model action, and provider configuration flows remain unchanged below it.
+**Reversed by direction 1c (owner-approved).** With **zero providers configured the panel is hidden
+entirely**: the screen is already an empty state telling the user to add a provider and it carries both
+entry points, so the panel would only repeat it. When **providers exist but none is eligible** the panel
+stays visible in **Setup required**. The earlier requirement that it "must remain visible when no
+providers are configured" no longer applies. The existing provider cards, Add Model action, and provider
+configuration flows remain unchanged below it.
 
 The same component appears in:
 

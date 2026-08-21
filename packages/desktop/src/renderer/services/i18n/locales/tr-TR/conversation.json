@@ -351,6 +351,10 @@
         "title": "Model sağlayıcı hız sınırına ulaşıldı",
         "body": "Sağlayıcı geçici olarak istekleri sınırlıyor. Bir süre bekleyin, istek sıklığını azaltın veya model değiştirin."
       },
+      "USER_LLM_PROVIDER_QUOTA_EXHAUSTED": {
+        "title": "Model sağlayıcısının kotası tükendi",
+        "body": "Sağlayıcı hesabının bakiyesi veya kotası tükendiği için beklemek işe yaramaz. Hesaba bakiye yükleyin, faturalandırma planını kontrol edin veya başka bir modele geçin."
+      },
       "USER_LLM_PROVIDER_TIMEOUT": {
         "title": "Model sağlayıcı isteği zaman aşımına uğradı",
         "body": "Sağlayıcı zamanında yanıt vermedi. Daha sonra tekrar deneyin veya daha kararlı bir sağlayıcıya geçin."
@@ -500,6 +504,8 @@
     "changes": {
       "tab": "Değişiklikler",
       "filesTab": "Dosyalar",
+      "previewTab": "Önizleme",
+      "browserTab": "Tarayıcı",
       "currentBranchLabel": "Geçerli dal",
       "summary": "{{count}} dosya değiştirildi",
       "insertions": "+{{count}} ekleme",
@@ -620,10 +626,6 @@
     "contextWindow": "Bağlam penceresi",
     "percentUsed": "%{{percent}} kullanıldı",
     "tokenCount": "{{used}} / {{limit}} belirteç",
-    "localTokenUsage": "Yerel belirteç kullanımı",
-    "today": "Bugün",
-    "weekToDate": "Bu hafta",
-    "monthToDate": "Bu ay",
     "triggerLabel": "Bağlam kullanımını göster",
     "estimated": "Tahmini",
     "unavailable": "Bağlam kullanımı kullanılamıyor"
@@ -664,7 +666,8 @@
     "codes": {
       "TEAM_ASSISTANT_ID_REQUIRED": "Please select an assistant before creating the team.",
       "TEAM_ASSISTANT_NOT_FOUND": "Assistant {{assistantId}} is no longer available. Refresh the assistant list and choose another one.",
-      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Use assistant_id instead of {{field}}."
+      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Use assistant_id instead of {{field}}.",
+      "TEAM_MEMBER_MODEL_UNRESOLVED": "No model is available for this team member. Add or enable a model provider in Settings, then try again."
     }
   },
   "thinking": {
@@ -924,7 +927,7 @@
         "continueToProduce": "Üretime devam et",
         "askAssistant": "Asistana sor",
         "assistantTitle": "Yazım asistanı",
-        "assistantDescription": "Hikâye yapısını, çekim fikirlerini ve istemleri geliştirmek için asistanı kullanın.",
+        "assistantDescription": "Kısa açıklamanızdan bir storyboard taslağı oluşturun.",
         "textChargeDisclosure": "Hikâye panosu taslağı yapılandırdığınız metin modelini kullanır. Sağlayıcınız model kullanımı için ücret alabilir.",
         "draftStoryboard": "Hikâye panosu taslağı oluştur",
         "addShot": "Çekim ekle",
@@ -990,10 +993,67 @@
         "openProduce": "Üretimi aç",
         "handoffDescription": "Devir yalnızca hikâye panosu bildirim dosyasını ve seçilen medyayı içerir. İnceleme slaytları dışa aktarılmaz.",
         "partialHandoff": "Bazı sahnelerde seçilmiş medya olmadığından bu devir kısmidir.",
+        "cut": {
+          "duration": {
+            "played": "Oynatılan {{seconds}} sn",
+            "untrimmed": "Kaynak {{seconds}} sn",
+            "render": "Çıktı {{seconds}} sn"
+          },
+          "trimmed": "Kırpıldı",
+          "graded": "Renk ayarlı",
+          "clipAccessible": "Klip {{number}}, {{title}}, {{seconds}} saniye",
+          "dragClip": "Sıralamak için {{title}} öğesini sürükleyin",
+          "moveAnnouncement": "Klip {{clip}}, {{total}} içinde {{position}} konumuna taşındı. Kurgu sırası artık size ait.",
+          "playhead": "Kurgu oynatma başlığı",
+          "secondsValue": "{{seconds}} saniye",
+          "trimInHandle": "Giriş noktası tutamacı",
+          "trimOutHandle": "Çıkış noktası tutamacı",
+          "inspector": "Klip denetçisi",
+          "selectClip": "İncelemek için bir klip veya slate seçin.",
+          "takes": "Çekimler",
+          "trim": "Kırpma",
+          "inPoint": "Giriş",
+          "outPoint": "Çıkış",
+          "trimInField": "Saniye cinsinden giriş noktası",
+          "trimOutField": "Saniye cinsinden çıkış noktası",
+          "setIn": "Oynatma başlığına I koy",
+          "setOut": "Oynatma başlığına O koy",
+          "frame": "Kadraj",
+          "scale": "Kırpma ölçeği",
+          "scaleValue": "{{percent}}%",
+          "cropHint": "Ok tuşları kırpmayı taşır; on adım için Shift tuşunu basılı tutun.",
+          "cropOverlay": "Kırpma çerçevesi",
+          "colour": "Renk",
+          "colourLabels": {
+            "exposure": "Pozlama",
+            "contrast": "Kontrast",
+            "saturation": "Doygunluk",
+            "temperature": "Sıcaklık"
+          },
+          "resetClip": "Bu klibi sıfırla",
+          "noUndo": "Geri alma yoktur. Sıfırlama; kırpma, kadraj ve rengi varsayılanlara döndürür.",
+          "divergence": "Sizin sürümünüz · elle düzenlendi",
+          "resyncTitle": "Kurgu sırası yeniden eşitlensin mi?",
+          "resyncDescription": "Storyboard sırası geri gelir. Kırpmalar, kadrajlar ve renk filtreleri korunur.",
+          "resyncAction": "Storyboard ile yeniden eşitle",
+          "outsideTitle": "Henüz kurguda değil",
+          "outsideDescription": "Bu sahnelerin çekimi var ancak elle düzenlenen kurgunuzun dışında.",
+          "placeIt": "{{title}} öğesini yerleştir…",
+          "placeBefore": "{{number}} öncesine · {{title}}",
+          "addToEnd": "{{title}} öğesini sona ekle",
+          "addAllToEnd": "Tümünü sona ekle",
+          "volume": "Önizleme sesi"
+        },
         "render": {
+          "footer": "Kurguyu oluştur",
           "action": "Videoyu işle",
           "progress": "Video işleniyor… {{percent}}%",
+          "progressWithClip": "Video işleniyor… {{percent}}% · Klip {{clip}}/{{total}}",
           "cancel": "İşlemeyi iptal et",
+          "busyReason": "Bu proje zaten işleniyor. Tamamlanmasını bekleyin veya işlemi başlatan pencereden iptal edin.",
+          "installFfmpeg": "FFmpeg'i yükle",
+          "tryAgain": "İşlemeyi tekrar dene",
+          "openProduce": "Üret'e git",
           "missingScenes": "{{count}} sahnede çekim yok ve videoya dahil edilmeyecek.",
           "missingScenes_one": "{{count}} sahnede çekim yok ve videoya dahil edilmeyecek.",
           "missingScenes_other": "{{count}} sahnede çekim yok ve videoya dahil edilmeyecek.",
@@ -1003,6 +1063,10 @@
             "busy": "Bu proje zaten işleniyor.",
             "noRenderableScenes": "İşlenecek çekimi olan sahne yok.",
             "failed": "Video işlenemedi.",
+            "failedClip": "{{clip}}/{{total}} numaralı klip işlenemedi.",
+            "noRenderableShots": "{{shots}} numaralı çekimlerde işlenebilir klip yok.",
+            "noRenderableShots_one": "{{shots}} numaralı çekimde işlenebilir klip yok.",
+            "noRenderableShots_other": "{{shots}} numaralı çekimlerde işlenebilir klip yok.",
             "cancelled": "Video işleme iptal edildi."
           }
         }
@@ -1292,6 +1356,11 @@
     "export": {
       "title": "Varlıkları dışa aktar",
       "body": "Storyboard bildirim dosyasını ve her sahnenin seçili varlığını dışa aktarın.",
+      "checkingRender": "İşlenmiş kurgu kontrol ediliyor…",
+      "noRender": "Henüz işlenmedi",
+      "renderedAt": "İşlenme zamanı",
+      "staleRender": "Bu kurgu son düzenlemelerinizden önce işlendi.",
+      "latestRenderUnavailable": "En son işlenmiş kurgu kontrol edilemedi. Dışa Aktar'ı yeniden açın.",
       "gapWarning": "{{shots}} numaralı çekimler hâlâ slate ve dışa aktarmaya dahil edilmeyecek.",
       "gapWarning_one": "{{shots}} numaralı çekim hâlâ slate ve dışa aktarmaya dahil edilmeyecek.",
       "gapWarning_other": "{{shots}} numaralı çekimler hâlâ slate ve dışa aktarmaya dahil edilmeyecek.",

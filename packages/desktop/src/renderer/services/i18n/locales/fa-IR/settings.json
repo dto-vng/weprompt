@@ -362,9 +362,6 @@
   "modelNotFoundAfterUrlChange": "مدل {{model}} در آدرس جدید پیدا نشد؛ اگر کار نکرد، دوباره آن را انتخاب کنید.",
   "apiKey": "کلید API",
   "deleteModelConfirm": "آیا مطمئن هستید که می‌خواهید این مدل را حذف کنید؟",
-  "deleteAllModelConfirm": "آیا مطمئن هستید که می‌خواهید همه مدل‌ها را حذف کنید؟",
-  "modelCount": "مدل",
-  "apiKeyCount": "کلید API",
   "pleaseEnterBaseUrlAndApiKey": "لطفاً آدرس پایه و کلید API را وارد کنید",
   "pleaseEnterApiKey": "لطفاً کلید API را وارد کنید",
   "pleaseEnterBaseUrl": "لطفاً آدرس پایه را وارد کنید",
@@ -885,8 +882,59 @@
   "includePrereleaseUpdates": "شامل نسخه‌های پیش‌انتشار/توسعه",
   "saveModelConfigFailed": "ذخیره پیکربندی مدل ناموفق بود",
   "healthCheck": "بررسی سلامت",
-  "clearStatus": "پاک کردن وضعیت",
-  "healthStatusCleared": "وضعیت سلامت پاک شد",
+  "modelRow": {
+    "latency": "{{latency}} میلی‌ثانیه",
+    "neverChecked": "هرگز بررسی نشده",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "حذف مدل",
+    "deleteAppOperationsWarning": "این مدل برای عملیات برنامه تثبیت شده است. با حذف آن، این تنظیم تا زمانی که مدل دیگری انتخاب کنید در دسترس نخواهد بود."
+  },
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "{{count}} مدل",
+    "modelCount_one": "{{count}} مدل",
+    "modelCount_other": "{{count}} مدل",
+    "apiKeyCount": "{{count}} کلید",
+    "apiKeyCount_one": "{{count}} کلید",
+    "apiKeyCount_other": "{{count}} کلید",
+    "healthChecked": "{{checked}} از {{total}} بررسی‌شده",
+    "healthNotChecked": "بررسی‌نشده",
+    "healthFailing": "{{count}} ناموفق",
+    "healthFailing_one": "{{count}} ناموفق",
+    "healthFailing_other": "{{count}} ناموفق",
+    "deleteConfirmTitle": "حذف ارائه‌دهنده",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "ارائه‌دهنده، کلیدهای API آن و همهٔ مدل‌هایی را که پیکربندی کرده حذف می‌کند. گفتگوهای موجود همان مدلی را که با آن آغاز شده‌اند حفظ می‌کنند.",
+    "clearHealth": "پاک کردن وضعیت سلامت",
+    "clearHealthConfirmTitle": "پاک کردن وضعیت سلامت",
+    "clearHealthConfirmBody": "نتایج ثبت‌شدهٔ بررسی سلامت برای {{provider}} حذف می‌شود. برای اندازه‌گیری دوباره، بررسی سلامت را اجرا کنید.",
+    "healthCleared": "وضعیت سلامت {{provider}} پاک شد.",
+    "deleteAppOperationsWarning": "این ارائه‌دهنده برای عملیات برنامه تثبیت شده است. با حذف آن، این تنظیم تا زمانی که مدل دیگری انتخاب کنید در دسترس نخواهد بود.",
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "فعال یا غیرفعال کردن"
+  },
+  "providerHealth": {
+    "configuredInferenceUnavailable": "پیکربندی شده · استنتاج در دسترس نیست.",
+    "setupNeedsAttention": "راه‌اندازی نیاز به بررسی دارد.",
+    "overload": {
+      "action": "ارائه‌دهنده موقتاً بیش‌ازحد بارگذاری شده است. بعداً دوباره تلاش کنید."
+    },
+    "rateLimit": {
+      "action": "تا بازنشانی محدودیت ارائه‌دهنده صبر کنید و دوباره تلاش کنید."
+    },
+    "quota": {
+      "action": "سهمیه یا موجودی حساب ارائه‌دهنده تمام شده است. اعتبار اضافه کنید یا ارائه‌دهنده را عوض کنید و دوباره تلاش کنید."
+    },
+    "setup": {
+      "action": "اعتبارنامه‌ها و پیکربندی ارائه‌دهنده را بررسی کنید و دوباره تلاش کنید."
+    },
+    "connectivity": {
+      "action": "شبکه، پراکسی و Base URL را بررسی کنید و دوباره تلاش کنید."
+    },
+    "provider": {
+      "action": "ارائه‌دهنده نتوانست بررسی استنتاج را کامل کند. بعداً دوباره تلاش کنید."
+    }
+  },
   "latency": "تأخیر",
   "customAcpAgent": "ایجنت‌های ACP سفارشی",
   "addCustomAgent": "افزودن",
@@ -1349,31 +1397,44 @@
   "mcpNoTools": "این سرور هیچ ابزاری ارائه نمی‌دهد",
   "appOperationsModel": {
     "title": "مدل عملیات برنامه",
-    "description": "برای پردازش زمینه در پس‌زمینه و کمک‌رسانی سراسری آینده در برنامه، مستقل از مدل‌های گفتگو استفاده می‌شود.",
+    "panelLabel": "عملیات برنامه",
+    "panelInfo": "WePrompt از این برای کارهای پس‌زمینه‌ی خودش استفاده می‌کند — در حال حاضر خلاصه‌کردن گفتگوهای طولانی تا بتوانند ادامه پیدا کنند. گفتگوهای شما تغییری نمی‌کنند.",
+    "popoverSubtitle": "فقط برای کارهای پس‌زمینه. تغییر آن بر گفتگوهای شما اثری ندارد.",
     "selectionLabel": "انتخاب",
     "auto": "خودکار",
     "fixed": "ثابت",
-    "resolvedModelLabel": "مدل تعیین‌شده",
-    "healthLabel": "وضعیت",
-    "usedByLabel": "استفاده‌شده توسط",
-    "contextCompaction": "فشرده‌سازی زمینه",
-    "saving": "در حال ذخیره‌سازی…",
+    "autoExplainer": "WePrompt بهترین مدل واجد شرایط را انتخاب می‌کند و با تغییر ارائه‌دهنده‌ها آن را دوباره تعیین می‌کند.",
+    "modelLabel": "مدل",
+    "managedByAuto": "مدیریت‌شده توسط حالت خودکار",
+    "kept": "نگه‌داشته‌شده",
+    "switchToAuto": "تغییر به خودکار",
+    "pickAnother": "انتخاب مورد دیگر",
+    "checkNow": "همین حالا بررسی کن",
+    "openSettings": "تغییر مدل عملیات برنامه",
+    "contextCompaction": "خلاصه‌کردن گفتگوهای طولانی",
+    "usedByCompaction": "برای خلاصه‌کردن گفتگوهای طولانی استفاده می‌شود",
+    "setupRequiredImpact": "هیچ مدل متنی مناسبی پیکربندی نشده است. تا زمانی که یکی اضافه کنید، گفتگوهای طولانی به‌جای مدل با یک قاعده‌ی ساده خلاصه می‌شوند.",
     "loadFailed": "تنظیمات عملیات برنامه بارگیری نشد.",
     "saveFailed": "مدل عملیات برنامه ذخیره نشد.",
+    "saveFailedToast": "ذخیره نشد. برای تلاش مجدد دوباره انتخاب کنید.",
     "checkFailed": "بررسی سلامت عملیات برنامه ناموفق بود.",
     "backendUpdateRequired": "برای پیکربندی مدل عملیات برنامه، WePrompt را به‌روزرسانی کنید.",
-    "checkResult": {
-      "ready": "سالم · {{checked}}",
-      "setupRequired": "نیازمند راه‌اندازی · {{checked}}",
-      "unavailable": "بررسی ناموفق · {{checked}}",
-      "checkedJustNow": "همین حالا بررسی شد",
-      "checkedAt": "بررسی‌شده در {{time}}"
+    "backendUpdateRequiredDetail": "بک‌اند این نسخه این تنظیم را ارائه نمی‌دهد. گفتگوها تأثیری نمی‌بینند.",
+    "checkTime": {
+      "never": "هنوز بررسی نشده",
+      "justNow": "همین حالا بررسی شد",
+      "today": "امروز {{time}} بررسی شد",
+      "date": "{{date}} {{time}} بررسی شد"
     },
     "status": {
       "ready": "آماده",
-      "checking": "در حال بررسی",
+      "checking": "در حال بررسی…",
       "setupRequired": "نیاز به راه‌اندازی دارد",
-      "unavailable": "در دسترس نیست"
+      "unavailable": "در دسترس نیست",
+      "loading": "در حال بارگیری…",
+      "saving": "در حال ذخیره‌سازی…",
+      "saveFailed": "ذخیره نشد",
+      "loadFailed": "بارگیری نشد"
     },
     "reason": {
       "noEligibleModel": "یک مدل متنی با اطلاعات ورود معتبر اضافه یا فعال کنید.",

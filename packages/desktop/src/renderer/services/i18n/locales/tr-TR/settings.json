@@ -362,9 +362,6 @@
   "modelNotFoundAfterUrlChange": "{{model}} modeli yeni adreste bulunamadı; çalışmazsa yeniden seçin.",
   "apiKey": "API Anahtarı",
   "deleteModelConfirm": "Bu modeli silmek istediğinizden emin misiniz?",
-  "deleteAllModelConfirm": "Tüm modelleri silmek istediğinizden emin misiniz?",
-  "modelCount": "Model",
-  "apiKeyCount": "API Anahtarı",
   "pleaseEnterBaseUrlAndApiKey": "Lütfen temel URL ve API anahtarını girin",
   "pleaseEnterApiKey": "Lütfen API Anahtarını girin",
   "pleaseEnterBaseUrl": "Lütfen Temel URL girin",
@@ -873,8 +870,59 @@
   "includePrereleaseUpdates": "Ön sürüm/geliştirici sürümlerini dahil et",
   "saveModelConfigFailed": "Model yapılandırması kaydedilemedi",
   "healthCheck": "Sağlık Kontrolü",
-  "clearStatus": "Durumu Temizle",
-  "healthStatusCleared": "Sağlık durumu temizlendi",
+  "modelRow": {
+    "latency": "{{latency}} ms",
+    "neverChecked": "Hiç kontrol edilmedi",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "Modeli kaldır",
+    "deleteAppOperationsWarning": "Bu model uygulama işlemleri için sabitlenmiş. Silerseniz, başka bir model seçene kadar bu ayar kullanılamaz."
+  },
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "{{count}} model",
+    "modelCount_one": "{{count}} model",
+    "modelCount_other": "{{count}} model",
+    "apiKeyCount": "{{count}} anahtar",
+    "apiKeyCount_one": "{{count}} anahtar",
+    "apiKeyCount_other": "{{count}} anahtar",
+    "healthChecked": "{{total}} modelden {{checked}} tanesi kontrol edildi",
+    "healthNotChecked": "Kontrol edilmedi",
+    "healthFailing": "{{count}} başarısız",
+    "healthFailing_one": "{{count}} başarısız",
+    "healthFailing_other": "{{count}} başarısız",
+    "deleteConfirmTitle": "Sağlayıcıyı sil",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "Sağlayıcıyı, API anahtarlarını ve yapılandırdığı tüm modelleri siler. Mevcut sohbetler başlatıldıkları modeli korur.",
+    "clearHealth": "Sağlık durumunu temizle",
+    "clearHealthConfirmTitle": "Sağlık durumunu temizle",
+    "clearHealthConfirmBody": "{{provider}} için kaydedilen sağlık sonuçlarını siler. Yeniden ölçmek için bir sağlık kontrolü çalıştırın.",
+    "healthCleared": "{{provider}} için sağlık durumu temizlendi.",
+    "deleteAppOperationsWarning": "Bu sağlayıcı uygulama işlemleri için sabitlenmiş. Silerseniz, başka bir model seçene kadar bu ayar kullanılamaz.",
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "Etkinleştir veya devre dışı bırak"
+  },
+  "providerHealth": {
+    "configuredInferenceUnavailable": "Yapılandırıldı · çıkarım kullanılamıyor.",
+    "setupNeedsAttention": "Kurulumun kontrol edilmesi gerekiyor.",
+    "overload": {
+      "action": "Sağlayıcı geçici olarak aşırı yüklü. Daha sonra tekrar deneyin."
+    },
+    "rateLimit": {
+      "action": "Sağlayıcı sınırının sıfırlanmasını bekleyip tekrar deneyin."
+    },
+    "quota": {
+      "action": "Sağlayıcı hesabının kotası veya bakiyesi tükendi. Bakiye yükleyin veya sağlayıcıyı değiştirip yeniden deneyin."
+    },
+    "setup": {
+      "action": "Sağlayıcı kimlik bilgilerini ve yapılandırmasını kontrol edip tekrar deneyin."
+    },
+    "connectivity": {
+      "action": "Ağı, proxy'yi ve Base URL'yi kontrol edip tekrar deneyin."
+    },
+    "provider": {
+      "action": "Sağlayıcı çıkarım kontrolünü tamamlayamadı. Daha sonra tekrar deneyin."
+    }
+  },
   "latency": "Gecikme",
   "customAcpAgent": "Özel ACP Ajanları",
   "addCustomAgent": "Ekle",
@@ -1349,31 +1397,44 @@
   "mcpNoTools": "Bu sunucu hiçbir araç sunmuyor",
   "appOperationsModel": {
     "title": "Uygulama işlemleri modeli",
-    "description": "Sohbet modellerinden bağımsız olarak arka plandaki bağlam işlemleri ve gelecekte uygulama genelindeki destek için kullanılır.",
+    "panelLabel": "Uygulama işlemleri",
+    "panelInfo": "WePrompt bunu kendi arka plan işleri için kullanır — şu anda uzun sohbetleri özetleyip devam edebilmelerini sağlar. Sohbetleriniz etkilenmez.",
+    "popoverSubtitle": "Yalnızca arka plan işleri için. Bunu değiştirmek sohbetlerinizi etkilemez.",
     "selectionLabel": "Seçim",
     "auto": "Otomatik",
     "fixed": "Sabit",
-    "resolvedModelLabel": "Belirlenen model",
-    "healthLabel": "Durum",
-    "usedByLabel": "Kullanan",
-    "contextCompaction": "Bağlam sıkıştırma",
-    "saving": "Kaydediliyor…",
+    "autoExplainer": "WePrompt uygun en iyi modeli seçer ve sağlayıcılar değiştiğinde yeniden belirler.",
+    "modelLabel": "Model",
+    "managedByAuto": "Otomatik tarafından yönetiliyor",
+    "kept": "Korundu",
+    "switchToAuto": "Otomatik'e geç",
+    "pickAnother": "Başka bir tane seç",
+    "checkNow": "Şimdi denetle",
+    "openSettings": "Uygulama işlemleri modelini değiştir",
+    "contextCompaction": "Uzun sohbetleri özetleme",
+    "usedByCompaction": "Uzun sohbetleri özetlemek için kullanılır",
+    "setupRequiredImpact": "Uygun bir metin modeli yapılandırılmadı. Siz bir tane ekleyene kadar uzun sohbetler model yerine basit bir kuralla özetlenir.",
     "loadFailed": "Uygulama işlemleri ayarları yüklenemedi.",
     "saveFailed": "Uygulama işlemleri modeli kaydedilemedi.",
+    "saveFailedToast": "Kaydedilemedi. Yeniden seçerek tekrar deneyin.",
     "checkFailed": "Uygulama işlemleri durum denetimi başarısız oldu.",
     "backendUpdateRequired": "Uygulama işlemleri modelini yapılandırmak için WePrompt'u güncelleyin.",
-    "checkResult": {
-      "ready": "Sağlıklı · {{checked}}",
-      "setupRequired": "Kurulum gerekli · {{checked}}",
-      "unavailable": "Kontrol başarısız · {{checked}}",
-      "checkedJustNow": "az önce kontrol edildi",
-      "checkedAt": "{{time}} tarihinde kontrol edildi"
+    "backendUpdateRequiredDetail": "Bu sürümün arka ucu bu ayarı sunmuyor. Sohbetler etkilenmez.",
+    "checkTime": {
+      "never": "Henüz denetlenmedi",
+      "justNow": "Az önce denetlendi",
+      "today": "Bugün {{time}} tarihinde denetlendi",
+      "date": "{{date}} {{time}} tarihinde denetlendi"
     },
     "status": {
       "ready": "Hazır",
-      "checking": "Denetleniyor",
+      "checking": "Denetleniyor…",
       "setupRequired": "Kurulum gerekli",
-      "unavailable": "Kullanılamıyor"
+      "unavailable": "Kullanılamıyor",
+      "loading": "Yükleniyor…",
+      "saving": "Kaydediliyor…",
+      "saveFailed": "Kaydedilemedi",
+      "loadFailed": "Yüklenemedi"
     },
     "reason": {
       "noEligibleModel": "Geçerli kimlik bilgilerine sahip bir metin modeli ekleyin veya etkinleştirin.",

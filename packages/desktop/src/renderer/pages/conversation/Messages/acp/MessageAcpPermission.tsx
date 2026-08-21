@@ -8,6 +8,7 @@ import type { IMessageAcpPermission } from '@/common/chat/chatLib';
 import { conversation } from '@/common/adapter/ipcBridge';
 import { iconColors } from '@/renderer/styles/colors';
 import { Button, Card, Message, Typography } from '@arco-design/web-react';
+import { PERMISSION_DENY_BORDER } from '../permissionButtonStyles';
 import { Bookmark, CheckOne, Earth, Edit, Lightning, Lock } from '@icon-park/react';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -129,6 +130,7 @@ const MessageAcpPermission: React.FC<MessageAcpPermissionProps> = React.memo(({ 
                     <Button
                       key={option_id}
                       type={isDeny ? 'secondary' : 'primary'}
+                      className={isDeny ? PERMISSION_DENY_BORDER : undefined}
                       size='small'
                       disabled={pendingOptionId !== null && pendingOptionId !== option_id}
                       loading={pendingOptionId === option_id}

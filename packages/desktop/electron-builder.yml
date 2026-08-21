@@ -178,6 +178,9 @@ dmg:
 
 afterPack: scripts/afterPack.js
 afterSign: scripts/afterSign.js
+# Mac retries re-enter signing through artifactBuildStarted; kept from sprint4,
+# mainline does not define it. `releasePackagingConfig.test.ts` pins its presence.
+artifactBuildStarted: scripts/afterSign.js
 
 linux:
   target:

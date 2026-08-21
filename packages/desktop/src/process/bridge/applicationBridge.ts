@@ -150,6 +150,10 @@ export function initApplicationBridge(): void {
     return restartApplication(app);
   });
 
+  ipcBridge.application.quit.provider(() => {
+    app.quit();
+  });
+
   ipcBridge.application.isDevToolsOpened.provider(() => {
     if (mainWindowRef && !mainWindowRef.isDestroyed()) {
       return Promise.resolve(mainWindowRef.webContents.isDevToolsOpened());

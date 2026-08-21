@@ -15,6 +15,9 @@ import {
 
 const CONVERSATION_ID = '22222222-2222-4222-8222-222222222222';
 const OTHER_CONVERSATION_ID = '33333333-3333-4333-8333-333333333333';
+// Ids the running app actually mints for conversations: 8-hex short ids, never RFC-4122 uuids.
+const SHORT_CONVERSATION_ID = 'f90e8348';
+const OTHER_SHORT_CONVERSATION_ID = 'df17cd9c';
 const PRINCIPAL_ID = 'desktop-local-principal';
 const TEAM_USER_ID = 'system_default_user';
 
@@ -31,6 +34,56 @@ const team = (conversationIds: readonly string[], userId: string = TEAM_USER_ID)
     slot_id: `slot-${index}`,
     conversation_id,
   })),
+});
+
+/**
+ * Key sets captured verbatim from a live `GET /api/teams?user_id=system_default_user` 200 response
+ * on 2026-08-18. Values are neutralized; the KEY SET is the point. The wire carries no `user_id`
+ * and no `workspace_mode` on a team, even though `TTeam` declares both as required — so do not
+ * "complete" this fixture from the type. Every bug this feature shipped was hidden by a fixture
+ * built from a type or a schema instead of a real response.
+ */
+const WIRE_TEAM_KEYS = [
+  'assistants',
+  'created_at',
+  'id',
+  'leader_assistant_id',
+  'name',
+  'updated_at',
+  'workspace',
+] as const;
+const WIRE_ASSISTANT_KEYS = [
+  'assistant_backend',
+  'assistant_id',
+  'assistant_name',
+  'backend',
+  'conversation_id',
+  'model',
+  'name',
+  'pending_confirmations',
+  'role',
+  'slot_id',
+] as const;
+
+const wireTeam = (conversationIds: readonly string[]) => ({
+  assistants: conversationIds.map((conversation_id, index) => ({
+    assistant_backend: 'aionrs',
+    assistant_id: `assistant-${index}`,
+    assistant_name: `Assistant ${index}`,
+    backend: 'aionrs',
+    conversation_id,
+    model: 'default',
+    name: `Assistant ${index}`,
+    pending_confirmations: 0,
+    role: index === 0 ? 'leader' : 'teammate',
+    slot_id: `slot-${index}`,
+  })),
+  created_at: 1_755_000_000,
+  id: 'team-1',
+  leader_assistant_id: 'assistant-0',
+  name: 'Wire Team',
+  updated_at: 1_755_000_000,
+  workspace: '/workspace',
 });
 
 function createHarness(overrides: Partial<PresentationScopeResolverOptions> = {}) {
@@ -72,6 +125,86 @@ describe('PresentationScopeResolver', () => {
       workspace: '/workspace',
     });
     expect(harness.listTeams).toHaveBeenCalledWith({ userId: TEAM_USER_ID });
+  });
+
+  it('resolves an individual conversation whose id is a short id rather than a uuid', async () => {
+    const harness = createHarness({
+      getConversation: async () => ({ id: SHORT_CONVERSATION_ID, type: 'aionrs', extra: { workspace: '/workspace' } }),
+    });
+
+    await expect(
+      harness.resolver.resolve({ conversationId: SHORT_CONVERSATION_ID, principalId: PRINCIPAL_ID })
+    ).resolves.toEqual({
+      ok: true,
+      conversationId: SHORT_CONVERSATION_ID,
+      principalId: PRINCIPAL_ID,
+      scope: 'individual',
+      runtime: 'aionrs',
+      workspace: '/workspace',
+    });
+  });
+
+  it('keeps individual scope when enumerated teams bind short-id conversations', async () => {
+    const harness = createHarness({
+      getConversation: async () => ({ id: SHORT_CONVERSATION_ID, type: 'aionrs', extra: { workspace: '/workspace' } }),
+      listTeams: async () => [team([OTHER_SHORT_CONVERSATION_ID])],
+    });
+
+    await expect(
+      harness.resolver.resolve({ conversationId: SHORT_CONVERSATION_ID, principalId: PRINCIPAL_ID })
+    ).resolves.toMatchObject({
+      ok: true,
+      scope: 'individual',
+    });
+  });
+
+  it('proves team membership from a short-id assistant conversation', async () => {
+    const harness = createHarness({
+      getConversation: async () => ({ id: SHORT_CONVERSATION_ID, type: 'aionrs', extra: { workspace: '/workspace' } }),
+      listTeams: async () => [team([SHORT_CONVERSATION_ID])],
+    });
+
+    await expect(
+      harness.resolver.resolve({ conversationId: SHORT_CONVERSATION_ID, principalId: PRINCIPAL_ID })
+    ).resolves.toMatchObject({
+      ok: true,
+      scope: 'team',
+    });
+  });
+
+  it('pins the team fixture to the captured wire key set', () => {
+    const wire = wireTeam([SHORT_CONVERSATION_ID]);
+
+    expect(Object.keys(wire).toSorted()).toEqual([...WIRE_TEAM_KEYS]);
+    expect(Object.keys(wire.assistants[0]).toSorted()).toEqual([...WIRE_ASSISTANT_KEYS]);
+  });
+
+  it('resolves an individual conversation against the real /api/teams payload shape', async () => {
+    const harness = createHarness({
+      getConversation: async () => ({ id: SHORT_CONVERSATION_ID, type: 'aionrs', extra: { workspace: '/workspace' } }),
+      listTeams: async () => [wireTeam([OTHER_SHORT_CONVERSATION_ID])],
+    });
+
+    await expect(
+      harness.resolver.resolve({ conversationId: SHORT_CONVERSATION_ID, principalId: PRINCIPAL_ID })
+    ).resolves.toMatchObject({
+      ok: true,
+      scope: 'individual',
+    });
+  });
+
+  it('proves team membership from the real /api/teams payload shape', async () => {
+    const harness = createHarness({
+      getConversation: async () => ({ id: SHORT_CONVERSATION_ID, type: 'aionrs', extra: { workspace: '/workspace' } }),
+      listTeams: async () => [wireTeam([SHORT_CONVERSATION_ID])],
+    });
+
+    await expect(
+      harness.resolver.resolve({ conversationId: SHORT_CONVERSATION_ID, principalId: PRINCIPAL_ID })
+    ).resolves.toMatchObject({
+      ok: true,
+      scope: 'team',
+    });
   });
 
   it('classifies team ownership only from authoritative assistants membership', async () => {
@@ -128,13 +261,16 @@ describe('PresentationScopeResolver', () => {
   it.each([
     ['enumeration rejection', async () => Promise.reject(new Error('offline'))],
     ['non-array enumeration', async () => ({})],
-    ['foreign principal enumeration', async () => [team([], 'another-user')]],
+    // A 'foreign principal enumeration' row lived here. It asserted the `team.user_id` equality
+    // check, which is deliberately gone: the field is absent from the wire, so the check rejected
+    // every real payload. Ownership of the enumeration is the server's, via the `?user_id=` filter.
     ['missing assistants enumeration', async () => [{ id: 'team-1', user_id: TEAM_USER_ID }]],
     [
       'ambiguous assistants and agents aliases',
       async () => [{ ...team([CONVERSATION_ID]), agents: team([CONVERSATION_ID]).assistants }],
     ],
-    ['malformed assistant conversation id', async () => [team(['../foreign'])]],
+    // Hostile shape kept visible: bounded-identifier validation still rejects it, on the NUL.
+    ['traversal-shaped assistant conversation id', async () => [team(['../foreign\0'])]],
     [
       'ambiguous duplicate membership',
       async () => [team([CONVERSATION_ID]), { ...team([CONVERSATION_ID]), id: 'team-2' }],
@@ -166,8 +302,10 @@ describe('PresentationScopeResolver', () => {
     expect(harness.listTeams).not.toHaveBeenCalled();
   });
 
+  // Replaces a 'path-shaped request id' row that the bounded-identifier guard no longer rejects on
+  // shape: it had become an exact duplicate of the foreign-response row below. The guard itself is
+  // covered directly, including its fail-fast ordering, by the request-id test that follows.
   it.each([
-    ['path-shaped request id', '../foreign', conversation()],
     ['foreign conversation response', CONVERSATION_ID, { ...conversation(), id: OTHER_CONVERSATION_ID }],
     ['missing conversation runtime', CONVERSATION_ID, { id: CONVERSATION_ID, extra: { workspace: '/workspace' } }],
     ['non-object conversation extra', CONVERSATION_ID, { id: CONVERSATION_ID, type: 'aionrs', extra: null }],
@@ -178,5 +316,20 @@ describe('PresentationScopeResolver', () => {
       ok: false,
       code: 'SCOPE_UNAVAILABLE',
     });
+  });
+
+  it.each([
+    ['blank', ''],
+    ['NUL-bearing', 'f90e8348\0forged'],
+    ['over-length', 'f'.repeat(257)],
+  ] as const)('rejects a %s request id before any authoritative lookup', async (_reason, conversationId) => {
+    const harness = createHarness();
+
+    await expect(harness.resolver.resolve({ conversationId, principalId: PRINCIPAL_ID })).resolves.toEqual({
+      ok: false,
+      code: 'SCOPE_UNAVAILABLE',
+    });
+    expect(harness.getConversation).not.toHaveBeenCalled();
+    expect(harness.listTeams).not.toHaveBeenCalled();
   });
 });

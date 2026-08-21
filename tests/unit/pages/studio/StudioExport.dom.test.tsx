@@ -30,6 +30,7 @@ const bridge = vi.hoisted(() => ({
   proposeStoryboard: { invoke: vi.fn() },
   chooseAndImportReference: { invoke: vi.fn() },
   chooseAndExportAssets: { invoke: vi.fn() },
+  getLatestRender: { invoke: vi.fn() },
   renderCut: { invoke: vi.fn() },
   cancelRender: { invoke: vi.fn() },
   submitScenes: { invoke: vi.fn() },
@@ -58,6 +59,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, values?: Record<string, unknown>) =>
       values === undefined ? key : `${key}:${Object.values(values).join(',')}`,
+    i18n: { language: 'en-US' },
   }),
 }));
 
@@ -151,6 +153,14 @@ const deferred = <T,>() => {
   return { promise, resolve };
 };
 
+const confirmExport = async (): Promise<void> => {
+  const confirm = screen.getByRole('button', {
+    name: 'conversation.creativeStudio.export.confirm',
+  });
+  await waitFor(() => expect(confirm).toBeEnabled());
+  fireEvent.click(confirm);
+};
+
 describe('Studio asset export', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -174,6 +184,7 @@ describe('Studio asset export', () => {
         missingSceneIds: [],
       })
     );
+    bridge.getLatestRender.invoke.mockResolvedValue(ok(null));
     bridge.submitScenes.invoke.mockResolvedValue(ok([]));
     bridge.renderCut.invoke.mockResolvedValue(ok({ assetId: 'render-1', missingSceneIds: [] }));
     bridge.cancelRender.invoke.mockResolvedValue(ok({ cancelled: true }));
@@ -207,11 +218,7 @@ describe('Studio asset export', () => {
       .getAllByRole('button')
       .forEach((button) => expect(button).toBeDisabled());
 
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'conversation.creativeStudio.export.confirm',
-      })
-    );
+    await confirmExport();
 
     await waitFor(() =>
       expect(bridge.chooseAndExportAssets.invoke).toHaveBeenCalledExactlyOnceWith({
@@ -228,6 +235,31 @@ describe('Studio asset export', () => {
     expect(screen.queryByText(/Export video/i)).not.toBeInTheDocument();
   });
 
+  it('shows the persisted cut render time and stale-edit warning before opening the folder picker', async () => {
+    const formatTimestamp = vi.spyOn(Date.prototype, 'toLocaleString').mockReturnValue('Jul 29, 2026, 3:15 PM');
+    bridge.getLatestRender.invoke.mockResolvedValueOnce(
+      ok({ fileName: 'cut.mp4' as const, renderedAt: '2026-07-29T08:15:00.000Z' })
+    );
+    renderProject();
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'conversation.creativeStudio.phase.review.handoff',
+      })
+    );
+
+    const dialog = await screen.findByRole('dialog');
+    expect(bridge.getLatestRender.invoke).toHaveBeenCalledExactlyOnceWith({ projectId: 'project-1' });
+    expect(within(dialog).getByText('cut.mp4')).toBeVisible();
+    expect(within(dialog).getByText('conversation.creativeStudio.export.renderedAt')).toBeVisible();
+    expect(within(dialog).getByText('conversation.creativeStudio.export.staleRender')).toBeVisible();
+    expect(within(dialog).getByText('Jul 29, 2026, 3:15 PM')).toHaveAttribute('datetime', '2026-07-29T08:15:00.000Z');
+    expect(within(dialog).queryByText('2026-07-29T08:15:00.000Z')).not.toBeInTheDocument();
+    expect(formatTimestamp).toHaveBeenCalledWith('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+    formatTimestamp.mockRestore();
+    expect(bridge.chooseAndExportAssets.invoke).not.toHaveBeenCalled();
+  });
+
   it('exports imported references only when the user opts in', async () => {
     renderProject();
 
@@ -241,11 +273,7 @@ describe('Studio asset export', () => {
         name: 'conversation.creativeStudio.export.includeReferences',
       })
     );
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'conversation.creativeStudio.export.confirm',
-      })
-    );
+    await confirmExport();
 
     await waitFor(() =>
       expect(bridge.chooseAndExportAssets.invoke).toHaveBeenCalledExactlyOnceWith({
@@ -271,11 +299,7 @@ describe('Studio asset export', () => {
         name: 'conversation.creativeStudio.phase.review.handoff',
       })
     );
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'conversation.creativeStudio.export.confirm',
-      })
-    );
+    await confirmExport();
 
     expect(
       await screen.findByRole('dialog', {
@@ -308,11 +332,7 @@ describe('Studio asset export', () => {
         name: 'conversation.creativeStudio.phase.review.handoff',
       })
     );
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'conversation.creativeStudio.export.confirm',
-      })
-    );
+    await confirmExport();
 
     const dialog = await screen.findByRole('dialog', {
       name: 'conversation.creativeStudio.export.successTitle',
@@ -333,11 +353,7 @@ describe('Studio asset export', () => {
         name: 'conversation.creativeStudio.phase.review.handoff',
       })
     );
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'conversation.creativeStudio.export.confirm',
-      })
-    );
+    await confirmExport();
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.queryByText('conversation.creativeStudio.export.successTitle')).not.toBeInTheDocument();
@@ -374,11 +390,7 @@ describe('Studio asset export', () => {
         name: 'conversation.creativeStudio.phase.review.handoff',
       })
     );
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'conversation.creativeStudio.export.confirm',
-      })
-    );
+    await confirmExport();
 
     expect(await screen.findByText('conversation.creativeStudio.export.failed')).toBeInTheDocument();
     expect(screen.getByText('conversation.creativeStudio.errors.storage')).toBeInTheDocument();

@@ -132,6 +132,95 @@ describe('composeMessage', () => {
 });
 
 describe('normalizeAgentStreamError', () => {
+  /**
+   * BUG-055, from a suspended Moonshot key. aioncore classified the provider's
+   * `exceeded_current_quota_error` as `Rate limited, retry after 5000ms`, so the
+   * envelope that reached the desktop was indistinguishable from a burst limit:
+   * `USER_LLM_PROVIDER_RATE_LIMITED`, `retryable: true`, `resolution: { kind:
+   * 'retry' }`. The app told the user to wait and reduce frequency — advice that
+   * never restores a suspended account — and retried automatically, spending
+   * three attempts per run against an account that could serve none of them.
+   *
+   * The provider's own wording survives that flattening, which is the only signal
+   * available on this side, so it is what the reclassification reads.
+   */
+  it('reclassifies an exhausted account that arrived wearing a rate limit envelope', () => {
+    expect(
+      normalizeAgentStreamError({
+        message: 'Model provider request failed',
+        code: 'USER_LLM_PROVIDER_RATE_LIMITED',
+        ownership: 'user_llm_provider',
+        detail:
+          'your account org-3f2a is suspended due to insufficient balance, please recharge your account or check your plan and billing details',
+        retryable: true,
+        resolution: { kind: 'retry' },
+      })
+    ).toMatchObject({
+      code: 'USER_LLM_PROVIDER_QUOTA_EXHAUSTED',
+      retryable: false,
+    });
+  });
+
+  it('drops the retry resolution along with the code, so nothing offers to try again', () => {
+    const normalized = normalizeAgentStreamError({
+      message: 'Model provider request failed',
+      code: 'USER_LLM_PROVIDER_RATE_LIMITED',
+      detail: 'You exceeded your current quota, please check your plan and billing details.',
+      retryable: true,
+      resolution: { kind: 'retry' },
+    });
+
+    expect(normalized?.resolution).toBeUndefined();
+  });
+
+  it('reads the message when no detail is carried', () => {
+    expect(
+      normalizeAgentStreamError({
+        message: 'Your credit balance is too low to access the API',
+        code: 'USER_LLM_PROVIDER_RATE_LIMITED',
+        retryable: true,
+      })
+    ).toMatchObject({ code: 'USER_LLM_PROVIDER_QUOTA_EXHAUSTED', retryable: false });
+  });
+
+  /**
+   * The other half of the contract. A real burst limit must keep its code, its
+   * retryability and its retry resolution — over-matching here would break the
+   * one case the existing copy is correct for.
+   */
+  it.each([
+    'Rate limit reached for requests, please slow down',
+    'Too many requests, retry after 5s',
+    'The provider is throttling this key',
+  ])('leaves a genuine rate limit untouched: %s', (detail) => {
+    expect(
+      normalizeAgentStreamError({
+        message: 'Model provider request failed',
+        code: 'USER_LLM_PROVIDER_RATE_LIMITED',
+        detail,
+        retryable: true,
+        resolution: { kind: 'retry' },
+      })
+    ).toMatchObject({
+      code: 'USER_LLM_PROVIDER_RATE_LIMITED',
+      retryable: true,
+      resolution: { kind: 'retry' },
+    });
+  });
+
+  it('does not reclassify quota wording carried under some other code', () => {
+    // The rewrite is scoped to the one code aioncore mislabels; a different code
+    // that happens to mention billing must be left exactly as it arrived.
+    expect(
+      normalizeAgentStreamError({
+        message: 'Setup failed',
+        code: 'USER_LLM_PROVIDER_UNAUTHORIZED',
+        detail: 'check your plan and billing details',
+        retryable: true,
+      })
+    ).toMatchObject({ code: 'USER_LLM_PROVIDER_UNAUTHORIZED', retryable: true });
+  });
+
   it('treats resolution-only error metadata as structured', () => {
     expect(
       normalizeAgentStreamError({

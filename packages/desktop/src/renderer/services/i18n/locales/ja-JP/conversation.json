@@ -220,7 +220,8 @@
     "codes": {
       "TEAM_ASSISTANT_ID_REQUIRED": "Please select an assistant before creating the team.",
       "TEAM_ASSISTANT_NOT_FOUND": "Assistant {{assistantId}} is no longer available. Refresh the assistant list and choose another one.",
-      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Use assistant_id instead of {{field}}."
+      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Use assistant_id instead of {{field}}.",
+      "TEAM_MEMBER_MODEL_UNRESOLVED": "No model is available for this team member. Add or enable a model provider in Settings, then try again."
     }
   },
   "agentError": {
@@ -367,6 +368,10 @@
       "USER_LLM_PROVIDER_RATE_LIMITED": {
         "title": "モデルプロバイダーのレート制限に達しました",
         "body": "プロバイダーが一時的にリクエストを制限しています。少し待つか、リクエスト頻度を下げるか、モデルを切り替えてください。"
+      },
+      "USER_LLM_PROVIDER_QUOTA_EXHAUSTED": {
+        "title": "モデルプロバイダーのクォータが上限に達しました",
+        "body": "プロバイダーのアカウントの残高またはクォータが尽きているため、待っても解消しません。アカウントにチャージするか、請求プランを確認するか、別のモデルに切り替えてください。"
       },
       "USER_LLM_PROVIDER_TIMEOUT": {
         "title": "モデルプロバイダーのリクエストがタイムアウトしました",
@@ -515,6 +520,8 @@
     "changes": {
       "tab": "変更",
       "filesTab": "ファイル",
+      "previewTab": "プレビュー",
+      "browserTab": "ブラウザ",
       "currentBranchLabel": "現在のブランチ",
       "summary": "{{count}} 個のファイルが変更されました",
       "insertions": "+{{count}} 行追加",
@@ -635,10 +642,6 @@
     "contextWindow": "コンテキストウィンドウ",
     "percentUsed": "{{percent}}% 使用済み",
     "tokenCount": "{{used}} / {{limit}} トークン",
-    "localTokenUsage": "ローカルのトークン使用量",
-    "today": "今日",
-    "weekToDate": "今週の合計",
-    "monthToDate": "今月の合計",
     "triggerLabel": "コンテキストの使用状況を表示",
     "estimated": "推定",
     "unavailable": "コンテキスト使用量を取得できません"
@@ -921,7 +924,7 @@
         "continueToProduce": "生成へ進む",
         "askAssistant": "アシスタントに相談",
         "assistantTitle": "構成アシスタント",
-        "assistantDescription": "ストーリー構成、ショット案、プロンプトの作成にアシスタントを利用できます。",
+        "assistantDescription": "ブリーフをもとにストーリーボードの下書きを作成します。",
         "textChargeDisclosure": "ストーリーボードの下書きには設定済みのテキストモデルを使用します。プロバイダーから利用料が請求される場合があります。",
         "draftStoryboard": "ストーリーボードを下書き",
         "addShot": "ショットを追加",
@@ -984,10 +987,67 @@
         "openProduce": "生成を開く",
         "handoffDescription": "引き渡しに含まれるのは、ストーリーボードのマニフェストと選択したメディアのみです。確認用スレートは書き出されません。",
         "partialHandoff": "選択したメディアがないシーンがあるため、この引き渡しは一部のみです。",
+        "cut": {
+          "duration": {
+            "played": "再生 {{seconds}}秒",
+            "untrimmed": "素材 {{seconds}}秒",
+            "render": "書き出し {{seconds}}秒"
+          },
+          "trimmed": "トリミング済み",
+          "graded": "カラー調整済み",
+          "clipAccessible": "クリップ{{number}}、{{title}}、{{seconds}}秒",
+          "dragClip": "{{title}}をドラッグして並べ替え",
+          "moveAnnouncement": "クリップ{{clip}}を{{total}}個中{{position}}番目に移動しました。カット順は手動になりました。",
+          "playhead": "カットの再生ヘッド",
+          "secondsValue": "{{seconds}}秒",
+          "trimInHandle": "イン点ハンドル",
+          "trimOutHandle": "アウト点ハンドル",
+          "inspector": "クリップインスペクター",
+          "selectClip": "確認するクリップまたはスレートを選択してください。",
+          "takes": "テイク",
+          "trim": "トリム",
+          "inPoint": "イン",
+          "outPoint": "アウト",
+          "trimInField": "イン点（秒）",
+          "trimOutField": "アウト点（秒）",
+          "setIn": "再生ヘッドにIを設定",
+          "setOut": "再生ヘッドにOを設定",
+          "frame": "フレーム",
+          "scale": "クロップ倍率",
+          "scaleValue": "{{percent}}%",
+          "cropHint": "矢印キーでクロップを移動します。Shiftを押すと10ステップ移動します。",
+          "cropOverlay": "クロップ枠",
+          "colour": "カラー",
+          "colourLabels": {
+            "exposure": "露出",
+            "contrast": "コントラスト",
+            "saturation": "彩度",
+            "temperature": "色温度"
+          },
+          "resetClip": "このクリップをリセット",
+          "noUndo": "元に戻す機能はありません。リセットすると、トリム、クロップ、カラーが初期値に戻ります。",
+          "divergence": "自分のカット · 手動編集",
+          "resyncTitle": "カット順を再同期しますか？",
+          "resyncDescription": "ストーリーボード順に戻します。トリム、クロップ、カラーフィルターは保持されます。",
+          "resyncAction": "ストーリーボードと再同期",
+          "outsideTitle": "まだカットに未配置",
+          "outsideDescription": "これらのシーンにはテイクがありますが、手動カットには含まれていません。",
+          "placeIt": "{{title}}を配置…",
+          "placeBefore": "{{number}}の前 · {{title}}",
+          "addToEnd": "{{title}}を末尾に追加",
+          "addAllToEnd": "すべて末尾に追加",
+          "volume": "プレビュー音量"
+        },
         "render": {
+          "footer": "カットを書き出す",
           "action": "動画をレンダリング",
           "progress": "動画をレンダリング中… {{percent}}%",
+          "progressWithClip": "動画をレンダリング中… {{percent}}% · クリップ {{clip}}/{{total}}",
           "cancel": "レンダリングをキャンセル",
+          "busyReason": "このプロジェクトはすでにレンダリング中です。完了を待つか、開始したウィンドウからキャンセルしてください。",
+          "installFfmpeg": "FFmpeg をインストール",
+          "tryAgain": "レンダリングを再試行",
+          "openProduce": "生成へ移動",
           "missingScenes": "テイクのないシーンが{{count}}件あり、動画には含まれません。",
           "missingScenes_one": "テイクのないシーンが{{count}}件あり、動画には含まれません。",
           "missingScenes_other": "テイクのないシーンが{{count}}件あり、動画には含まれません。",
@@ -997,6 +1057,9 @@
             "busy": "このプロジェクトはすでにレンダリング中です。",
             "noRenderableScenes": "レンダリングできるテイクがあるシーンはありません。",
             "failed": "動画をレンダリングできませんでした。",
+            "failedClip": "クリップ {{clip}}/{{total}} をレンダリングできませんでした。",
+            "noRenderableShots": "ショット {{shots}} にはレンダリング可能なクリップがありません。",
+            "noRenderableShots_other": "ショット {{shots}} にはレンダリング可能なクリップがありません。",
             "cancelled": "動画のレンダリングをキャンセルしました。"
           }
         }
@@ -1278,6 +1341,11 @@
     "export": {
       "title": "素材を書き出す",
       "body": "ストーリーボードのマニフェストと各シーンで選択した素材を書き出します。",
+      "checkingRender": "レンダリング済みカットを確認中…",
+      "noRender": "未レンダリング",
+      "renderedAt": "レンダリング日時",
+      "staleRender": "このカットは最新の編集より前にレンダリングされています。",
+      "latestRenderUnavailable": "最新のレンダリング済みカットを確認できませんでした。書き出しを開き直してください。",
       "gapWarning": "ショット {{shots}} はまだスレートのため、書き出しには含まれません。",
       "gapWarning_other": "ショット {{shots}} はまだスレートのため、書き出しには含まれません。",
       "confirmSelectedCount": "{{count}} ショットを書き出しますか？",

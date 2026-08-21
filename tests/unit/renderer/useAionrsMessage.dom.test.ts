@@ -9,7 +9,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IResponseMessage } from '@/common/adapter/ipcBridge';
 import { useAionrsMessage } from '@/renderer/pages/conversation/platforms/aionrs/useAionrsMessage';
 import { getConversationOrNull } from '@/renderer/pages/conversation/utils/conversationCache';
-import { getLocalTokenUsageSummary } from '@/renderer/pages/conversation/utils/localTokenUsage';
 
 const {
   mergeLiveMessageMock,
@@ -305,38 +304,107 @@ describe('useAionrsMessage runtime state', () => {
     });
   });
 
-  it('records explicit completed-turn usage once with a stable event id', async () => {
-    renderHook(() => useAionrsMessage('conv-1'));
+  it('persists AionRS occupancy and persists it once per turn', async () => {
+    const { result } = renderHook(() => useAionrsMessage('conv-canonical'));
+    const occurredAt = Date.now();
 
     await waitFor(() => {
       expect(responseStreamHandlerRef.current).toBeDefined();
     });
 
-    const completedTurn: IResponseMessage = {
+    const completedTurn = {
       type: 'finish',
-      data: { input_tokens: 10, output_tokens: 5 },
+      data: null,
+      provider_usage: { input_tokens: 10, output_tokens: 5 },
       msg_id: 'message-1',
       turn_id: 'turn-1',
-      conversation_id: 'conv-1',
-    };
+      conversation_id: 'conv-canonical',
+      created_at: occurredAt,
+    } as IResponseMessage;
 
     act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'tips',
+        data: { content: 'Token watermark override: provider=0, local_estimate=11768, using=11768' },
+        msg_id: 'message-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-canonical',
+        created_at: occurredAt,
+      });
       responseStreamHandlerRef.current?.(completedTurn);
       responseStreamHandlerRef.current?.(completedTurn);
     });
 
-    const events = JSON.parse(localStorage.getItem('aionui.local-token-usage.v1') ?? '{"events":[]}').events;
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      id: 'conv-1:turn-1',
-      inputTokens: 10,
-      outputTokens: 5,
+    await waitFor(() => {
+      expect(updateConversationInvokeMock).toHaveBeenCalledTimes(1);
     });
-    expect(getLocalTokenUsageSummary()).toEqual({ today: 15, weekToDate: 15, monthToDate: 15 });
+    expect(result.current.tokenUsage).toEqual({ total_tokens: 11_768 });
+    expect(updateConversationInvokeMock).toHaveBeenCalledWith({
+      id: 'conv-canonical',
+      updates: {
+        extra: {
+          last_token_usage: { total_tokens: 11_768 },
+        },
+      },
+      merge_extra: true,
+    });
   });
 
-  it('records diagnostic estimates when completed turns omit provider usage', async () => {
-    renderHook(() => useAionrsMessage('conv-1'));
+  it('restores AionRS occupancy after a remount', async () => {
+    const occurredAt = Date.now();
+    const firstMount = renderHook(() => useAionrsMessage('conv-restart'));
+
+    act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'tips',
+        data: { content: 'Token watermark override: provider=0, local_estimate=11768, using=11768' },
+        msg_id: 'message-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-restart',
+        created_at: occurredAt,
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'finish',
+        data: null,
+        provider_usage: { input_tokens: 10, output_tokens: 5 },
+        msg_id: 'message-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-restart',
+        created_at: occurredAt,
+      });
+    });
+    await waitFor(() => expect(updateConversationInvokeMock).toHaveBeenCalledTimes(1));
+    firstMount.unmount();
+
+    vi.mocked(getConversationOrNull).mockResolvedValue({
+      id: 'conv-restart',
+      type: 'aionrs',
+      name: 'Restarted conversation',
+      created_at: occurredAt,
+      modified_at: occurredAt,
+      extra: {
+        workspace: '/tmp/conv-restart',
+        last_token_usage: { total_tokens: 11_768 },
+      },
+      model: {
+        id: 'provider-1',
+        platform: 'new-api',
+        name: 'Kimi',
+        base_url: '',
+        api_key: '',
+        use_model: 'kimi-k2.6',
+      },
+    } as never);
+
+    const restarted = renderHook(() => useAionrsMessage('conv-restart'));
+
+    await waitFor(() => {
+      expect(restarted.result.current.tokenUsage).toEqual({ total_tokens: 11_768 });
+    });
+  });
+
+  it('uses diagnostic estimates only for occupancy when completed turns omit provider usage', async () => {
+    const { result } = renderHook(() => useAionrsMessage('conv-1'));
 
     await waitFor(() => {
       expect(responseStreamHandlerRef.current).toBeDefined();
@@ -377,11 +445,38 @@ describe('useAionrsMessage runtime state', () => {
       });
     });
 
-    expect(getLocalTokenUsageSummary()).toEqual({ today: 48_802, weekToDate: 48_802, monthToDate: 48_802 });
+    expect(result.current.tokenUsage).toEqual({ total_tokens: 37_034 });
   });
 
-  it('prefers explicit provider usage over a pending diagnostic estimate', async () => {
-    renderHook(() => useAionrsMessage('conv-1'));
+  it('accepts a lower later occupancy snapshot after context compaction', async () => {
+    const { result } = renderHook(() => useAionrsMessage('conv-1'));
+
+    await waitFor(() => {
+      expect(responseStreamHandlerRef.current).toBeDefined();
+    });
+
+    act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'tips',
+        data: { content: 'Token watermark override: provider=0, local_estimate=37034, using=37034' },
+        msg_id: 'message-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-1',
+      });
+      responseStreamHandlerRef.current?.({
+        type: 'tips',
+        data: { content: 'Token watermark override: provider=0, local_estimate=11768, using=11768' },
+        msg_id: 'message-2',
+        turn_id: 'turn-2',
+        conversation_id: 'conv-1',
+      });
+    });
+
+    expect(result.current.tokenUsage).toEqual({ total_tokens: 11_768 });
+  });
+
+  it('keeps explicit provider consumption separate from a diagnostic occupancy estimate', async () => {
+    const { result } = renderHook(() => useAionrsMessage('conv-1'));
 
     await waitFor(() => {
       expect(responseStreamHandlerRef.current).toBeDefined();
@@ -406,29 +501,10 @@ describe('useAionrsMessage runtime state', () => {
       });
     });
 
-    expect(getLocalTokenUsageSummary()).toEqual({ today: 15, weekToDate: 15, monthToDate: 15 });
+    expect(result.current.tokenUsage).toEqual({ total_tokens: 11_768 });
   });
 
-  it('does not record a completed turn without explicit usage', async () => {
-    renderHook(() => useAionrsMessage('conv-1'));
-
-    await waitFor(() => {
-      expect(responseStreamHandlerRef.current).toBeDefined();
-    });
-
-    act(() => {
-      responseStreamHandlerRef.current?.({
-        type: 'finish',
-        data: {},
-        msg_id: 'message-1',
-        conversation_id: 'conv-1',
-      });
-    });
-
-    expect(getLocalTokenUsageSummary()).toEqual({ today: 0, weekToDate: 0, monthToDate: 0 });
-  });
-
-  it('records output-only usage with the message id fallback', async () => {
+  it('does not invent missing input usage for an output-only report', async () => {
     renderHook(() => useAionrsMessage('conv-1'));
 
     await waitFor(() => {
@@ -444,18 +520,11 @@ describe('useAionrsMessage runtime state', () => {
       });
     });
 
-    const events = JSON.parse(localStorage.getItem('aionui.local-token-usage.v1') ?? '{"events":[]}').events;
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      id: 'conv-1:message-1',
-      inputTokens: 0,
-      outputTokens: 8,
-    });
     expect(updateConversationInvokeMock).not.toHaveBeenCalled();
   });
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY, -1, 'malformed'])(
-    'keeps valid output when input usage is invalid: %p',
+    'rejects a report with invalid input usage instead of inventing zero: %p',
     async (invalidInputTokens) => {
       renderHook(() => useAionrsMessage('conv-1'));
 
@@ -472,14 +541,6 @@ describe('useAionrsMessage runtime state', () => {
         });
       });
 
-      const events = JSON.parse(localStorage.getItem('aionui.local-token-usage.v1') ?? '{"events":[]}').events;
-      expect(events).toEqual([
-        expect.objectContaining({
-          id: 'conv-1:message-1',
-          inputTokens: 0,
-          outputTokens: 8,
-        }),
-      ]);
       expect(updateConversationInvokeMock).not.toHaveBeenCalled();
     }
   );
@@ -574,7 +635,7 @@ describe('useAionrsMessage runtime state', () => {
   });
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY, -1, 'malformed'])(
-    'keeps valid input when output usage is invalid: %p',
+    'rejects a report with invalid output usage instead of inventing zero: %p',
     async (invalidOutputTokens) => {
       renderHook(() => useAionrsMessage('conv-1'));
 
@@ -591,19 +652,7 @@ describe('useAionrsMessage runtime state', () => {
         });
       });
 
-      const events = JSON.parse(localStorage.getItem('aionui.local-token-usage.v1') ?? '{"events":[]}').events;
-      expect(events).toEqual([
-        expect.objectContaining({
-          id: 'conv-1:message-1',
-          inputTokens: 4,
-          outputTokens: 0,
-        }),
-      ]);
-      expect(updateConversationInvokeMock).toHaveBeenCalledWith({
-        id: 'conv-1',
-        updates: { extra: { last_token_usage: { total_tokens: 4 } } },
-        merge_extra: true,
-      });
+      expect(updateConversationInvokeMock).not.toHaveBeenCalled();
     }
   );
 });

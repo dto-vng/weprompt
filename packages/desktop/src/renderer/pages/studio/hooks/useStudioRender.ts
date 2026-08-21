@@ -15,9 +15,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 export type StudioRenderViewState = {
   status: 'idle' | StudioRenderProgressEvent['status'];
   progress: number;
+  clipIndex: number | null;
+  clipTotal: number | null;
   assetId: string | null;
   missingSceneIds: string[] | null;
+  errorCode: StudioRenderErrorCode | null;
   errorMessageKey: string | null;
+  busy: boolean;
 };
 
 export type UseStudioRenderResult = StudioRenderViewState & {
@@ -36,13 +40,29 @@ const RENDER_ERROR_MESSAGE_KEYS: Record<StudioRenderErrorCode, string> = {
 const idleState = (): StudioRenderViewState => ({
   status: 'idle',
   progress: 0,
+  clipIndex: null,
+  clipTotal: null,
   assetId: null,
   missingSceneIds: null,
+  errorCode: null,
   errorMessageKey: null,
+  busy: false,
 });
 
 const isRenderErrorCode = (code: StudioCommandErrorCode): code is StudioRenderErrorCode =>
   Object.hasOwn(RENDER_ERROR_MESSAGE_KEYS, code);
+
+const clipProgressFromEvent = (
+  event: Extract<StudioRenderProgressEvent, { status: 'running' | 'failed' }>
+): Pick<StudioRenderViewState, 'clipIndex' | 'clipTotal'> => {
+  const valid =
+    Number.isSafeInteger(event.clipIndex) &&
+    Number.isSafeInteger(event.clipTotal) &&
+    event.clipIndex! > 0 &&
+    event.clipTotal! > 0 &&
+    event.clipIndex! <= event.clipTotal!;
+  return valid ? { clipIndex: event.clipIndex!, clipTotal: event.clipTotal! } : { clipIndex: null, clipTotal: null };
+};
 
 const stateFromEvent = (event: StudioRenderProgressEvent): StudioRenderViewState => {
   switch (event.status) {
@@ -50,33 +70,47 @@ const stateFromEvent = (event: StudioRenderProgressEvent): StudioRenderViewState
       return {
         status: 'running',
         progress: event.progress,
+        ...clipProgressFromEvent(event),
         assetId: null,
         missingSceneIds: null,
+        errorCode: null,
         errorMessageKey: null,
+        busy: false,
       };
     case 'succeeded':
       return {
         status: 'succeeded',
         progress: 1,
+        clipIndex: null,
+        clipTotal: null,
         assetId: event.assetId,
         missingSceneIds: [...event.missingSceneIds],
+        errorCode: null,
         errorMessageKey: null,
+        busy: false,
       };
     case 'failed':
       return {
         status: 'failed',
         progress: event.progress,
+        ...clipProgressFromEvent(event),
         assetId: null,
         missingSceneIds: event.missingSceneIds === undefined ? null : [...event.missingSceneIds],
+        errorCode: event.errorCode,
         errorMessageKey: RENDER_ERROR_MESSAGE_KEYS[event.errorCode],
+        busy: false,
       };
     case 'cancelled':
       return {
         status: 'cancelled',
         progress: event.progress,
+        clipIndex: null,
+        clipTotal: null,
         assetId: null,
         missingSceneIds: [...event.missingSceneIds],
+        errorCode: 'cancelled',
         errorMessageKey: RENDER_ERROR_MESSAGE_KEYS.cancelled,
+        busy: false,
       };
   }
 };
@@ -96,7 +130,17 @@ export const useStudioRender = (projectId: string): UseStudioRenderResult => {
     setState(idleState());
     const unsubscribe = ipcBridge.creativeStudio.renderProgress.on((event) => {
       if (event.projectId !== projectId || requestGenerationRef.current !== generation) return;
-      setState(stateFromEvent(event));
+      const next = stateFromEvent(event);
+      setState(
+        event.status === 'running' && !renderInFlightRef.current
+          ? {
+              ...next,
+              errorCode: 'busy',
+              errorMessageKey: RENDER_ERROR_MESSAGE_KEYS.busy,
+              busy: true,
+            }
+          : next
+      );
     });
     return () => {
       if (requestGenerationRef.current === generation) requestGenerationRef.current += 1;
@@ -112,9 +156,13 @@ export const useStudioRender = (projectId: string): UseStudioRenderResult => {
     setState({
       status: 'running',
       progress: 0,
+      clipIndex: null,
+      clipTotal: null,
       assetId: null,
       missingSceneIds: null,
+      errorCode: null,
       errorMessageKey: null,
+      busy: false,
     });
     try {
       const result = await ipcBridge.creativeStudio.renderCut.invoke({ projectId: requestedProjectId });
@@ -123,9 +171,13 @@ export const useStudioRender = (projectId: string): UseStudioRenderResult => {
         setState({
           status: 'succeeded',
           progress: 1,
+          clipIndex: null,
+          clipTotal: null,
           assetId: result.data.assetId,
           missingSceneIds: [...result.data.missingSceneIds],
+          errorCode: null,
           errorMessageKey: null,
+          busy: false,
         });
         return;
       }
@@ -136,7 +188,9 @@ export const useStudioRender = (projectId: string): UseStudioRenderResult => {
         ...current,
         status: result.error.code === 'cancelled' ? 'cancelled' : 'failed',
         assetId: null,
+        errorCode: isRenderErrorCode(result.error.code) ? result.error.code : 'render_failed',
         errorMessageKey,
+        busy: result.error.code === 'busy',
       }));
     } catch {
       if (projectIdRef.current !== requestedProjectId || requestGenerationRef.current !== generation) return;
@@ -144,7 +198,9 @@ export const useStudioRender = (projectId: string): UseStudioRenderResult => {
         ...current,
         status: 'failed',
         assetId: null,
+        errorCode: 'render_failed',
         errorMessageKey: RENDER_ERROR_MESSAGE_KEYS.render_failed,
+        busy: false,
       }));
     } finally {
       if (projectIdRef.current === requestedProjectId && requestGenerationRef.current === generation) {
@@ -161,7 +217,9 @@ export const useStudioRender = (projectId: string): UseStudioRenderResult => {
         setState((current) => ({
           ...current,
           status: 'failed',
+          errorCode: 'render_failed',
           errorMessageKey: RENDER_ERROR_MESSAGE_KEYS.render_failed,
+          busy: false,
         }));
       }
     } catch {
@@ -169,7 +227,9 @@ export const useStudioRender = (projectId: string): UseStudioRenderResult => {
         setState((current) => ({
           ...current,
           status: 'failed',
+          errorCode: 'render_failed',
           errorMessageKey: RENDER_ERROR_MESSAGE_KEYS.render_failed,
+          busy: false,
         }));
       }
     }

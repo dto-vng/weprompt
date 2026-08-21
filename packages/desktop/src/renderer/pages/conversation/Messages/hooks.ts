@@ -6,6 +6,7 @@
 
 import { ipcBridge } from '@/common';
 import type { AgentStreamErrorInfo, IMessageText, IMessageTips, TMessage } from '@/common/chat/chatLib';
+import { isQuotaExhaustedMessage } from '@/common/types/provider/quotaExhaustion';
 import {
   composeMessage,
   isDiagnosticTelemetryTip,
@@ -756,7 +757,13 @@ const classifyPersistedSendFailure = (
   if (persistedCode?.startsWith('USER_LLM_PROVIDER_')) {
     return {
       message,
-      code: persistedCode,
+      // BUG-055: the same correction normalizeAgentStreamError makes on the live
+      // stream. Persisted errors are rebuilt here instead, so without it a
+      // reopened conversation still advises waiting out a suspended account.
+      code:
+        persistedCode === 'USER_LLM_PROVIDER_RATE_LIMITED' && isQuotaExhaustedMessage(message)
+          ? 'USER_LLM_PROVIDER_QUOTA_EXHAUSTED'
+          : persistedCode,
       ownership: 'user_llm_provider',
       detail: message,
       retryable: false,

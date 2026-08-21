@@ -50,10 +50,13 @@ import { getSendBoxDraftHook, type FileOrFolderItem } from '@/renderer/hooks/cha
 import { createSetUploadFile, useSendBoxFiles } from '@/renderer/hooks/chat/useSendBoxFiles';
 import { useSlashCommands } from '@/renderer/hooks/chat/useSlashCommands';
 import { useOpenFileSelector, usePresentationSourceDraft } from '@/renderer/hooks/file/selection';
-import { useLocalTokenUsage } from '@/renderer/hooks/useLocalTokenUsage';
 import { useLatestRef } from '@/renderer/hooks/ui/useLatestRef';
 import { useMessageList } from '@/renderer/pages/conversation/Messages/hooks';
-import { resolveConversationContextBudgetSnapshot } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
+import {
+  clearActiveContextBudget,
+  publishActiveContextBudget,
+  resolveConversationContextBudgetSnapshot,
+} from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 import {
   createPresentationCommandQueueController,
   shouldEnqueueConversationCommand,
@@ -80,7 +83,7 @@ import type { AgentModeOption } from '@/renderer/utils/model/agentTypes';
 import { isElectronDesktop } from '@/renderer/utils/platform';
 import { Button, Message, Tag } from '@arco-design/web-react';
 import { Brain, MagicHat, Shield } from '@icon-park/react';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { classifyConversationBusyError } from '../conversationBusyError';
 import { useAionrsMessage } from './useAionrsMessage';
@@ -118,6 +121,7 @@ const useAionrsSendBoxDraft = getSendBoxDraftHook('aionrs', {
 
 const EMPTY_AT_PATH: Array<string | FileOrFolderItem> = [];
 const EMPTY_UPLOAD_FILES: string[] = [];
+const initialMessageInFlight = new Map<string, string>();
 
 const toPresentationSourceRefs = (descriptors: readonly PresentationSourceDescriptor[]): PresentationSourceRef[] =>
   descriptors.map((descriptor) => ({
@@ -217,7 +221,6 @@ const AionrsSendBox: React.FC<{
       },
     }
   );
-  const localUsage = useLocalTokenUsage();
   const messages = useMessageList();
   const contextBudget = useMemo(
     () =>
@@ -231,6 +234,10 @@ const AionrsSendBox: React.FC<{
       }),
     [conversationContext?.conversation, current_model, loadedMcpStatuses, loadedSkills, messages, tokenUsage]
   );
+  useLayoutEffect(() => {
+    publishActiveContextBudget(conversation_id, contextBudget);
+    return () => clearActiveContextBudget(conversation_id, contextBudget);
+  }, [contextBudget, conversation_id]);
   const runtimeView = useConversationRuntimeView(conversation_id);
   const { markSendStarted, markSendAccepted, markSendFailed } = runtimeView;
 
@@ -1001,7 +1008,8 @@ const AionrsSendBox: React.FC<{
     onExecute: executeCommand,
   });
 
-  // Handle initial message from Guid page — wait until model is ready
+  // Handle the initial message from the Guid page. Managed presentation handoffs
+  // remain eligible for durable queueing before the runtime can execute a turn.
   useEffect(() => {
     if (!conversation_id || !current_model?.use_model) return;
 
@@ -1067,20 +1075,40 @@ const AionrsSendBox: React.FC<{
         }
       }
 
-      sessionStorage.setItem(processedKey, '1');
-      sessionStorage.removeItem(storageKey);
+      if (
+        !agentWarmed ||
+        !commandQueueRuntimeGate.hydrated ||
+        !commandQueueRuntimeGate.canSendMessage ||
+        commandQueueRuntimeGate.isProcessing ||
+        initialMessageInFlight.has(storageKey)
+      ) {
+        return;
+      }
+
+      initialMessageInFlight.set(storageKey, storedMessage);
 
       try {
         const { input, files: initialFiles, injectSkills } = JSON.parse(storedMessage);
         await executeCommand({ input, files: initialFiles || [], injectSkills });
+        if (sessionStorage.getItem(storageKey) === storedMessage) {
+          sessionStorage.setItem(processedKey, '1');
+          sessionStorage.removeItem(storageKey);
+        }
       } catch (error) {
         console.error('[AionrsSendBox] Failed to send initial message:', error);
-        sessionStorage.removeItem(processedKey);
+      } finally {
+        if (initialMessageInFlight.get(storageKey) === storedMessage) {
+          initialMessageInFlight.delete(storageKey);
+        }
       }
     };
 
     void processInitialMessage();
   }, [
+    agentWarmed,
+    commandQueueRuntimeGate.canSendMessage,
+    commandQueueRuntimeGate.hydrated,
+    commandQueueRuntimeGate.isProcessing,
     conversation_id,
     current_model?.use_model,
     enqueueManagedPresentation,
@@ -1521,7 +1549,7 @@ const AionrsSendBox: React.FC<{
               beforeRuntimeSet={teamPermission?.warmupSession}
               loadConfigOptions={teamPermission?.loadConfigOptions}
             />
-            <ContextUsageIndicator budget={contextBudget} localUsage={localUsage} />
+            <ContextUsageIndicator budget={contextBudget} />
           </div>
         }
         prefix={

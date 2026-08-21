@@ -1,0 +1,121 @@
+name: Pull Request CI
+
+on:
+  pull_request:
+    branches: [sprint3]
+  push:
+    branches: [sprint3]
+
+concurrency:
+  group: pull-request-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  BUN_INSTALL_REGISTRY: 'https://registry.npmjs.org/'
+
+jobs:
+  quality-and-tests:
+    # macOS runner, matching how the suite has always been run and the primary
+    # platform the product ships on. The gate briefly ran on ubuntu-latest and
+    # found 26 host-dependent failures (BUG-042): updater/tray/menu tests that
+    # implicitly assert darwin behaviour. Linux is inherited upstream build
+    # capability, NOT a release target (product owner, 2026-08-10), so the
+    # gate follows the shipping reality instead of forcing 25 test edits for a
+    # host nobody ships on. If a Linux release is ever chartered, BUG-042
+    # documents exactly what breaks.
+    #
+    # macos-15 = the same runner family as build-and-release.yml's arm64 leg.
+    # If a required status check is ever configured, it must reference THIS
+    # job name.
+    name: Quality and tests (macOS)
+    runs-on: macos-15
+    timeout-minutes: 45
+    # BLOCKING as of 2026-08-10. `continue-on-error` was removed after this
+    # gate passed a full hosted run (`31405462957`: every step green, zero
+    # failing tests) once BUG-042's CI-environment isolation landed.
+    #
+    # Known intermittent: BUG-043 — the readiness hardlink-drift guard fails
+    # open on hosted filesystems, observed fail/fail/pass across three hosted
+    # runs. It WILL red this gate occasionally. That is deliberate: it is a
+    # real fail-open defect on a shipped-adjacent path, and hiding it behind a
+    # retry would repeat the mistake BUG-030's narrow quarantine exists to
+    # avoid. Re-run the job; if the noise becomes unmanageable, quarantine
+    # that single test by exact signature — never the whole job.
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+
+      - name: Restore Bun dependency cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.3.14-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-1.3.14-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check
+        run: bunx tsc --noEmit
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Check formatting
+        run: bunx oxfmt --check
+
+      - name: Validate i18n
+        run: |
+          bun run i18n:types
+          node scripts/check-i18n.js
+
+      # Runs the whole suite in one invocation. Baseline on the integrated
+      # sprint3 tip: 624 files (1 skipped), 8,126 passed, 19 skipped.
+      #
+      # BUG-030 quarantine: TeamSiderSection can raise EnvironmentTeardownError
+      # that fails the PROCESS after every test has already passed. That is
+      # detectable from this run's own summary, so it needs no separate
+      # invocation. Tracking:
+      # https://github.com/khoapnt-vng/WePrompt/blob/sprint3/TASKS.md
+      #
+      # Do NOT reintroduce `vitest run --exclude=<file>` to carve this file out.
+      # The CLI flag REPLACES the resolved exclude list rather than adding to
+      # it, so the glob escapes into node_modules and sibling worktrees —
+      # measured locally as 13,874 discovered test files instead of 625.
+      - name: Run Vitest suite
+        shell: bash
+        run: |
+          set -o pipefail
+          log="$RUNNER_TEMP/suite.log"
+
+          if bun run test 2>&1 | tee "$log"; then
+            exit 0
+          fi
+
+          clean="$RUNNER_TEMP/suite-clean.log"
+          sed $'s/\033\\[[0-9;]*[mK]//g' "$log" > "$clean"
+
+          # Pass only when the process died on the known teardown error while
+          # NOTHING actually failed. Any failed file or test still blocks.
+          if grep -q 'EnvironmentTeardownError' "$clean" \
+            && ! grep -Eq 'Test Files[[:space:]]+[0-9]+ failed' "$clean" \
+            && ! grep -Eq 'Tests[[:space:]]+[0-9]+ failed' "$clean"; then
+            echo '::warning title=BUG-030 quarantine::Suite exited non-zero via EnvironmentTeardownError with zero failing tests; treated as the known BUG-030 teardown.'
+            {
+              echo '### BUG-030 quarantine'
+              echo 'The suite exited non-zero through the known EnvironmentTeardownError while every test passed. BUG-030 remains non-blocking.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo '::error title=Suite failed::Failure is not the known BUG-030 post-green teardown signature.'
+          exit 1

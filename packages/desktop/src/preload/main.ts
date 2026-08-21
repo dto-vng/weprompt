@@ -11,6 +11,7 @@
 import '@sentry/electron/preload';
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { ADAPTER_BRIDGE_EVENT_KEY } from '../common/adapter/native/constants';
+import { isBoundedConversationId } from '@/common/types/office/conversationId';
 import type {
   GrantPresentationExternalDropRequest,
   GrantPresentationExternalDropResult,
@@ -42,8 +43,7 @@ const isPresentationGrantOwner = (value: unknown): value is PresentationGrantOwn
   return (
     value.owner_type === 'conversation' &&
     hasExactKeys(value, ['owner_type', 'conversation_id']) &&
-    typeof value.conversation_id === 'string' &&
-    UUID_PATTERN.test(value.conversation_id)
+    isBoundedConversationId(value.conversation_id)
   );
 };
 

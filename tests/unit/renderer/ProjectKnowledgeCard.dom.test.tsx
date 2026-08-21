@@ -680,6 +680,46 @@ describe('ProjectKnowledgeCard', () => {
     expect(screen.getByTestId('knowledge-embed-all')).toBeDisabled();
   });
 
+  // Without an embedding-capable model the embed pass resolves no model and returns
+  // having changed nothing — by design, and it succeeds, so nothing raises and no toast
+  // appears. The buttons looked live and did nothing; the prerequisite was stated one
+  // line above them and connected to nothing.
+  it('disables Embed all when no embedding model is configured', () => {
+    setState({ sources: [partialSource], summary: { fileCount: 1, passageCount: 5, semantic: 'off' } });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByTestId('knowledge-embed-all')).toBeDisabled();
+  });
+
+  it('offers Embed all once an embedding model exists', () => {
+    setState({ sources: [partialSource], summary: { fileCount: 1, passageCount: 5, semantic: 'on' } });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByTestId('knowledge-embed-all')).toBeEnabled();
+  });
+
+  it('disables the per-source Retry that can only embed', () => {
+    setState({ sources: [partialSource], summary: { fileCount: 1, passageCount: 5, semantic: 'off' } });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    expect(screen.getByTestId(`knowledge-retry-embed-${partialSource.id}`)).toBeDisabled();
+  });
+
+  // The distinction that matters: retrying a FAILED source re-indexes it, which works
+  // perfectly well without embeddings. Gating that too would remove the only way to
+  // recover a parse failure while semantic search happens to be off.
+  it('leaves Retry on a failed source enabled with no embedding model', () => {
+    setState({ sources: [failedSource], summary: { fileCount: 1, passageCount: 0, semantic: 'off' } });
+
+    render(<ProjectKnowledgeCard project={project} />);
+
+    const retry = screen.getByRole('button', { name: 'conversation.projectHome.knowledgeRetry' });
+    expect(retry).toBeEnabled();
+  });
+
   // ---- semantic off is a state with a fix, not just a diagnosis ----------
 
   it('sends the user to the model settings page from the semantic-off note', () => {

@@ -53,6 +53,7 @@ import {
   hasExactPresentationTerminalEvidence,
 } from '../storage';
 import { buildPresentationRunDirective } from './presentationRunDirective';
+import { isBoundedConversationId } from '@/common/types/office/conversationId';
 import {
   buildPresentationGrounding,
   extractPresentationSources,
@@ -201,8 +202,7 @@ function normalizeRequest(value: unknown): NormalizedStartRequest | null {
   if (
     !isPlainRecord(value) ||
     !hasExactKeys(value, ['conversation_id', 'client_request_id', 'input', 'selected_template_id', 'sources']) ||
-    typeof value.conversation_id !== 'string' ||
-    !UUID_RE.test(value.conversation_id) ||
+    !isBoundedConversationId(value.conversation_id) ||
     typeof value.client_request_id !== 'string' ||
     !UUID_RE.test(value.client_request_id) ||
     typeof value.input !== 'string' ||
@@ -259,7 +259,7 @@ function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]): b
 }
 
 function normalizeGetRequest(value: unknown): GetPresentationRunRequest | null {
-  if (!isPlainRecord(value) || typeof value.conversation_id !== 'string' || !UUID_RE.test(value.conversation_id)) {
+  if (!isPlainRecord(value) || !isBoundedConversationId(value.conversation_id)) {
     return null;
   }
   if (
@@ -286,8 +286,7 @@ function normalizeListRequest(value: unknown): ListRecoverablePresentationRunsRe
   if (
     !isPlainRecord(value) ||
     !hasOnlyKeys(value, ['conversation_id', 'cursor', 'limit']) ||
-    typeof value.conversation_id !== 'string' ||
-    !UUID_RE.test(value.conversation_id) ||
+    !isBoundedConversationId(value.conversation_id) ||
     (value.cursor !== undefined &&
       (typeof value.cursor !== 'string' ||
         value.cursor.length < 3 ||
@@ -311,8 +310,7 @@ function normalizeOpenRequest(value: unknown): OpenPresentationRunRequest | null
   if (
     !isPlainRecord(value) ||
     !hasExactKeys(value, ['conversation_id', 'run_id', 'expected_sha256']) ||
-    typeof value.conversation_id !== 'string' ||
-    !UUID_RE.test(value.conversation_id) ||
+    !isBoundedConversationId(value.conversation_id) ||
     typeof value.run_id !== 'string' ||
     !UUID_RE.test(value.run_id) ||
     typeof value.expected_sha256 !== 'string' ||
@@ -331,8 +329,7 @@ function normalizeDiscardRequest(value: unknown): DiscardPresentationRunRequest 
   if (
     !isPlainRecord(value) ||
     !hasExactKeys(value, ['conversation_id', 'run_id', 'expected_revision']) ||
-    typeof value.conversation_id !== 'string' ||
-    !UUID_RE.test(value.conversation_id) ||
+    !isBoundedConversationId(value.conversation_id) ||
     typeof value.run_id !== 'string' ||
     !UUID_RE.test(value.run_id) ||
     !Number.isSafeInteger(value.expected_revision) ||
@@ -351,8 +348,7 @@ function normalizeClaimRequest(value: unknown): ClaimInitialPresentationDispatch
   if (
     !isPlainRecord(value) ||
     !hasExactKeys(value, ['conversation_id', 'run_id', 'holder_id', 'expected_revision']) ||
-    typeof value.conversation_id !== 'string' ||
-    !UUID_RE.test(value.conversation_id) ||
+    !isBoundedConversationId(value.conversation_id) ||
     typeof value.run_id !== 'string' ||
     !UUID_RE.test(value.run_id) ||
     typeof value.holder_id !== 'string' ||
@@ -376,8 +372,7 @@ function normalizeLeaseRequest<
   if (
     !isPlainRecord(value) ||
     !hasExactKeys(value, ['conversation_id', 'run_id', 'lease_token', 'expected_revision']) ||
-    typeof value.conversation_id !== 'string' ||
-    !UUID_RE.test(value.conversation_id) ||
+    !isBoundedConversationId(value.conversation_id) ||
     typeof value.run_id !== 'string' ||
     !UUID_RE.test(value.run_id) ||
     typeof value.lease_token !== 'string' ||

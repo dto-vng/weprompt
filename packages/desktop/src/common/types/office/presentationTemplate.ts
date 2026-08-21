@@ -40,6 +40,40 @@ export type PresentationTemplateSummary = {
   previewDataUrl: string;
 };
 
+export type PresentationTemplateCandidateDescription = {
+  name: string;
+  tokens: { colors: string[]; fonts: string[] };
+  preview_data_url: string;
+  sha256: string;
+  byte_length: number;
+};
+
+export type PresentationTemplateCandidateFailureCode =
+  | 'INVALID_REQUEST'
+  | 'RUN_NOT_FOUND'
+  | 'RUN_FORBIDDEN'
+  | 'SCOPE_UNAVAILABLE'
+  | 'TEAM_SCOPE_UNSUPPORTED'
+  | 'CANDIDATE_OUTSIDE_WORKSPACE'
+  | 'CANDIDATE_UNSUPPORTED'
+  | 'CANDIDATE_TOO_LARGE'
+  | 'CANDIDATE_CHANGED'
+  | 'CONFIRMATION_NOT_MINTED'
+  | 'INSTALL_FAILED';
+
+export type PresentationTemplateCandidateFailure = {
+  ok: false;
+  code: PresentationTemplateCandidateFailureCode;
+};
+
+export type DescribePresentationTemplateCandidateResult =
+  | { ok: true; candidate: PresentationTemplateCandidateDescription }
+  | PresentationTemplateCandidateFailure;
+
+export type ImportPresentationTemplateCandidateResult =
+  | { ok: true; template: PresentationTemplateSummary }
+  | PresentationTemplateCandidateFailure;
+
 /** Exact app-owned scratch location for one Office artifact run. */
 export type ArtifactScratchAllocation = {
   runId: string;

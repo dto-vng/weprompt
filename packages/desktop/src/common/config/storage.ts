@@ -605,6 +605,11 @@ export interface IProvider {
       last_check?: number; // 时间戳 / timestamp
       latency?: number; // 延迟时间（毫秒）/ latency in milliseconds
       error?: string; // 错误信息 / error message
+      failure_class?: import('@/common/types/provider/providerApi').ProviderHealthFailureClass;
+      http_status?: number;
+      request_id?: string;
+      retry_after_ms?: number;
+      provider_error_type?: string;
     }
   >;
   /**

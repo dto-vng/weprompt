@@ -17,6 +17,7 @@ const {
   getSlashCommandsInvokeMock,
   responseStreamOnMock,
   responseStreamHandlerRef,
+  updateConversationInvokeMock,
 } = vi.hoisted(() => ({
   addOrUpdateMessageMock: vi.fn(),
   ensureRuntimeInvokeMock: vi.fn(),
@@ -25,6 +26,7 @@ const {
   responseStreamHandlerRef: {
     current: undefined as ((message: IResponseMessage) => void) | undefined,
   },
+  updateConversationInvokeMock: vi.fn(),
 }));
 
 vi.mock('@/renderer/pages/conversation/Messages/hooks', () => ({
@@ -53,6 +55,9 @@ vi.mock('@/common', () => ({
       getSlashCommands: {
         invoke: getSlashCommandsInvokeMock,
       },
+      update: {
+        invoke: updateConversationInvokeMock,
+      },
     },
   },
 }));
@@ -73,7 +78,9 @@ describe('useAcpMessage', () => {
     resetEnsureConversationRuntimeStateForTests();
     ensureRuntimeInvokeMock.mockResolvedValue({ recovered: false, config_options: [], runtime: null });
     getSlashCommandsInvokeMock.mockResolvedValue([]);
+    updateConversationInvokeMock.mockResolvedValue(true);
     responseStreamHandlerRef.current = undefined;
+    localStorage.clear();
   });
 
   it('reports matching finish and error terminals to lifecycle consumers', () => {
@@ -268,7 +275,7 @@ describe('useAcpMessage', () => {
     });
   });
 
-  it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])(
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
     'keeps the last valid context usage when ACP reports invalid used value %s',
     (used) => {
       vi.mocked(getConversationOrNull).mockResolvedValue(null);
@@ -297,7 +304,7 @@ describe('useAcpMessage', () => {
     }
   );
 
-  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
     'keeps the last valid context limit when ACP reports invalid size %s',
     (size) => {
       vi.mocked(getConversationOrNull).mockResolvedValue(null);
@@ -325,6 +332,92 @@ describe('useAcpMessage', () => {
       expect(result.current.context_limit).toBe(32_000);
     }
   );
+
+  it('persists ACP occupancy and persists it once per turn', async () => {
+    vi.mocked(getConversationOrNull).mockResolvedValue(null);
+    const { result } = renderHook(() => useAcpMessage('conv-usage'));
+    const occurredAt = Date.now();
+    const usageMessage = {
+      type: 'acp_context_usage',
+      data: {
+        used: 12_000,
+        size: 32_000,
+        _meta: { input_tokens: 10, output_tokens: 5 },
+      },
+      msg_id: 'message-1',
+      turn_id: 'turn-1',
+      conversation_id: 'conv-usage',
+      created_at: occurredAt,
+      provider_usage: { input_tokens: 10, output_tokens: 5 },
+    } as IResponseMessage;
+
+    act(() => {
+      responseStreamHandlerRef.current?.(usageMessage);
+      responseStreamHandlerRef.current?.(usageMessage);
+    });
+
+    await waitFor(() => {
+      expect(result.current.tokenUsage).toEqual({ total_tokens: 12_000 });
+      expect(updateConversationInvokeMock).toHaveBeenCalledTimes(1);
+    });
+    expect(updateConversationInvokeMock).toHaveBeenCalledWith({
+      id: 'conv-usage',
+      updates: {
+        extra: {
+          last_token_usage: { total_tokens: 12_000 },
+          last_context_limit: 32_000,
+        },
+      },
+      merge_extra: true,
+    });
+  });
+
+  it('restores persisted ACP occupancy after a remount', async () => {
+    vi.mocked(getConversationOrNull).mockResolvedValue(null);
+    const occurredAt = Date.now();
+    const firstMount = renderHook(() => useAcpMessage('conv-restart'));
+
+    act(() => {
+      responseStreamHandlerRef.current?.({
+        type: 'acp_context_usage',
+        data: { used: 12_000, size: 32_000 },
+        provider_usage: { input_tokens: 10, output_tokens: 5 },
+        msg_id: 'message-1',
+        turn_id: 'turn-1',
+        conversation_id: 'conv-restart',
+        created_at: occurredAt,
+      });
+    });
+    await waitFor(() => expect(updateConversationInvokeMock).toHaveBeenCalledTimes(1));
+    firstMount.unmount();
+
+    vi.mocked(getConversationOrNull).mockResolvedValue({
+      id: 'conv-restart',
+      type: 'acp',
+      name: 'Restarted conversation',
+      created_at: occurredAt,
+      modified_at: occurredAt,
+      extra: {
+        last_token_usage: { total_tokens: 12_000 },
+        last_context_limit: 32_000,
+      },
+      model: {
+        id: 'provider-1',
+        platform: 'acp',
+        name: 'ACP',
+        base_url: '',
+        api_key: '',
+        use_model: 'model-1',
+      },
+    } as never);
+
+    const restarted = renderHook(() => useAcpMessage('conv-restart'));
+
+    await waitFor(() => {
+      expect(restarted.result.current.tokenUsage).toEqual({ total_tokens: 12_000 });
+      expect(restarted.result.current.context_limit).toBe(32_000);
+    });
+  });
 
   it('loads initial slash commands after runtime ensure without legacy warmup', async () => {
     vi.mocked(getConversationOrNull).mockResolvedValue(null);

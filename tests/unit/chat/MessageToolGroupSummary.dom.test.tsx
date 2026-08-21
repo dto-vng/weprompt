@@ -14,6 +14,33 @@ import MessageToolGroupSummary from '@/renderer/pages/conversation/Messages/comp
 import enUsMessages from '@/renderer/services/i18n/locales/en-US/messages.json';
 import type { WorkJournalSourceMessage } from '@/renderer/pages/conversation/Messages/types';
 
+const thinkingStep = (
+  id: string,
+  subject: string | undefined,
+  status: 'thinking' | 'done',
+  raw = 'RAW_THINKING_SENTINEL'
+): WorkJournalSourceMessage =>
+  ({
+    id,
+    conversation_id: 'conv-1',
+    type: 'thinking',
+    position: 'left',
+    content: { subject, content: raw, status },
+  }) as WorkJournalSourceMessage;
+
+const toolGroupStep = (id: string, statuses: Array<'Success' | 'Error'>): WorkJournalSourceMessage =>
+  ({
+    id,
+    conversation_id: 'conv-1',
+    type: 'tool_group',
+    position: 'left',
+    content: statuses.map((status, index) => ({
+      call_id: `${id}-${index}`,
+      name: 'ExecCommand',
+      status,
+    })),
+  }) as WorkJournalSourceMessage;
+
 const mockDownloadFileFromPath = vi.fn().mockResolvedValue(undefined);
 const mockMessageSuccess = vi.fn();
 const mockMessageError = vi.fn();
@@ -486,6 +513,31 @@ describe('MessageToolGroupSummary plain-language activity', () => {
     expect(within(expandTechnicalDetails()).getByText('Reviewing the conversation activity')).toBeInTheDocument();
   });
 
+  it('shows the localized running fallback for active subjectless thinking', () => {
+    render(<MessageToolGroupSummary isActive messages={[thinkingStep('thinking-running', undefined, 'thinking')]} />);
+
+    expect(screen.getByText('conversation.thinking.label')).toBeVisible();
+    expect(document.body).not.toHaveTextContent('RAW_THINKING_SENTINEL');
+  });
+
+  it('keeps completed subjectless thinking in Technical Details', () => {
+    render(<MessageToolGroupSummary messages={[thinkingStep('thinking-done', undefined, 'done')]} />);
+
+    expect(screen.queryByText('conversation.thinking.complete')).not.toBeInTheDocument();
+    expect(within(expandTechnicalDetails()).getByText('conversation.thinking.complete')).toBeVisible();
+    expect(document.body).not.toHaveTextContent('RAW_THINKING_SENTINEL');
+  });
+
+  it('keeps consecutive subjectless thinking messages as separate detail rows', () => {
+    render(
+      <MessageToolGroupSummary
+        messages={[thinkingStep('thinking-one', undefined, 'done'), thinkingStep('thinking-two', undefined, 'done')]}
+      />
+    );
+
+    expect(within(expandTechnicalDetails()).getAllByText('conversation.thinking.complete')).toHaveLength(2);
+  });
+
   it('keeps safe trimmed plan narration visible', () => {
     render(
       <MessageToolGroupSummary
@@ -689,34 +741,22 @@ describe('MessageToolGroupSummary plain-language activity', () => {
     render(
       <MessageToolGroupSummary
         isActive
-        messages={
-          [
-            {
-              id: 'thinking-command',
-              conversation_id: 'conv-1',
-              type: 'thinking',
-              position: 'left',
-              content: { subject: 'Execute: npm test', content: 'raw command reasoning', status: 'thinking' },
-            },
-            {
-              id: 'thinking-path',
-              conversation_id: 'conv-1',
-              type: 'thinking',
-              position: 'left',
-              content: {
-                subject: 'Review packages/desktop/src/renderer/App.tsx',
-                content: 'raw path reasoning',
-                status: 'thinking',
-              },
-            },
-          ] as WorkJournalSourceMessage[]
-        }
+        messages={[
+          thinkingStep('thinking-command', 'Execute: npm test', 'thinking'),
+          thinkingStep('thinking-path', 'Review packages/desktop/src/renderer/App.tsx', 'thinking'),
+          thinkingStep('thinking-diagnostic', 'Microcompact: internal activity telemetry', 'thinking'),
+        ]}
       />
     );
 
     expect(screen.queryByText(/Execute: npm test/)).not.toBeInTheDocument();
     expect(screen.queryByText(/packages\/desktop\/src/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/raw .* reasoning/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Microcompact/)).not.toBeInTheDocument();
+    expect(screen.getByText('conversation.thinking.label')).toBeVisible();
+    expect(document.body).not.toHaveTextContent('RAW_THINKING_SENTINEL');
+    expect(document.querySelector('[title*="RAW_THINKING_SENTINEL"]')).toBeNull();
+    expect(document.querySelector('[aria-label*="RAW_THINKING_SENTINEL"]')).toBeNull();
+    expect(document.querySelector('[aria-description*="RAW_THINKING_SENTINEL"]')).toBeNull();
   });
 
   it('rejects diagnostic thinking subjects', () => {
@@ -1442,6 +1482,30 @@ describe('MessageToolGroupSummary plain-language activity', () => {
       expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
 
+    it('keeps the turn recap independent of provider thinking subjects', () => {
+      const withoutSubject = render(
+        <MessageToolGroupSummary
+          messages={[toolGroupStep('failed-tool', ['Error']), thinkingStep('thinking-fallback', undefined, 'done')]}
+        />
+      );
+      const recapWithoutSubject = screen.getByRole('status').textContent;
+      // Without this the comparison below would still pass if the recap ever rendered
+      // empty in both cases, which is the regression this test exists to catch.
+      expect(recapWithoutSubject).toBeTruthy();
+      withoutSubject.unmount();
+
+      render(
+        <MessageToolGroupSummary
+          messages={[
+            toolGroupStep('failed-tool', ['Error']),
+            thinkingStep('thinking-subject', 'Reviewing the failed operation', 'done'),
+          ]}
+        />
+      );
+
+      expect(screen.getByRole('status')).toHaveTextContent(recapWithoutSubject ?? '');
+    });
+
     it('keeps raw command, path, output, telemetry, and provider narration out of the recap', () => {
       const unsafePlan = 'Run: bun test packages/desktop/src/renderer/App.tsx request_id=secret';
       render(
@@ -1538,6 +1602,46 @@ describe('MessageToolGroupSummary narration-first journal', () => {
       content: { entries: [{ content: 'Enable the Google Drive API', status: 'completed' }] },
     } as unknown as WorkJournalSourceMessage;
     render(<MessageToolGroupSummary messages={[singleActionWithSubject]} isActive={false} />);
+    expect(screen.getByText(/done|finished|came together/i)).toBeInTheDocument();
+  });
+
+  it('keeps a failed tool turn failed when safe-subject thinking is present', () => {
+    render(
+      <MessageToolGroupSummary
+        messages={[
+          toolGroupStep('failed-tool', ['Error']),
+          thinkingStep('safe-thinking', 'Reviewing the failed operation', 'done'),
+        ]}
+      />
+    );
+
+    expect(screen.getByText(/wasn't able to finish|didn't go through/i)).toHaveClass('text-warning');
+    expect(screen.queryByText(/got most of this done|Good progress/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps one successful tool trivial when thinking is present', () => {
+    render(
+      <MessageToolGroupSummary
+        messages={[
+          toolGroupStep('single-tool', ['Success']),
+          thinkingStep('safe-thinking', 'Reviewing the successful operation', 'done'),
+        ]}
+      />
+    );
+
+    expect(screen.queryByText(/done|finished|came together/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps the completed close for multiple successful tools when thinking is present', () => {
+    render(
+      <MessageToolGroupSummary
+        messages={[
+          toolGroupStep('multi-tool', ['Success', 'Success']),
+          thinkingStep('safe-thinking', 'Reviewing the completed operations', 'done'),
+        ]}
+      />
+    );
+
     expect(screen.getByText(/done|finished|came together/i)).toBeInTheDocument();
   });
 

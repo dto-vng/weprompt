@@ -220,7 +220,8 @@
     "codes": {
       "TEAM_ASSISTANT_ID_REQUIRED": "Please select an assistant before creating the team.",
       "TEAM_ASSISTANT_NOT_FOUND": "Assistant {{assistantId}} is no longer available. Refresh the assistant list and choose another one.",
-      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Use assistant_id instead of {{field}}."
+      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "Use assistant_id instead of {{field}}.",
+      "TEAM_MEMBER_MODEL_UNRESOLVED": "No model is available for this team member. Add or enable a model provider in Settings, then try again."
     }
   },
   "agentError": {
@@ -367,6 +368,10 @@
       "USER_LLM_PROVIDER_RATE_LIMITED": {
         "title": "모델 제공자 요청 제한에 도달했습니다",
         "body": "제공자가 일시적으로 요청을 제한하고 있습니다. 잠시 기다리거나 요청 빈도를 낮추거나 모델을 전환하세요."
+      },
+      "USER_LLM_PROVIDER_QUOTA_EXHAUSTED": {
+        "title": "모델 공급자 할당량 소진",
+        "body": "공급자 계정의 잔액 또는 할당량이 소진되어 기다려도 해결되지 않습니다. 계정을 충전하거나 요금제를 확인하거나 다른 모델로 전환하세요."
       },
       "USER_LLM_PROVIDER_TIMEOUT": {
         "title": "모델 제공자 요청 시간이 초과되었습니다",
@@ -515,6 +520,8 @@
     "changes": {
       "tab": "변경",
       "filesTab": "파일",
+      "previewTab": "미리보기",
+      "browserTab": "브라우저",
       "currentBranchLabel": "현재 브랜치",
       "summary": "{{count}}개 파일 변경됨",
       "insertions": "+{{count}} 줄 추가",
@@ -635,10 +642,6 @@
     "contextWindow": "컨텍스트 창",
     "percentUsed": "{{percent}}% 사용됨",
     "tokenCount": "{{used}} / {{limit}} 토큰",
-    "localTokenUsage": "로컬 토큰 사용량",
-    "today": "오늘",
-    "weekToDate": "이번 주 누적",
-    "monthToDate": "이번 달 누적",
     "triggerLabel": "컨텍스트 사용량 표시",
     "estimated": "예상",
     "unavailable": "컨텍스트 사용량을 확인할 수 없음"
@@ -921,7 +924,7 @@
         "continueToProduce": "제작으로 계속",
         "askAssistant": "어시스턴트에게 묻기",
         "assistantTitle": "작성 어시스턴트",
-        "assistantDescription": "어시스턴트로 이야기 구조, 숏 아이디어, 프롬프트를 발전시키세요.",
+        "assistantDescription": "브리프를 바탕으로 스토리보드 초안을 만듭니다.",
         "textChargeDisclosure": "스토리보드 초안에는 설정한 텍스트 모델이 사용됩니다. 공급자가 모델 사용 요금을 청구할 수 있습니다.",
         "draftStoryboard": "스토리보드 초안 만들기",
         "addShot": "숏 추가",
@@ -984,10 +987,67 @@
         "openProduce": "제작 열기",
         "handoffDescription": "전달에는 스토리보드 매니페스트와 선택된 미디어만 포함됩니다. 검토용 슬레이트는 내보내지지 않습니다.",
         "partialHandoff": "일부 장면에 선택된 미디어가 없어 이번 전달은 일부만 포함합니다.",
+        "cut": {
+          "duration": {
+            "played": "재생 {{seconds}}초",
+            "untrimmed": "원본 {{seconds}}초",
+            "render": "렌더링 {{seconds}}초"
+          },
+          "trimmed": "트리밍됨",
+          "graded": "색보정됨",
+          "clipAccessible": "클립 {{number}}, {{title}}, {{seconds}}초",
+          "dragClip": "{{title}}을 드래그하여 순서 변경",
+          "moveAnnouncement": "클립 {{clip}}을 전체 {{total}}개 중 {{position}}번째로 이동했습니다. 이제 컷 순서는 수동입니다.",
+          "playhead": "컷 재생 헤드",
+          "secondsValue": "{{seconds}}초",
+          "trimInHandle": "인 지점 핸들",
+          "trimOutHandle": "아웃 지점 핸들",
+          "inspector": "클립 인스펙터",
+          "selectClip": "검토할 클립 또는 슬레이트를 선택하세요.",
+          "takes": "테이크",
+          "trim": "트림",
+          "inPoint": "인",
+          "outPoint": "아웃",
+          "trimInField": "인 지점(초)",
+          "trimOutField": "아웃 지점(초)",
+          "setIn": "재생 헤드에 I 설정",
+          "setOut": "재생 헤드에 O 설정",
+          "frame": "프레임",
+          "scale": "크롭 배율",
+          "scaleValue": "{{percent}}%",
+          "cropHint": "화살표 키로 크롭을 이동합니다. Shift를 누르면 열 단계씩 이동합니다.",
+          "cropOverlay": "크롭 프레임",
+          "colour": "색상",
+          "colourLabels": {
+            "exposure": "노출",
+            "contrast": "대비",
+            "saturation": "채도",
+            "temperature": "색온도"
+          },
+          "resetClip": "이 클립 초기화",
+          "noUndo": "실행 취소는 없습니다. 초기화하면 트림, 크롭, 색상이 기본값으로 돌아갑니다.",
+          "divergence": "내 컷 · 수동 편집",
+          "resyncTitle": "컷 순서를 다시 동기화할까요?",
+          "resyncDescription": "스토리보드 순서로 돌아갑니다. 트림, 크롭, 색상 필터는 유지됩니다.",
+          "resyncAction": "스토리보드와 다시 동기화",
+          "outsideTitle": "아직 컷에 없음",
+          "outsideDescription": "이 장면들은 테이크가 있지만 수동 컷에는 포함되지 않았습니다.",
+          "placeIt": "{{title}} 배치…",
+          "placeBefore": "{{number}} 앞 · {{title}}",
+          "addToEnd": "{{title}}을 끝에 추가",
+          "addAllToEnd": "모두 끝에 추가",
+          "volume": "미리보기 볼륨"
+        },
         "render": {
+          "footer": "컷 렌더링",
           "action": "동영상 렌더링",
           "progress": "동영상 렌더링 중… {{percent}}%",
+          "progressWithClip": "동영상 렌더링 중… {{percent}}% · 클립 {{clip}}/{{total}}",
           "cancel": "렌더링 취소",
+          "busyReason": "이 프로젝트는 이미 렌더링 중입니다. 완료될 때까지 기다리거나 렌더링을 시작한 창에서 취소하세요.",
+          "installFfmpeg": "FFmpeg 설치",
+          "tryAgain": "렌더링 다시 시도",
+          "openProduce": "생성으로 이동",
           "missingScenes": "테이크가 없는 장면 {{count}}개는 동영상에 포함되지 않습니다.",
           "missingScenes_one": "테이크가 없는 장면 {{count}}개는 동영상에 포함되지 않습니다.",
           "missingScenes_other": "테이크가 없는 장면 {{count}}개는 동영상에 포함되지 않습니다.",
@@ -997,6 +1057,9 @@
             "busy": "이 프로젝트는 이미 렌더링 중입니다.",
             "noRenderableScenes": "렌더링할 테이크가 있는 장면이 없습니다.",
             "failed": "동영상을 렌더링하지 못했습니다.",
+            "failedClip": "클립 {{clip}}/{{total}}을 렌더링할 수 없습니다.",
+            "noRenderableShots": "샷 {{shots}}에 렌더링 가능한 클립이 없습니다.",
+            "noRenderableShots_other": "샷 {{shots}}에 렌더링 가능한 클립이 없습니다.",
             "cancelled": "동영상 렌더링을 취소했습니다."
           }
         }
@@ -1278,6 +1341,11 @@
     "export": {
       "title": "에셋 내보내기",
       "body": "스토리보드 매니페스트와 각 장면에서 선택한 에셋을 내보냅니다.",
+      "checkingRender": "렌더링된 컷을 확인하는 중…",
+      "noRender": "아직 렌더링되지 않음",
+      "renderedAt": "렌더링 시간",
+      "staleRender": "이 컷은 최근 편집 전에 렌더링되었습니다.",
+      "latestRenderUnavailable": "최신 렌더링 컷을 확인할 수 없습니다. 내보내기를 다시 여세요.",
       "gapWarning": "쇼트 {{shots}}는 아직 슬레이트이므로 내보내기에 포함되지 않습니다.",
       "gapWarning_other": "쇼트 {{shots}}는 아직 슬레이트이므로 내보내기에 포함되지 않습니다.",
       "confirmSelectedCount": "쇼트 {{count}}개를 내보낼까요?",

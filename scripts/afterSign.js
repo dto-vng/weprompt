@@ -1,4 +1,9 @@
 const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+
+const MAC_DMG_RETRY_MARKER_ENV = 'WEPROMPT_MAC_DMG_RETRY_MARKER';
+const MAC_DMG_RETRY_NONCE_ENV = 'WEPROMPT_MAC_DMG_RETRY_NONCE';
 
 const INTERNAL_RELEASE_SIGNING_ENV_NAMES = [
   'BUILD_CERTIFICATE_BASE64',
@@ -115,5 +120,32 @@ async function afterSign(
   }
 }
 
+function artifactBuildStarted(event, { env = process.env } = {}) {
+  if (event.targetPresentableName !== 'DMG') {
+    return;
+  }
+
+  const markerPath = env[MAC_DMG_RETRY_MARKER_ENV];
+  const nonce = env[MAC_DMG_RETRY_NONCE_ENV];
+  if (markerPath == null && nonce == null) {
+    return;
+  }
+  if (typeof nonce !== 'string' || !/^[a-f0-9]{64}$/.test(nonce) || typeof markerPath !== 'string') {
+    throw new Error('Invalid macOS DMG retry authorization environment');
+  }
+
+  const expectedMarkerPath = path.resolve(__dirname, '..', 'out', `.mac-dmg-retry-${nonce}.json`);
+  if (path.resolve(markerPath) !== expectedMarkerPath) {
+    throw new Error('Invalid macOS DMG retry authorization path');
+  }
+
+  fs.writeFileSync(
+    markerPath,
+    `${JSON.stringify({ artifactPath: path.resolve(event.file), nonce, target: event.targetPresentableName })}\n`,
+    { encoding: 'utf8', mode: 0o600 }
+  );
+}
+
 exports.afterSign = afterSign;
+exports.artifactBuildStarted = artifactBuildStarted;
 exports.default = afterSign;

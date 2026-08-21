@@ -33,6 +33,7 @@ vi.mock('@/renderer/components/chat/SpeechInputButton', () => ({ default: () => 
 vi.mock('@/renderer/components/media/UploadProgressBar', () => ({ default: () => null }));
 vi.mock('@/renderer/hooks/chat/useCompositionInput', () => ({
   useCompositionInput: () => ({
+    createCompositionValueSync: () => vi.fn(),
     compositionHandlers: {},
     createKeyDownHandler: () => vi.fn(),
     isComposingState: false,
@@ -115,23 +116,13 @@ vi.mock('react-i18next', () => ({
         'conversation.contextUsage.contextWindow': 'Context window',
         'conversation.contextUsage.percentUsed': '{{percent}}% used',
         'conversation.contextUsage.tokenCount': '{{used}} of {{limit}} tokens',
-        'conversation.contextUsage.localTokenUsage': 'Local token usage',
-        'conversation.contextUsage.today': 'Today',
-        'conversation.contextUsage.weekToDate': 'Week to date',
-        'conversation.contextUsage.monthToDate': 'Month to date',
       };
       return (translations[key] ?? key).replace(/{{(\w+)}}/g, (_match, name: string) => String(options?.[name] ?? ''));
     },
   }),
 }));
 
-const usageMeter = (
-  <ContextUsageIndicator
-    tokenUsage={{ total_tokens: 12_000 }}
-    context_limit={32_000}
-    localUsage={{ today: 120, weekToDate: 560, monthToDate: 1_240 }}
-  />
-);
+const usageMeter = <ContextUsageIndicator tokenUsage={{ total_tokens: 12_000 }} context_limit={32_000} />;
 
 describe('usage meter composer integration', () => {
   it('renders the real Arco meter on desktop and suppresses inline right tools on compact mobile', () => {

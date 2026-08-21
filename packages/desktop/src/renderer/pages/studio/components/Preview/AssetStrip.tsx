@@ -116,7 +116,8 @@ export const AssetStrip: React.FC<AssetStripProps> = ({
                   <span className={studioType.meta}>{versionLabel}</span>
                   {selected && (
                     <span
-                      className={`${studioType.eyebrow} rounded-full bg-primary-light-1 px-6px py-2px text-primary-6`}
+                      data-selected-take-chip
+                      className={`${studioType.eyebrow} rounded-full bg-fill-2 px-6px py-2px text-t-secondary`}
                     >
                       {t('conversation.creativeStudio.phase.review.selectedTake')}
                     </span>

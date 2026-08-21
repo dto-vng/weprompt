@@ -5,6 +5,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   linkSync,
@@ -140,7 +141,171 @@ function resolveAppBuilderInstallUtil(): string {
   return resolve(appBuilderDir, 'templates/nsis/include/installUtil.nsh');
 }
 
+type MacRetryHarnessMode = 'package-validation-failure' | 'authorized-dmg-failure' | 'mismatched-dmg-authorization';
+
+function createValidViteOutput(outDir: string): void {
+  mkdirSync(resolve(outDir, 'main'), { recursive: true });
+  mkdirSync(resolve(outDir, 'preload'), { recursive: true });
+  mkdirSync(resolve(outDir, 'renderer/assets'), { recursive: true });
+  writeFileSync(resolve(outDir, 'main/index.js'), '', 'utf8');
+  const templateInventory = readFileSync(
+    resolve(repoRoot, 'packages/desktop/resources/presentation-templates/manifest.json')
+  );
+  const templateInventoryDigest = createHash('sha256').update(templateInventory).digest('hex');
+  writeFileSync(resolve(outDir, 'main/presentation-template-inventory.sha256'), `${templateInventoryDigest}\n`, 'utf8');
+  writeFileSync(resolve(outDir, 'preload/index.js'), '', 'utf8');
+  writeFileSync(resolve(outDir, 'renderer/assets/index-test.js'), '', 'utf8');
+  writeFileSync(
+    resolve(outDir, 'renderer/index.html'),
+    '<!doctype html><html><body><div id="root"></div><script type="module" src="./assets/index-test.js"></script></body></html>\n',
+    'utf8'
+  );
+}
+
+function runMacRetryHarness(mode: MacRetryHarnessMode): {
+  builderCalls: string[];
+  output: string;
+  status: number | null;
+} {
+  const tempDir = mkdtempSync(join(tmpdir(), 'aionui-mac-retry-test-'));
+  const hookPath = join(tempDir, 'hook.cjs');
+  const builderCallsPath = join(tempDir, 'builder-calls.json');
+  const outDir = resolve(repoRoot, 'out');
+  const backupOutDir = resolve(repoRoot, `.tmp-out-backup-${process.pid}-${Date.now()}-mac-retry`);
+
+  writeFileSync(
+    hookPath,
+    `
+const childProcess = require('node:child_process');
+const fs = require('node:fs');
+const Module = require('node:module');
+const path = require('node:path');
+
+const originalLoad = Module._load;
+const originalSpawnSync = childProcess.spawnSync;
+
+Object.defineProperty(process, 'platform', { value: 'darwin' });
+
+function recordPrepareCall() {
+  return { prepared: true, dir: 'mock-bundled-aioncore', sourceType: 'mock' };
+}
+
+Module._load = function patchedLoad(request, parent, isMain) {
+  if (request.endsWith('packages/shared-scripts/src/prepare-aioncore.js')) {
+    return { prepareAioncore: recordPrepareCall };
+  }
+  if (request === './resolveAioncoreVersion.js' || request.endsWith('/resolveAioncoreVersion.js')) {
+    return { resolveAioncoreVersion: () => 'v-test' };
+  }
+  return originalLoad.call(this, request, parent, isMain);
+};
+
+childProcess.spawnSync = function mockedSpawnSync(command, args, options) {
+  if (command === 'sleep' || command === 'sh') {
+    return { pid: 1, output: [], stdout: null, stderr: null, status: 0, signal: null };
+  }
+  return originalSpawnSync(command, args, options);
+};
+
+childProcess.execSync = function mockedExecSync(command, options = {}) {
+  const commandText = String(command);
+  if (!commandText.includes('electron-builder --config packages/desktop/electron-builder.yml')) {
+    return Buffer.from('');
+  }
+
+  const callsPath = process.env.AIONUI_BUILDER_CALLS_FILE;
+  const calls = fs.existsSync(callsPath) ? JSON.parse(fs.readFileSync(callsPath, 'utf8')) : [];
+  calls.push(commandText);
+  fs.writeFileSync(callsPath, JSON.stringify(calls));
+
+  if (commandText.includes('--prepackaged')) {
+    return Buffer.from('');
+  }
+
+  fs.mkdirSync(path.join(process.cwd(), 'out/mac/WePrompt.app'), { recursive: true });
+
+  if (
+    process.env.AIONUI_MAC_RETRY_MODE === 'authorized-dmg-failure' ||
+    process.env.AIONUI_MAC_RETRY_MODE === 'mismatched-dmg-authorization'
+  ) {
+    const { artifactBuildStarted } = require(path.join(process.cwd(), 'scripts/afterSign.js'));
+    const packageVersion = require(path.join(process.cwd(), 'package.json')).version;
+    const artifactArch =
+      process.env.AIONUI_MAC_RETRY_MODE === 'mismatched-dmg-authorization' ? 'arm64' : 'x64';
+    artifactBuildStarted(
+      {
+        targetPresentableName: 'DMG',
+        file: path.join(process.cwd(), 'out', \`WePrompt-\${packageVersion}-mac-\${artifactArch}.dmg\`),
+        arch: 1,
+      },
+      { env: options.env }
+    );
+    throw new Error('hdiutil: create failed - Device not configured');
+  }
+
+  throw new Error('Packaged presentation template validation failed');
+};
+`,
+    'utf8'
+  );
+
+  let movedExistingOut = false;
+  try {
+    if (existsSync(outDir)) {
+      renameSync(outDir, backupOutDir);
+      movedExistingOut = true;
+    }
+    createValidViteOutput(outDir);
+
+    const {
+      WEPROMPT_INTERNAL_RELEASE: _internalRelease,
+      WEPROMPT_MAC_DMG_RETRY_MARKER: _retryMarker,
+      WEPROMPT_MAC_DMG_RETRY_NONCE: _retryNonce,
+      ...testEnvironment
+    } = process.env;
+    const result = spawnSync(
+      process.execPath,
+      ['scripts/build-with-builder.js', 'auto', '--mac', '--x64', '--skip-vite'],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: {
+          ...testEnvironment,
+          AIONUI_BUILDER_CALLS_FILE: builderCallsPath,
+          AIONUI_MAC_RETRY_MODE: mode,
+          NODE_OPTIONS: [testEnvironment.NODE_OPTIONS, `--require=${hookPath}`].filter(Boolean).join(' '),
+        },
+      }
+    );
+    const builderCalls = existsSync(builderCallsPath)
+      ? (JSON.parse(readFileSync(builderCallsPath, 'utf8')) as string[])
+      : [];
+
+    return {
+      builderCalls,
+      output: result.stderr + result.stdout,
+      status: result.status,
+    };
+  } finally {
+    rmSync(outDir, { recursive: true, force: true });
+    if (movedExistingOut) {
+      renameSync(backupOutDir, outDir);
+    }
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 describe('build-with-builder', () => {
+  it('fails before packaging when multiple architectures would share one prepared AionCore runtime', () => {
+    const result = spawnSync(process.execPath, ['scripts/build-with-builder.js', '--mac', '--arm64', '--x64'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('each architecture must prepare and verify its own AionCore lineage-bound runtime');
+  });
+
   it('uses the WePrompt executable for current outputs and retains legacy upgrade cleanup names', () => {
     const source = readFileSync(resolve(repoRoot, 'scripts/build-with-builder.js'), 'utf8');
 
@@ -216,6 +381,38 @@ describe('build-with-builder', () => {
     expect(source).not.toContain("const candidates = ['mac', 'mac-arm64', 'mac-x64', 'mac-universal']");
   });
 
+  it(
+    'propagates package validation failures without retrying a leftover mac app',
+    { timeout: BUILD_SCRIPT_TIMEOUT_MS },
+    () => {
+      const result = runMacRetryHarness('package-validation-failure');
+
+      expect(result.status).not.toBe(0);
+      expect(result.output).toContain('Packaged presentation template validation failed');
+      expect(result.builderCalls.filter((command) => command.includes('--prepackaged'))).toHaveLength(0);
+    }
+  );
+
+  it(
+    'retries an authorized post-validation DMG failure with both mac artifacts',
+    { timeout: BUILD_SCRIPT_TIMEOUT_MS },
+    () => {
+      const result = runMacRetryHarness('authorized-dmg-failure');
+
+      expect(result.status, result.output).toBe(0);
+      expect(result.builderCalls).toHaveLength(2);
+      expect(result.builderCalls[1]).toMatch(/--mac\s+dmg\s+zip\s+--x64\s+--prepackaged/);
+    }
+  );
+
+  it('rejects retry authorization issued for a different mac artifact', { timeout: BUILD_SCRIPT_TIMEOUT_MS }, () => {
+    const result = runMacRetryHarness('mismatched-dmg-authorization');
+
+    expect(result.status).not.toBe(0);
+    expect(result.output).toContain('hdiutil: create failed - Device not configured');
+    expect(result.builderCalls.filter((command) => command.includes('--prepackaged'))).toHaveLength(0);
+  });
+
   it('rejects skip-vite when renderer output is only a source html shell', { timeout: BUILD_SCRIPT_TIMEOUT_MS }, () => {
     const outDir = resolve(repoRoot, 'out');
     const backupOutDir = resolve(repoRoot, `.tmp-out-backup-${process.pid}-${Date.now()}`);
@@ -263,6 +460,72 @@ childProcess.execSync = function mockedExecSync(command) {
 
       expect(result.status).not.toBe(0);
       expect(result.stderr + result.stdout).toContain('Renderer build output is incomplete');
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+      if (movedExistingOut) {
+        renameSync(backupOutDir, outDir);
+      }
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects skip-vite for a stale template inventory cache', { timeout: BUILD_SCRIPT_TIMEOUT_MS }, () => {
+    const outDir = resolve(repoRoot, 'out');
+    const backupOutDir = resolve(repoRoot, `.tmp-out-backup-${process.pid}-${Date.now()}`);
+    const tempDir = mkdtempSync(join(tmpdir(), 'aionui-build-stale-template-inventory-test-'));
+    const hookPath = join(tempDir, 'hook.cjs');
+
+    writeFileSync(
+      hookPath,
+      `
+const childProcess = require('node:child_process');
+childProcess.execSync = function mockedExecSync() {
+  return Buffer.from('');
+};
+`,
+      'utf8'
+    );
+
+    let movedExistingOut = false;
+    try {
+      if (existsSync(outDir)) {
+        renameSync(outDir, backupOutDir);
+        movedExistingOut = true;
+      }
+      mkdirSync(resolve(outDir, 'main'), { recursive: true });
+      mkdirSync(resolve(outDir, 'preload'), { recursive: true });
+      mkdirSync(resolve(outDir, 'renderer/assets'), { recursive: true });
+      const staleManifest = `${JSON.stringify(
+        [{ id: 'legacy-template', format: 'html', packagedReferenceFile: null }],
+        null,
+        2
+      )}\n`;
+      const staleDigest = createHash('sha256').update(staleManifest).digest('hex');
+      writeFileSync(resolve(outDir, 'main/index.js'), `const staleTemplateInventory = ${staleManifest};\n`, 'utf8');
+      writeFileSync(resolve(outDir, 'main/presentation-template-inventory.sha256'), `${staleDigest}\n`, 'utf8');
+      writeFileSync(resolve(outDir, 'preload/index.js'), '', 'utf8');
+      writeFileSync(resolve(outDir, 'renderer/assets/index-test.js'), '', 'utf8');
+      writeFileSync(
+        resolve(outDir, 'renderer/index.html'),
+        '<!doctype html><html><body><div id="root"></div><script type="module" src="./assets/index-test.js"></script></body></html>\n',
+        'utf8'
+      );
+
+      const result = spawnSync(
+        process.execPath,
+        ['scripts/build-with-builder.js', 'x64', '--skip-vite', '--pack-only'],
+        {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            NODE_OPTIONS: [process.env.NODE_OPTIONS, `--require=${hookPath}`].filter(Boolean).join(' '),
+          },
+        }
+      );
+
+      expect(result.status).not.toBe(0);
+      expect(result.stderr + result.stdout).toMatch(/presentation template inventory/i);
     } finally {
       rmSync(outDir, { recursive: true, force: true });
       if (movedExistingOut) {
@@ -469,6 +732,7 @@ childProcess.execSync = function mockedExecSync(command) {
         hookPath,
         `
 const childProcess = require('node:child_process');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const Module = require('node:module');
 const path = require('node:path');
@@ -524,6 +788,14 @@ childProcess.execSync = function mockedExecSync(command) {
   }
   if (commandText.includes('electron-vite build')) {
     ensurePlaceholder('out/main/index.js');
+    const templateInventory = fs.readFileSync(
+      path.join(process.cwd(), 'packages/desktop/resources/presentation-templates/manifest.json')
+    );
+    const templateInventoryDigest = crypto.createHash('sha256').update(templateInventory).digest('hex');
+    fs.writeFileSync(
+      path.join(process.cwd(), 'out/main/presentation-template-inventory.sha256'),
+      templateInventoryDigest + '\\n'
+    );
     ensurePlaceholder('out/preload/index.js');
     ensurePlaceholder('out/renderer/assets/index-test.js');
     ensurePlaceholder('out/renderer/assets/index-test.css');

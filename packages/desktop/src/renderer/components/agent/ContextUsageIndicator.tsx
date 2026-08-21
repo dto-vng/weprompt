@@ -9,12 +9,13 @@ import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { TokenUsageData } from '@/common/config/storage';
-import type { ContextUsageSnapshot } from '@/renderer/pages/conversation/contextHandoff/contextBudget';
-import type { LocalTokenUsageSummary } from '@/renderer/pages/conversation/utils/localTokenUsage';
+import {
+  contextUsagePercent,
+  type ContextUsageSnapshot,
+} from '@/renderer/pages/conversation/contextHandoff/contextBudget';
 
 type ContextUsageIndicatorProps = {
   tokenUsage?: TokenUsageData | null;
-  localUsage: LocalTokenUsageSummary;
   context_limit?: number;
   budget?: ContextUsageSnapshot;
   className?: string;
@@ -25,7 +26,6 @@ const CONTEXT_TRACK_COLOR = 'var(--color-fill-3)';
 
 const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
   tokenUsage,
-  localUsage,
   context_limit,
   budget,
   className = '',
@@ -64,9 +64,9 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
   const contextUsage = budget ?? legacyBudget;
   const percentage =
     typeof contextUsage.ratio === 'number' && Number.isFinite(contextUsage.ratio) ? contextUsage.ratio * 100 : null;
+  const roundedPercentage = percentage === null ? null : contextUsagePercent(contextUsage.ratio);
   const displayTotal = typeof contextUsage.totalTokens === 'number' ? formatTokenCount(contextUsage.totalTokens) : null;
   const displayLimit = contextUsage.contextLimit ? formatTokenCount(contextUsage.contextLimit, true) : null;
-  const isWarning = contextUsage.status === 'compress';
   const isDanger = contextUsage.status === 'too_large';
 
   const strokeWidth = 2.5;
@@ -75,17 +75,25 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
   const visualPercentage = percentage === null ? 0 : Math.min(Math.max(percentage, 0), 100);
   const strokeDashoffset = circumference - (visualPercentage / 100) * circumference;
 
+  /**
+   * The gauge is coloured from how full the window is, not from the budget status.
+   * The two ladders are different on purpose: `compress` starts at 50% because that
+   * is when compaction becomes worthwhile, which is far too early to alarm anyone,
+   * and the healthy colour used to be `--primary-6` — the brand orange — so an empty
+   * context rendered in the same hue as a nearly-full one.
+   */
+  const WARNING_AT_PERCENT = 80;
   const getStrokeColor = () => {
     if (percentage === null) return 'var(--color-text-3)';
     if (isDanger) return 'rgb(var(--danger-6))';
-    if (isWarning) return 'rgb(var(--warning-6))';
-    return 'rgb(var(--primary-6))';
+    if (percentage >= WARNING_AT_PERCENT) return 'rgb(var(--warning-6))';
+    return 'rgb(var(--success-6))';
   };
 
   const percentageLabel =
     percentage === null
       ? t('conversation.contextUsage.unavailable')
-      : t('conversation.contextUsage.percentUsed', { percent: Math.round(percentage) });
+      : t('conversation.contextUsage.percentUsed', { percent: roundedPercentage });
   const usageLabel =
     contextUsage.source === 'estimated' && percentage !== null
       ? `${t('conversation.contextUsage.estimated')} · ${percentageLabel}`
@@ -94,7 +102,7 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
   const statusAnnouncement =
     percentage === null
       ? t('conversation.contextUsage.unavailable')
-      : t(`conversation.contextHandoff.budget.${contextUsage.status}`, { percent: `${Math.round(percentage)}%` });
+      : t(`conversation.contextHandoff.budget.${contextUsage.status}`, { percent: `${roundedPercentage}%` });
 
   const popoverContent = (
     <div className='min-w-240px p-12px'>
@@ -123,11 +131,6 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
           />
         </div>
       )}
-      <Divider className='my-12px!' />
-      <div className='text-12px text-t-secondary'>{t('conversation.contextUsage.localTokenUsage')}</div>
-      <UsageRow label={t('conversation.contextUsage.today')} value={localUsage.today} />
-      <UsageRow label={t('conversation.contextUsage.weekToDate')} value={localUsage.weekToDate} />
-      <UsageRow label={t('conversation.contextUsage.monthToDate')} value={localUsage.monthToDate} />
     </div>
   );
 
@@ -182,20 +185,6 @@ const ContextUsageIndicator: React.FC<ContextUsageIndicatorProps> = ({
     </Popover>
   );
 };
-
-type UsageRowProps = {
-  label: string;
-  value: number;
-};
-
-function UsageRow({ label, value }: UsageRowProps): React.ReactNode {
-  return (
-    <div className='mt-10px flex items-baseline justify-between gap-12px'>
-      <span className='text-12px text-t-secondary'>{label}</span>
-      <span className='text-12px font-medium text-t-primary whitespace-nowrap'>{formatTokenCount(value)}</span>
-    </div>
-  );
-}
 
 /**
  * 格式化 token 数量显示

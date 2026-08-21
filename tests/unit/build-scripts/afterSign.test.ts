@@ -1,3 +1,5 @@
+import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 type AfterSignContext = {
@@ -19,9 +21,14 @@ type AfterSignDependencies = {
 
 type AfterSignModule = {
   afterSign?: (context: AfterSignContext, dependencies?: AfterSignDependencies) => Promise<void>;
+  artifactBuildStarted?: (
+    event: { arch: number | null; file: string; targetPresentableName: string },
+    dependencies?: { env: NodeJS.ProcessEnv }
+  ) => void;
 };
 
 const afterSignModule = require('../../../scripts/afterSign.js') as AfterSignModule;
+const repoRoot = resolve(__dirname, '../../..');
 
 const context: AfterSignContext = {
   electronPlatformName: 'darwin',
@@ -158,5 +165,58 @@ describe('internal macOS afterSign policy', () => {
 
     expect(execSync).not.toHaveBeenCalled();
     expect(loadNotarize).not.toHaveBeenCalled();
+  });
+});
+
+describe('macOS DMG retry authorization hook', () => {
+  it('resolves the named artifactBuildStarted export through electron-builder', async () => {
+    const electronBuilderRequire = createRequire(require.resolve('electron-builder'));
+    const { resolveFunction } = electronBuilderRequire('app-builder-lib/out/util/resolve') as {
+      resolveFunction: (
+        type: string,
+        executor: string,
+        name: string,
+        rootSearchDir: string
+      ) => Promise<AfterSignModule['artifactBuildStarted']>;
+    };
+
+    const resolvedHook = await resolveFunction('commonjs', 'scripts/afterSign.js', 'artifactBuildStarted', repoRoot);
+
+    expect(resolvedHook).toBe(afterSignModule.artifactBuildStarted);
+  });
+
+  it('ignores non-DMG artifacts even when retry environment is malformed', () => {
+    expect(() =>
+      afterSignModule.artifactBuildStarted?.(
+        { arch: 1, file: '/tmp/WePrompt.zip', targetPresentableName: 'macOS zip' },
+        {
+          env: {
+            WEPROMPT_MAC_DMG_RETRY_MARKER: '/tmp/outside-marker',
+            WEPROMPT_MAC_DMG_RETRY_NONCE: 'invalid',
+          },
+        }
+      )
+    ).not.toThrow();
+  });
+
+  it('rejects malformed or externally located DMG retry authorization', () => {
+    const event = { arch: 1, file: '/tmp/WePrompt.dmg', targetPresentableName: 'DMG' };
+
+    expect(() =>
+      afterSignModule.artifactBuildStarted?.(event, {
+        env: {
+          WEPROMPT_MAC_DMG_RETRY_MARKER: '/tmp/outside-marker',
+          WEPROMPT_MAC_DMG_RETRY_NONCE: 'invalid',
+        },
+      })
+    ).toThrow(/authorization environment/);
+    expect(() =>
+      afterSignModule.artifactBuildStarted?.(event, {
+        env: {
+          WEPROMPT_MAC_DMG_RETRY_MARKER: '/tmp/outside-marker',
+          WEPROMPT_MAC_DMG_RETRY_NONCE: 'a'.repeat(64),
+        },
+      })
+    ).toThrow(/authorization path/);
   });
 });

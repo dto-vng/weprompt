@@ -6,7 +6,7 @@
 
 import type { ForgeProject } from '@/common/types/project/projectTypes';
 import type { TChatConversation } from '@/common/config/storage';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -17,6 +17,10 @@ const conversationsHarness = vi.hoisted(() => ({
   expandedWorkspaces: [] as string[],
   timelineSections: [] as Array<Record<string, unknown>>,
   handleToggleWorkspace: vi.fn(),
+}));
+const projectCreateHarness = vi.hoisted(() => ({
+  onCreated: undefined as ((project: ForgeProject) => void) | undefined,
+  refreshProjects: vi.fn(),
 }));
 
 const project: ForgeProject = {
@@ -99,8 +103,15 @@ vi.mock('@/renderer/pages/conversation/GroupedHistory/DragOverlayContent', () =>
   default: () => null,
 }));
 
+vi.mock('@/renderer/pages/conversation/projects/ProjectCreateModal', () => ({
+  ProjectCreateModal: ({ onCreated }: { onCreated: (project: ForgeProject) => void }) => {
+    projectCreateHarness.onCreated = onCreated;
+    return null;
+  },
+}));
+
 vi.mock('@/renderer/pages/conversation/projects/useProjects', () => ({
-  useProjects: () => ({ projects: [project], refreshProjects: vi.fn() }),
+  useProjects: () => ({ projects: [project], refreshProjects: projectCreateHarness.refreshProjects }),
 }));
 
 vi.mock('@/renderer/pages/conversation/GroupedHistory/hooks/useConversations', () => ({
@@ -185,7 +196,7 @@ const menuAction = (): HTMLElement => screen.getByLabelText('conversation.histor
 
 /**
  * The project row's hover actions used to render as oversized detached boxes
- * overlapping the row: two 20px buttons crammed into a 22px in-flow slot, with
+ * overlapping the row: two 22px buttons in an absolutely-positioned slot, with
  * `.arco-btn`'s own `display` beating the `hidden` / `group-hover:flex`
  * utilities so they never hid in the first place. They now mirror
  * `ConversationRow`: absolutely positioned, vertically centred, right-aligned,
@@ -197,6 +208,8 @@ describe('sidebar project row actions', () => {
     conversationsHarness.expandedWorkspaces = [];
     conversationsHarness.timelineSections = [];
     conversationsHarness.handleToggleWorkspace.mockReset();
+    projectCreateHarness.onCreated = undefined;
+    projectCreateHarness.refreshProjects.mockReset();
   });
 
   it('places both actions in one right-aligned, vertically centred slot', () => {
@@ -204,14 +217,20 @@ describe('sidebar project row actions', () => {
 
     const slot = newChatAction().parentElement?.parentElement;
 
-    expect(slot).toHaveClass('absolute', 'right-8px', 'top-1/2', '-translate-y-1/2', 'items-center');
+    // C-12: right-12px, not 8px. This strip is absolutely positioned so it ignores the row's
+    // padding and sets its own inset; at 8px its icons sat 5px right of the section-label '+'
+    // buttons, which is the misalignment that item fixed.
+    expect(slot).toHaveClass('absolute', 'right-12px', 'top-1/2', '-translate-y-1/2', 'items-center');
     expect(menuAction().parentElement?.parentElement).toBe(slot);
   });
 
   it('takes no layout width, so the row cannot be overlapped by its own actions', () => {
     renderSidebar();
 
-    // The fixed 22px slot could not hold two 20px buttons; they spilled left
+    // C-12 moved these from 20px to 22px so their icons land on the same vertical line as
+    // the section-label '+' buttons: a 14px glyph centres 3px inside a 20px box but 4px inside
+    // a 22px one, which left them 1px out even once the containers agreed.
+    // Historically the fixed slot could not hold two buttons; they spilled left
     // over the project name.
     expect(newChatAction().parentElement?.parentElement).not.toHaveClass('w-22px');
   });
@@ -223,11 +242,11 @@ describe('sidebar project row actions', () => {
     expect(menuAction().parentElement).toHaveClass('hidden', 'group-hover:flex');
   });
 
-  it('sizes both actions to the 20px icon-button footprint used elsewhere in the sidebar', () => {
+  it('sizes both actions to the 22px icon-button footprint used elsewhere in the sidebar', () => {
     renderSidebar();
 
     for (const action of [newChatAction(), menuAction()]) {
-      expect(action).toHaveClass('!w-20px', '!h-20px', '!p-0', 'sider-action-btn');
+      expect(action).toHaveClass('!w-22px', '!h-22px', '!p-0', 'sider-action-btn');
     }
   });
 
@@ -238,6 +257,22 @@ describe('sidebar project row actions', () => {
     expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/guid', {
       state: { workspace: '/w/alpha', projectId: 'p1' },
     });
+  });
+
+  it('opens the encoded Project Home route after project creation completes', () => {
+    renderSidebar();
+
+    act(() => {
+      projectCreateHarness.onCreated?.({
+        ...project,
+        id: 'created/project',
+        name: 'Created Project',
+        workspace: '/w/created',
+      });
+    });
+
+    expect(projectCreateHarness.refreshProjects).toHaveBeenCalledOnce();
+    expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/project/created%2Fproject');
   });
 
   it('does not navigate when the row menu is opened', () => {

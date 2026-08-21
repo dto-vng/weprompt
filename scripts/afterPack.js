@@ -10,6 +10,11 @@ const {
   getModulesToRebuild,
 } = require('./rebuildNativeModules');
 const { verifyBundledAioncoreResources } = require('../packages/shared-scripts/src/verify-bundled-aioncore-resources');
+const {
+  readPresentationTemplateInventory,
+  assertExactPresentationTemplateInventory,
+  assertPresentationTemplateResources,
+} = require('../packages/shared-scripts/src/presentation-template-inventory');
 
 /**
  * afterPack hook for electron-builder
@@ -54,6 +59,25 @@ function verifyBundledResources(resourcesDir, electronPlatformName, targetArch) 
   }
 
   console.log(`   ✓ Bundled resources verified for ${result.runtimeKey} (${result.checked.length} checks)`);
+}
+
+function verifyPresentationTemplateResources(resourcesDir) {
+  const templatesDirectory = path.join(resourcesDir, 'presentation-templates');
+  const requiredInventory = readPresentationTemplateInventory(
+    path.join(__dirname, '../packages/desktop/resources/presentation-templates/manifest.json')
+  );
+  const packagedInventory = readPresentationTemplateInventory(path.join(templatesDirectory, 'manifest.json'));
+  const inventory = assertExactPresentationTemplateInventory({
+    inventory: packagedInventory,
+    requiredInventory,
+  });
+  const checked = assertPresentationTemplateResources({
+    inventory,
+    resourcesDirectory: templatesDirectory,
+  });
+
+  console.log(`   ✓ Presentation template resources verified (${checked.length} references)`);
+  return checked;
 }
 
 /**
@@ -199,6 +223,7 @@ async function afterPack(context) {
     }
 
     verifyBundledResources(resourcesDir, electronPlatformName, targetArch);
+    verifyPresentationTemplateResources(resourcesDir);
 
     // Notarization prerequisite: sign the ad-hoc bundled-aioncore binaries that
     // electron-builder leaves untouched (extraResources are never auto-signed).
@@ -361,6 +386,7 @@ async function afterPack(context) {
 module.exports = afterPack;
 module.exports.assertBundledRuntimeIsolation = assertBundledRuntimeIsolation;
 module.exports.resolveResourcesDir = resolveResourcesDir;
+module.exports.verifyPresentationTemplateResources = verifyPresentationTemplateResources;
 module.exports.shouldSignBundledAioncore = shouldSignBundledAioncore;
 module.exports.resolveSigningIdentity = resolveSigningIdentity;
 module.exports.signBundledAioncoreBinaries = signBundledAioncoreBinaries;

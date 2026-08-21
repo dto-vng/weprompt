@@ -362,9 +362,6 @@
   "modelNotFoundAfterUrlChange": "モデル {{model}} は新しいアドレスで見つかりませんでした。利用できない場合は選択し直してください。",
   "apiKey": "API キー",
   "deleteModelConfirm": "このモデルを削除してもよろしいですか？",
-  "deleteAllModelConfirm": "すべてのモデルを削除してもよろしいですか？",
-  "modelCount": "モデル",
-  "apiKeyCount": "API キー",
   "pleaseEnterBaseUrlAndApiKey": "ベースURLとAPIキーを入力してください",
   "pleaseEnterApiKey": "APIキーを入力してください",
   "pleaseEnterBaseUrl": "ベースURLを入力してください",
@@ -873,8 +870,56 @@
   "includePrereleaseUpdates": "プレリリース/dev ビルドを含める",
   "saveModelConfigFailed": "モデル設定の保存に失敗しました",
   "healthCheck": "ヘルスチェック",
-  "clearStatus": "ステータスをクリア",
-  "healthStatusCleared": "ヘルスステータスがクリアされました",
+  "modelRow": {
+    "latency": "{{latency}} ms",
+    "neverChecked": "未チェック",
+    "actionLabel": "{{action}} — {{model}}",
+    "removeModel": "モデルを削除",
+    "deleteAppOperationsWarning": "このモデルはアプリ操作に固定されています。削除すると、別のモデルを選ぶまでその設定は利用できなくなります。"
+  },
+  "providerRow": {
+    "counts": "{{models}} · {{keys}}",
+    "modelCount": "{{count}} モデル",
+    "modelCount_other": "{{count}} モデル",
+    "apiKeyCount": "{{count}} キー",
+    "apiKeyCount_other": "{{count}} キー",
+    "healthChecked": "{{total}} 件中 {{checked}} 件チェック済み",
+    "healthNotChecked": "未チェック",
+    "healthFailing": "{{count}} 件失敗",
+    "healthFailing_other": "{{count}} 件失敗",
+    "deleteConfirmTitle": "プロバイダーを削除",
+    "deleteConfirmBody": "{{provider}} · {{counts}}",
+    "deleteConfirmDetail": "プロバイダーと、その API キーおよび設定済みのすべてのモデルを削除します。既存のチャットは開始時のモデルをそのまま使用します。",
+    "clearHealth": "ヘルス状態をクリア",
+    "clearHealthConfirmTitle": "ヘルス状態をクリア",
+    "clearHealthConfirmBody": "{{provider}} に記録されたヘルスチェック結果を破棄します。もう一度測定するにはヘルスチェックを実行してください。",
+    "healthCleared": "{{provider}} のヘルス状態をクリアしました。",
+    "deleteAppOperationsWarning": "このプロバイダーはアプリ操作に固定されています。削除すると、別のモデルを選ぶまでその設定は利用できなくなります。",
+    "actionLabel": "{{action}} — {{provider}}",
+    "toggleEnabled": "有効・無効を切り替え"
+  },
+  "providerHealth": {
+    "configuredInferenceUnavailable": "設定済み · 推論を利用できません。",
+    "setupNeedsAttention": "設定を確認してください。",
+    "overload": {
+      "action": "プロバイダーが一時的に過負荷です。しばらくしてから再試行してください。"
+    },
+    "rateLimit": {
+      "action": "プロバイダーの上限がリセットされてから再試行してください。"
+    },
+    "quota": {
+      "action": "プロバイダーのアカウントの残高またはクォータが不足しています。チャージするかプロバイダーを切り替えてから再試行してください。"
+    },
+    "setup": {
+      "action": "プロバイダーの認証情報と設定を確認してから再試行してください。"
+    },
+    "connectivity": {
+      "action": "ネットワーク、プロキシ、Base URL を確認してから再試行してください。"
+    },
+    "provider": {
+      "action": "プロバイダーは推論チェックを完了できませんでした。しばらくしてから再試行してください。"
+    }
+  },
   "latency": "レイテンシ",
   "customAcpAgent": "カスタム ACP エージェント",
   "addCustomAgent": "追加",
@@ -1351,31 +1396,44 @@
   "mcpNoTools": "このサーバーはツールを提供していません",
   "appOperationsModel": {
     "title": "アプリ操作モデル",
-    "description": "チャットモデルとは独立して、バックグラウンドのコンテキスト処理と将来のアプリ全体の支援に使用されます。",
+    "panelLabel": "アプリ操作",
+    "panelInfo": "WePrompt 自身のバックグラウンド処理に使うモデルです。現在は、長くなった会話を要約して続けられるようにします。各チャットで使うモデルには影響しません。",
+    "popoverSubtitle": "バックグラウンド処理専用です。変更してもチャットには影響しません。",
     "selectionLabel": "選択",
     "auto": "自動",
     "fixed": "固定",
-    "resolvedModelLabel": "解決済みモデル",
-    "healthLabel": "ステータス",
-    "usedByLabel": "使用先",
-    "contextCompaction": "コンテキスト圧縮",
-    "saving": "保存中…",
+    "autoExplainer": "WePrompt が利用可能な最適なモデルを選び、プロバイダーの変更時に再解決します。",
+    "modelLabel": "モデル",
+    "managedByAuto": "自動モードが管理",
+    "kept": "保持中",
+    "switchToAuto": "自動に切り替える",
+    "pickAnother": "別のモデルを選ぶ",
+    "checkNow": "今すぐ確認",
+    "openSettings": "アプリ操作モデルを変更",
+    "contextCompaction": "長い会話の要約",
+    "usedByCompaction": "長い会話の要約に使用",
+    "setupRequiredImpact": "利用できるテキストモデルが設定されていません。追加するまで、長い会話はモデルではなく簡易ルールで要約されます。",
     "loadFailed": "アプリ操作の設定を読み込めませんでした。",
     "saveFailed": "アプリ操作モデルを保存できませんでした。",
+    "saveFailedToast": "保存できませんでした。もう一度選択すると再試行します。",
     "checkFailed": "アプリ操作のヘルスチェックに失敗しました。",
     "backendUpdateRequired": "アプリ操作モデルを設定するには、WePrompt を更新してください。",
-    "checkResult": {
-      "ready": "正常 · {{checked}}",
-      "setupRequired": "セットアップが必要 · {{checked}}",
-      "unavailable": "チェック失敗 · {{checked}}",
-      "checkedJustNow": "たった今確認",
-      "checkedAt": "{{time}} に確認"
+    "backendUpdateRequiredDetail": "このビルドのバックエンドはこの設定を提供していません。チャットには影響しません。",
+    "checkTime": {
+      "never": "未確認",
+      "justNow": "たった今確認",
+      "today": "今日 {{time}} に確認",
+      "date": "{{date}} {{time}} に確認"
     },
     "status": {
       "ready": "準備完了",
-      "checking": "確認中",
+      "checking": "確認中…",
       "setupRequired": "セットアップが必要",
-      "unavailable": "利用不可"
+      "unavailable": "利用不可",
+      "loading": "読み込み中…",
+      "saving": "保存中…",
+      "saveFailed": "保存に失敗",
+      "loadFailed": "読み込みに失敗"
     },
     "reason": {
       "noEligibleModel": "有効な認証情報を持つテキストモデルを追加または有効にしてください。",

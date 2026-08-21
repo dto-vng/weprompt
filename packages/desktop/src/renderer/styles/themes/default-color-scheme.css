@@ -27,6 +27,24 @@
   --bg-2: #f0e9db; /* warm cream — panels / cards / 三级背景 */
   --bg-3: #e5dcc9; /* warm hairline border / 边框分隔 */
   --bg-chat-surface: #fffdf9;
+  /* Inline-code chip fill. Light: one step lighter than the --bg-3 it used to borrow,
+     which is the hairline-BORDER tone and read as a heavy block in dense tables (C-02).
+     Dark keeps --bg-3, where that tone is the raised surface, not the heaviest one —
+     swapping the token outright would have flattened the chip against the page. */
+  --md-inline-code-bg: #f0e9db;
+  /* Text-input surface + hairline (C-17). A pair, because a fill alone cannot work in
+     both themes: light wants a shade *lighter* than Arco's --color-fill-2, while dark
+     needs one *raised above* the page — the light value (--bg-base) is the page itself in
+     dark, which made the field invisible. The border is what guarantees the field reads as
+     a field in either theme, independently of how close the fill sits to the page. */
+  --input-surface: #faf6ee;
+  --input-border: #d8cbb6;
+  /* Tile behind a vendor logo image. Light: none needed — the page is already near-white,
+     which is what these logos are drawn for. Dark: a near-white tile, because several are
+     bare dark glyphs (Amp, Autohand, Copilot's mark) with no self-contained background,
+     and they disappear against the #0b0e14 page. */
+  --agent-logo-surface: transparent;
+  --agent-logo-border: transparent;
   --bg-artifact-surface: #fffdf9;
   --studio-page-background: #e9e3d6;
   --studio-slate-surface: #f0eadd;
@@ -37,6 +55,9 @@
   --studio-take-border: #dcd3c0;
   --studio-take-chip: rgb(31 29 27 / 42%); /* ink scrim so a take label stays legible over any frame */
   --studio-take-text: #fffdf8;
+  --cut-slate-hatch: repeating-linear-gradient(135deg, transparent 0 6px, rgb(180 56 15 / 12%) 6px 8px);
+  --control-handle: #374ea2;
+  --control-zero-tick: #14181f;
   --studio-library-hairline: #e4dccb;
   --studio-library-chip-text: #54503f;
   --studio-library-shape-surface: #fbf8f1;
@@ -93,7 +114,7 @@
   --fill-0: #ffffff; /* 填充色 0 */
   --fill-white-to-black: #ffffff; /* 白到黑填充色 */
   --border-special: var(--bg-3); /* 特殊边框色 */
-  --color-guid-agent-bar: #f0e9db; /* 首页 Agent 选择条背景 — warm cream */
+  --color-guid-agent-bar: #faf6ee; /* 首页 Agent 选择条背景 — matches the composer surface (C-13) */
 
   /* Document Surface - Light Mode
      The artifact editor/preview body reads as a white "page" sitting inside the
@@ -116,7 +137,11 @@
   --aou-4: #2e3f82;
   --aou-5: #374ea2;
   --aou-6: #4e63c0;
-  --aou-7: #6e82d6;
+  /* #6e82d6 gave only 4.14:1 on --aou-2, under WCAG AA's 4.5 for small text, and every
+     consumer of --aou-7 pairs it with --aou-2: the app-operations pill and tag, the
+     Checking status line, and the slash-command highlight. Lightened to 4.61:1 — the
+     smallest step that clears AA with margin while staying distinct from --aou-8. */
+  --aou-7: #788bd9;
   --aou-8: #8fa0e0;
   --aou-9: #b8c2ee;
   --aou-10: #e8ecfb;
@@ -127,6 +152,11 @@
   --bg-2: #161c27; /* 三级背景 */
   --bg-3: #1e2536; /* cards / raised surface / 边框分隔 */
   --bg-chat-surface: var(--bg-base);
+  --md-inline-code-bg: var(--bg-3); /* raised, not heaviest, in dark — keep as-is */
+  --input-surface: #161c27; /* raised above the #0b0e14 page, unlike --bg-base */
+  --input-border: #2a3344;
+  --agent-logo-surface: #f4f4f5;
+  --agent-logo-border: #2a3344;
   --bg-artifact-surface: var(--bg-1);
   --studio-page-background: var(--bg-base);
   --studio-slate-surface: var(--color-fill-2);
@@ -137,6 +167,9 @@
   --studio-take-border: var(--color-border-2);
   --studio-take-chip: rgb(6 8 12 / 62%); /* deeper scrim: dark frames need more separation than the cream theme */
   --studio-take-text: var(--text-white);
+  --cut-slate-hatch: repeating-linear-gradient(135deg, transparent 0 6px, rgb(232 100 97 / 18%) 6px 8px);
+  --control-handle: #6e82d6;
+  --control-zero-tick: #e6ecf5;
   --studio-library-hairline: var(--color-border-2);
   --studio-library-chip-text: var(--text-secondary);
   --studio-library-shape-surface: var(--color-fill-1);

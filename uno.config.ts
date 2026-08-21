@@ -148,6 +148,10 @@ export default defineConfig({
 
     // 文档编辑器/预览的白色页面背景（区别于暖色调 bg-1/bg-2 外层 chrome）
     // Artifact editor/preview "document" surface (distinct from the warm bg-1/bg-2 outer chrome)
+    // Chat/page surface — the near-white plane the working area renders on (C-04).
+    // Distinct from bg-document (the artifact editor's pure-white page) and from the
+    // warm bg-1/bg-2 chrome, which the sidebar deliberately keeps.
+    ['bg-chat-surface', { 'background-color': 'var(--bg-chat-surface)' }],
     ['bg-document', { 'background-color': 'var(--bg-document)' }],
     ['bg-document-muted', { 'background-color': 'var(--bg-document-muted)' }],
 

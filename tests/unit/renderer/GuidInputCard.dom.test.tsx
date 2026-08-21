@@ -14,6 +14,7 @@ vi.mock('@/renderer/hooks/context/LayoutContext', () => ({
 
 vi.mock('@/renderer/hooks/chat/useCompositionInput', () => ({
   useCompositionInput: () => ({
+    createCompositionValueSync: () => vi.fn(),
     compositionHandlers: {},
     isComposing: { current: false },
   }),

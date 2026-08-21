@@ -172,10 +172,12 @@ vi.mock('@renderer/pages/guid/components/AssistantSelectionArea', () => ({
   default: ({
     selectedAssistantId,
     localeKey,
+    variant,
     onSelectAssistant,
   }: {
     selectedAssistantId?: string | null;
     localeKey: string;
+    variant?: 'hero' | 'inline';
     onSelectAssistant: (assistantId: string) => void;
   }) => (
     <button
@@ -183,6 +185,7 @@ vi.mock('@renderer/pages/guid/components/AssistantSelectionArea', () => ({
       data-testid='assistant-selection-area-stub'
       data-selected-assistant-id={selectedAssistantId ?? ''}
       data-locale-key={localeKey}
+      data-variant={variant ?? ''}
       onClick={() => onSelectAssistant('asst-2')}
     >
       assistant-selector
@@ -366,6 +369,14 @@ describe('ProjectNewChatComposer', () => {
     fireEvent.click(picker);
 
     expect(setSelectedAssistantIdMock).toHaveBeenCalledExactlyOnceWith('asst-2');
+  });
+
+  it('asks the picker for its inline surface, since this one sits in a card above a full-bleed composer', () => {
+    // The hero default hugs its pills and centres them, which strands the bar
+    // in the middle of this card instead of lining it up with the composer.
+    render(<ProjectNewChatComposer project={project} />);
+
+    expect(screen.getByTestId('assistant-selection-area-stub')).toHaveAttribute('data-variant', 'inline');
   });
 
   it('submits on Enter from the textarea', () => {

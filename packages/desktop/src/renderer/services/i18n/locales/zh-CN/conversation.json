@@ -220,7 +220,8 @@
     "codes": {
       "TEAM_ASSISTANT_ID_REQUIRED": "创建团队前请先选择助手。",
       "TEAM_ASSISTANT_NOT_FOUND": "助手 {{assistantId}} 已不可用。请刷新助手列表后重新选择。",
-      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "请使用 assistant_id，不要再传 {{field}}。"
+      "TEAM_ASSISTANT_FIELD_UNSUPPORTED": "请使用 assistant_id，不要再传 {{field}}。",
+      "TEAM_MEMBER_MODEL_UNRESOLVED": "此团队成员没有可用的模型。请在设置中添加或启用模型提供方，然后重试。"
     }
   },
   "agentError": {
@@ -367,6 +368,10 @@
       "USER_LLM_PROVIDER_RATE_LIMITED": {
         "title": "模型服务商触发限流",
         "body": "服务商暂时限制了请求。请稍后重试、降低请求频率，或切换模型。"
+      },
+      "USER_LLM_PROVIDER_QUOTA_EXHAUSTED": {
+        "title": "模型服务商额度已用尽",
+        "body": "该服务商账户余额或额度已用尽，等待无法恢复。请为账户充值、检查计费方案，或切换到其他模型。"
       },
       "USER_LLM_PROVIDER_TIMEOUT": {
         "title": "模型服务商响应超时",
@@ -515,6 +520,8 @@
     "changes": {
       "tab": "变更",
       "filesTab": "文件",
+      "previewTab": "预览",
+      "browserTab": "浏览器",
       "currentBranchLabel": "当前分支",
       "summary": "{{count}} 个文件已变更",
       "insertions": "+{{count}} 行新增",
@@ -635,10 +642,6 @@
     "contextWindow": "上下文窗口",
     "percentUsed": "已使用 {{percent}}%",
     "tokenCount": "{{used}} / {{limit}} 个令牌",
-    "localTokenUsage": "本地令牌用量",
-    "today": "今天",
-    "weekToDate": "本周至今",
-    "monthToDate": "本月至今",
     "triggerLabel": "显示上下文用量",
     "estimated": "估算",
     "unavailable": "上下文用量不可用"
@@ -927,7 +930,7 @@
         "continueToProduce": "继续制作",
         "askAssistant": "询问助手",
         "assistantTitle": "编写助手",
-        "assistantDescription": "使用助手完善故事结构、镜头创意和提示词。",
+        "assistantDescription": "根据创作简报生成故事板草稿。",
         "textChargeDisclosure": "起草故事板会使用您配置的文本模型。提供商可能会对模型使用收费。",
         "draftStoryboard": "起草故事板",
         "addShot": "添加镜头",
@@ -990,10 +993,67 @@
         "openProduce": "打开制作",
         "handoffDescription": "交付内容仅包含故事板清单和已选媒体。审阅场记卡不会导出。",
         "partialHandoff": "部分场景没有已选媒体，因此此次交付不完整。",
+        "cut": {
+          "duration": {
+            "played": "已播放 {{seconds}} 秒",
+            "untrimmed": "源素材 {{seconds}} 秒",
+            "render": "成片 {{seconds}} 秒"
+          },
+          "trimmed": "已修剪",
+          "graded": "已调色",
+          "clipAccessible": "片段 {{number}}，{{title}}，{{seconds}} 秒",
+          "dragClip": "拖动 {{title}} 以重新排序",
+          "moveAnnouncement": "片段 {{clip}} 已移至 {{total}} 个片段中的第 {{position}} 位。剪辑顺序现已由你手动设置。",
+          "playhead": "剪辑播放头",
+          "secondsValue": "{{seconds}} 秒",
+          "trimInHandle": "入点手柄",
+          "trimOutHandle": "出点手柄",
+          "inspector": "片段检查器",
+          "selectClip": "选择片段或场记板进行检查。",
+          "takes": "镜次",
+          "trim": "修剪",
+          "inPoint": "入点",
+          "outPoint": "出点",
+          "trimInField": "入点（秒）",
+          "trimOutField": "出点（秒）",
+          "setIn": "在播放头设置 I",
+          "setOut": "在播放头设置 O",
+          "frame": "画面",
+          "scale": "裁剪缩放",
+          "scaleValue": "{{percent}}%",
+          "cropHint": "方向键可微调裁剪；按住 Shift 可移动十步。",
+          "cropOverlay": "裁剪框",
+          "colour": "色彩",
+          "colourLabels": {
+            "exposure": "曝光",
+            "contrast": "对比度",
+            "saturation": "饱和度",
+            "temperature": "色温"
+          },
+          "resetClip": "重置此片段",
+          "noUndo": "无法撤销。重置会将此片段的修剪、裁剪和色彩恢复为默认值。",
+          "divergence": "你的版本 · 手动编辑",
+          "resyncTitle": "重新同步剪辑顺序？",
+          "resyncDescription": "将恢复分镜顺序。修剪、裁剪和色彩滤镜会保留。",
+          "resyncAction": "与分镜重新同步",
+          "outsideTitle": "尚未加入剪辑",
+          "outsideDescription": "这些场景已有镜次，但未包含在你的手动剪辑中。",
+          "placeIt": "放置 {{title}}…",
+          "placeBefore": "置于 {{number}} 前 · {{title}}",
+          "addToEnd": "将 {{title}} 添加到末尾",
+          "addAllToEnd": "全部添加到末尾",
+          "volume": "预览音量"
+        },
         "render": {
+          "footer": "渲染剪辑",
           "action": "渲染视频",
           "progress": "正在渲染视频… {{percent}}%",
+          "progressWithClip": "正在渲染视频… {{percent}}% · 片段 {{clip}}/{{total}}",
           "cancel": "取消渲染",
+          "busyReason": "此项目已有渲染任务在运行。请等待完成，或在启动渲染的窗口中取消。",
+          "installFfmpeg": "安装 FFmpeg",
+          "tryAgain": "重试渲染",
+          "openProduce": "前往生成",
           "missingScenes": "{{count}} 个场景没有镜头，不会出现在视频中。",
           "missingScenes_one": "{{count}} 个场景没有镜头，不会出现在视频中。",
           "missingScenes_other": "{{count}} 个场景没有镜头，不会出现在视频中。",
@@ -1003,6 +1063,9 @@
             "busy": "此项目正在渲染。",
             "noRenderableScenes": "没有可用于渲染的场景镜头。",
             "failed": "无法渲染视频。",
+            "failedClip": "无法渲染第 {{clip}}/{{total}} 个片段。",
+            "noRenderableShots": "镜头 {{shots}} 没有可渲染的片段。",
+            "noRenderableShots_other": "镜头 {{shots}} 没有可渲染的片段。",
             "cancelled": "已取消视频渲染。"
           }
         }
@@ -1284,6 +1347,11 @@
     "export": {
       "title": "导出素材",
       "body": "导出故事板清单及每个场景选中的素材。",
+      "checkingRender": "正在检查已渲染的剪辑…",
+      "noRender": "尚未渲染",
+      "renderedAt": "渲染时间",
+      "staleRender": "此剪辑在你最近的编辑之前渲染。",
+      "latestRenderUnavailable": "无法检查最新渲染的剪辑。请重新打开导出。",
       "gapWarning": "镜头 {{shots}} 仍是场记卡，将不会包含在导出中。",
       "gapWarning_other": "镜头 {{shots}} 仍是场记卡，将不会包含在导出中。",
       "confirmSelectedCount": "导出 {{count}} 个镜头吗？",
