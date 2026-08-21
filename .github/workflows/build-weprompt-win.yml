@@ -20,7 +20,7 @@ permissions:
 env:
   RUST_TOOLCHAIN: '1.95.0'
   RUST_TARGET: 'x86_64-pc-windows-msvc'
-  AIONCORE_REPO: 'khoapnt-vng/aioncore'
+  AIONCORE_REPO: 'dto-vng/Aioncore'
 
 jobs:
   build:

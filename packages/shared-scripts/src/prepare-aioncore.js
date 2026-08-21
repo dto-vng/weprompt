@@ -33,22 +33,18 @@ const { assertGitShaResolvesOnRemote, listRemoteRefs } = require('./verify-git-s
 
 // Security-patched fork (D-01 loopback token, MCP OAuth discovery/DCR fix).
 // The upstream iOfficeAI/AionCore is unpatched; the desktop app ships the fork.
-const GITHUB_OWNER = 'khoapnt-vng';
-const GITHUB_REPO = 'aioncore';
-const AIONCORE_PUBLISHING_REMOTE = 'https://github.com/khoapnt-vng/aioncore.git';
+// VNG canonical home: github.com/dto-vng/Aioncore (khoapnt-vng retired).
+const GITHUB_OWNER = 'dto-vng';
+const GITHUB_REPO = 'Aioncore';
+const AIONCORE_PUBLISHING_REMOTE = 'https://github.com/dto-vng/Aioncore.git';
 
-// Target of the `v0.1.54` tag, which is the release this file's checksums pin.
-// Resolved out-of-band on BOTH publishing hosts before use, the standard the
-// BUG-040 fix set — a pin verified on one host is a pin that can disagree with
-// the other and never say so:
-//   git ls-remote https://github.com/khoapnt-vng/aioncore.git 'refs/tags/v0.1.54^{}'
-//   git ls-remote https://code.vng.vn/dto/aioncore.git       'refs/tags/v0.1.54^{}'
-// Both return 9bd693b3b43cdb1003061de0e4f62259ab6f42ae (2026-08-21).
-//
-// The same command confirmed the previous pin: `v0.1.51^{}` still resolves to
-// d4d8e87714690cdb230ab7a6987de3ceacbea275, the value this constant carried
-// before the mainline catch-up bumped the release to v0.1.54.
-const ACCEPTED_AIONCORE_SOURCE_COMMIT = '9bd693b3b43cdb1003061de0e4f62259ab6f42ae';
+// Target of the `v0.1.54-vng.1` tag, the release this file's checksums pin.
+// v0.1.54-vng.1 = upstream root 0.1.54 + VNG modification #1 (loopback-token
+// auth, MCP OAuth discovery, config-helper auth) — the VNG-owned fork build.
+// Resolve out-of-band before use (the BUG-040 standard):
+//   git ls-remote https://github.com/dto-vng/Aioncore.git 'refs/tags/v0.1.54-vng.1^{}'
+// returns 52b70f7270fe9e351793af668de4e6ab9194a228 (2026-08-21).
+const ACCEPTED_AIONCORE_SOURCE_COMMIT = '52b70f7270fe9e351793af668de4e6ab9194a228';
 
 // Default Forge mirror that publishes cosign-signed, self-built AionCore
 // artifacts (see aioncore-trust.js). Overridable via env for other mirrors.

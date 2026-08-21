@@ -27,14 +27,14 @@ const posixFakeToolchainIt = process.platform === 'win32' ? it.skip : it;
  */
 const FAKE_TOOLCHAIN_TIMEOUT_MS = 120_000;
 
-// Verbatim `git ls-remote https://github.com/khoapnt-vng/aioncore.git refs/tags/v0.1.54 refs/tags/v0.1.54^{}`
+// Verbatim `git ls-remote https://github.com/dto-vng/Aioncore.git refs/tags/v0.1.54-vng.1 refs/tags/v0.1.54-vng.1^{}`
 // output, captured 2026-08-21: the tag object line, then the peeled commit line
 // that ACCEPTED_AIONCORE_SOURCE_COMMIT pins. Kept as real wire output rather than
 // a hand-shaped single line — the previous fixture paired the peeled commit with
 // the unpeeled ref name, a shape `git ls-remote` never emits.
 const publishedAioncoreRefs =
-  '9bf46ba71eb1e71f7e41a3615d8eae19e0a6d497\trefs/tags/v0.1.54\n' +
-  '9bd693b3b43cdb1003061de0e4f62259ab6f42ae\trefs/tags/v0.1.54^{}\n';
+  'd657a41480c28680aab0373c701b3ca0aa093fb8\trefs/tags/v0.1.54-vng.1\n' +
+  '52b70f7270fe9e351793af668de4e6ab9194a228\trefs/tags/v0.1.54-vng.1^{}\n';
 const resolvePublishedAioncoreRefs = () => publishedAioncoreRefs;
 
 function writeFile(filePath: string, contents = 'x') {

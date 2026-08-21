@@ -79,6 +79,24 @@
  */
 
 const CHECKSUMS = {
+  // v0.1.54-vng.1 (VNG-owned fork: dto-vng/Aioncore) — root 0.1.54 + VNG mod #1.
+  // Built by dto-vng/Aioncore release run 32460395567 from commit 52b70f7;
+  // each digest below independently re-hashed (node:crypto) and cross-checked
+  // against the release aioncore-checksums.txt (2026-08-21, all matched).
+  'v0.1.54-vng.1': {
+    'aioncore-v0.1.54-vng.1-aarch64-apple-darwin.tar.gz':
+      '877e0612feff17f3123dccaaa49e0efac83653bfa6565a0a7075f209c76dff42',
+    'aioncore-v0.1.54-vng.1-aarch64-pc-windows-msvc.zip':
+      'a19e428aa0a793762fa281113c4634831412704c0fd13a029cb010cbf615355f',
+    'aioncore-v0.1.54-vng.1-aarch64-unknown-linux-gnu.tar.gz':
+      'b890fe40bd7eb2dfddc77041a0573522121f355b1dca3440c9b77bfae6ad7eef',
+    'aioncore-v0.1.54-vng.1-x86_64-apple-darwin.tar.gz':
+      '16b7c0769be9da763b92cce6e2744ea54ee2b14ca29db1b6d2b8076ee551aa29',
+    'aioncore-v0.1.54-vng.1-x86_64-pc-windows-msvc.zip':
+      'e4a12aa2b55085b62cb5c243e66c1c6ca3a05f14ecb2087c4045a4fc35125610',
+    'aioncore-v0.1.54-vng.1-x86_64-unknown-linux-gnu.tar.gz':
+      '9b7e9d826f4f4a11d5b693f019ec73bc69799ae58de671aed1051186db3b9812',
+  },
   'v0.1.54': {
     'aioncore-v0.1.54-aarch64-apple-darwin.tar.gz': '5de59456b1ca2fec14e5674f19548612b82e346de9906c637ce58a19b6b05b34',
     'aioncore-v0.1.54-aarch64-pc-windows-msvc.zip': '13c17d14a8bb187301b11b205d2eaee0953ced1957d8138d591fa4dbe4f5f9c9',
