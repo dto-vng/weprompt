@@ -4,8 +4,9 @@
  * Uses MSAL Node's public-client / PKCE flow: `acquireTokenInteractive` opens the
  * system browser on a loopback redirect (matching the "Mobile and desktop
  * applications" platform registered in Azure — `http://localhost`, no client secret).
- * Tokens are cached on disk, encrypted with Electron `safeStorage`, so a returning
- * user is signed in silently.
+ * Tokens are cached on disk so a returning user is signed in silently — encrypted with
+ * Electron `safeStorage` on Windows/Linux, and as a plain file on macOS (see
+ * shouldEncryptSsoCache for why the keychain is avoided there).
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -45,14 +46,28 @@ function buildLoopbackPage(variant: 'success' | 'error'): string {
 const SUCCESS_TEMPLATE = buildLoopbackPage('success');
 const ERROR_TEMPLATE = buildLoopbackPage('error');
 
-/** Persist the MSAL token cache to disk, encrypted with the OS keychain via safeStorage. */
+/**
+ * Whether to encrypt the SSO cache at rest with Electron `safeStorage`.
+ *
+ * On macOS `safeStorage` uses the login Keychain, and for an ad-hoc-signed app (no stable
+ * Developer ID identity) macOS treats every launch as a different app, so it re-prompts for the
+ * account password on each keychain access — a returning user is nagged constantly. We therefore
+ * persist the cache as a plain file on macOS. Windows (DPAPI) and Linux (libsecret/kwallet)
+ * encrypt without prompting, so the cache stays encrypted there.
+ */
+function shouldEncryptSsoCache(): boolean {
+  return process.platform !== 'darwin' && safeStorage.isEncryptionAvailable();
+}
+
+/** Persist the MSAL token cache to disk. Encrypted via safeStorage except on macOS, where an
+ *  ad-hoc signature would make the keychain prompt on every access (see shouldEncryptSsoCache). */
 function createEncryptedCachePlugin(cacheFile: string): ICachePlugin {
   return {
     beforeCacheAccess: async (context: TokenCacheContext) => {
       try {
         if (!existsSync(cacheFile)) return;
         const raw = readFileSync(cacheFile);
-        const data = safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(raw) : raw.toString('utf8');
+        const data = shouldEncryptSsoCache() ? safeStorage.decryptString(raw) : raw.toString('utf8');
         context.tokenCache.deserialize(data);
       } catch {
         // A corrupt or undecryptable cache (e.g. keychain reset) must not block
@@ -63,9 +78,7 @@ function createEncryptedCachePlugin(cacheFile: string): ICachePlugin {
       if (!context.cacheHasChanged) return;
       try {
         const data = context.tokenCache.serialize();
-        const buffer = safeStorage.isEncryptionAvailable()
-          ? safeStorage.encryptString(data)
-          : Buffer.from(data, 'utf8');
+        const buffer = shouldEncryptSsoCache() ? safeStorage.encryptString(data) : Buffer.from(data, 'utf8');
         mkdirSync(dirname(cacheFile), { recursive: true });
         writeFileSync(cacheFile, buffer);
       } catch {
