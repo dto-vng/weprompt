@@ -99,6 +99,15 @@ jobs:
           test -f "$BUNDLE/managed-resources/manifest.json" || {
             echo "::error::managed-resources/manifest.json missing — bundle would be rejected"; exit 1; }
 
+          # migration-lineage.json is NOT produced by the binary; prepare-aioncore's
+          # local-bundle path (and Sprint 4's migreset gate) require it beside the
+          # binary and deep-equal to packages/shared-scripts/src/aioncore-migration-lineage.json.
+          # This is valid because aioncore_ref pins the migrations to that accepted
+          # set; the app re-checks deep-equality and rejects any drift.
+          LINEAGE_SRC="$GITHUB_WORKSPACE/packages/shared-scripts/src/aioncore-migration-lineage.json"
+          test -f "$LINEAGE_SRC" || { echo "::error::$LINEAGE_SRC missing"; exit 1; }
+          cp "$LINEAGE_SRC" "$BUNDLE/migration-lineage.json"
+
           echo "AIONUI_BACKEND_LOCAL_BUNDLE_DIR=$BUNDLE" >> "$GITHUB_ENV"
           echo "Bundle ready at $BUNDLE"
 

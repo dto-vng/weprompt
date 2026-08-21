@@ -80,22 +80,25 @@
 
 const CHECKSUMS = {
   // v0.1.54-vng.1 (VNG-owned fork: dto-vng/Aioncore) — root 0.1.54 + VNG mod #1.
-  // Built by dto-vng/Aioncore release run 32460395567 from commit 52b70f7;
-  // each digest below independently re-hashed (node:crypto) and cross-checked
-  // against the release aioncore-checksums.txt (2026-08-21, all matched).
+  // Binary built from commit 52b70f7 (release run 32460395567). Release assets
+  // re-cut 2026-08-21 to embed migration-lineage.json alongside the binary
+  // (Sprint 4's migreset gate requires it in the tarball); binaries are byte-
+  // identical to the original run — only the archives changed. Each digest below
+  // independently re-hashed (node:crypto) and cross-checked against the re-cut
+  // aioncore-checksums.txt.
   'v0.1.54-vng.1': {
     'aioncore-v0.1.54-vng.1-aarch64-apple-darwin.tar.gz':
-      '877e0612feff17f3123dccaaa49e0efac83653bfa6565a0a7075f209c76dff42',
+      '1c226dbedcbf89bae531c29b26baf8a02816ba6ffb9f0e10cee1fa36bc3f0027',
     'aioncore-v0.1.54-vng.1-aarch64-pc-windows-msvc.zip':
-      'a19e428aa0a793762fa281113c4634831412704c0fd13a029cb010cbf615355f',
+      '03b8dbf28245018e653e372eec96b2c0a14019236b0a96e6c0a3cf740422e319',
     'aioncore-v0.1.54-vng.1-aarch64-unknown-linux-gnu.tar.gz':
-      'b890fe40bd7eb2dfddc77041a0573522121f355b1dca3440c9b77bfae6ad7eef',
+      '1ba4283a0be2c758f146cd88adf2fba391033eab61a848bc1866b29c03b7cb0b',
     'aioncore-v0.1.54-vng.1-x86_64-apple-darwin.tar.gz':
-      '16b7c0769be9da763b92cce6e2744ea54ee2b14ca29db1b6d2b8076ee551aa29',
+      'd15984937a3c5a629293348269dcbfae50e564ce52ca5f687261faff3aedb3c1',
     'aioncore-v0.1.54-vng.1-x86_64-pc-windows-msvc.zip':
-      'e4a12aa2b55085b62cb5c243e66c1c6ca3a05f14ecb2087c4045a4fc35125610',
+      '96ac06adb092d4f06531faa2a243fbfeb5c29dbdf8532efee260d50905d8807f',
     'aioncore-v0.1.54-vng.1-x86_64-unknown-linux-gnu.tar.gz':
-      '9b7e9d826f4f4a11d5b693f019ec73bc69799ae58de671aed1051186db3b9812',
+      'f2e86ff567a25aeb8b4b3cc6c28a95cecdf4eda47adb921c57ea4072bb1f4b64',
   },
   'v0.1.54': {
     'aioncore-v0.1.54-aarch64-apple-darwin.tar.gz': '5de59456b1ca2fec14e5674f19548612b82e346de9906c637ce58a19b6b05b34',
