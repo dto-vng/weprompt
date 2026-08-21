@@ -651,7 +651,6 @@ describe('httpBridge', () => {
         headers: {
           'Content-Type': 'application/json',
           Authorization: 'Bearer lifecycle-secret',
-
         },
         body: '{"content":"private prompt"}',
         signal: undefined,
