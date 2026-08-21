@@ -38,17 +38,16 @@ const GITHUB_REPO = 'aioncore';
 const AIONCORE_PUBLISHING_REMOTE = 'https://github.com/khoapnt-vng/aioncore.git';
 
 // Target of the `v0.1.54` tag, which is the release this file's checksums pin.
-// Resolved out-of-band immediately before use:
+// Resolved out-of-band on BOTH publishing hosts before use, the standard the
+// BUG-040 fix set — a pin verified on one host is a pin that can disagree with
+// the other and never say so:
 //   git ls-remote https://github.com/khoapnt-vng/aioncore.git 'refs/tags/v0.1.54^{}'
-//     -> 9bd693b3b43cdb1003061de0e4f62259ab6f42ae
+//   git ls-remote https://code.vng.vn/dto/aioncore.git       'refs/tags/v0.1.54^{}'
+// Both return 9bd693b3b43cdb1003061de0e4f62259ab6f42ae (2026-08-21).
+//
 // The same command confirmed the previous pin: `v0.1.51^{}` still resolves to
 // d4d8e87714690cdb230ab7a6987de3ceacbea275, the value this constant carried
 // before the mainline catch-up bumped the release to v0.1.54.
-//
-// NOTE, weaker than the BUG-040 verification it replaces: that one resolved the
-// tag on BOTH publishing hosts. code.vng.vn/dto/aioncore needs VPN credentials
-// that were not available here, so only github.com was checked this time.
-// Re-verify on code.vng.vn before this branch is released.
 const ACCEPTED_AIONCORE_SOURCE_COMMIT = '9bd693b3b43cdb1003061de0e4f62259ab6f42ae';
 
 // Default Forge mirror that publishes cosign-signed, self-built AionCore
