@@ -103,7 +103,10 @@
       "sendDiagnostics": "ذخیره تشخیص‌ها",
       "diagnosticsSent": "تشخیص‌ها ذخیره شدند",
       "diagnosticsReportSuccess": "بسته تشخیصی ذخیره شد",
-      "diagnosticsReportFailed": "بسته تشخیصی ذخیره نشد"
+      "diagnosticsReportFailed": "بسته تشخیصی ذخیره نشد",
+      "resetButton": "Reset & restart",
+      "resetHint": "This data was created by a different version of WePrompt and can't be opened. Reset & restart backs up the old data and starts fresh — nothing is permanently deleted.",
+      "resetFailed": "Reset failed. Please try again."
     },
     "localDataRepair": {
       "title": "ترمیم داده‌های محلی ناموفق بود",

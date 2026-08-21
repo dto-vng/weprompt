@@ -103,7 +103,10 @@
       "sendDiagnostics": "Зберегти діагностику",
       "diagnosticsSent": "Діагностику збережено",
       "diagnosticsReportSuccess": "Діагностичний пакет збережено",
-      "diagnosticsReportFailed": "Не вдалося зберегти діагностичний пакет"
+      "diagnosticsReportFailed": "Не вдалося зберегти діагностичний пакет",
+      "resetButton": "Reset & restart",
+      "resetHint": "This data was created by a different version of WePrompt and can't be opened. Reset & restart backs up the old data and starts fresh — nothing is permanently deleted.",
+      "resetFailed": "Reset failed. Please try again."
     },
     "localDataRepair": {
       "title": "Local data repair failed",

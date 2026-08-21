@@ -153,7 +153,9 @@ export function getInstallationIntegrityModalActions(
     recoverText:
       diagnosticsKind === 'recoverable_database_corruption'
         ? t('common.backendStartup.recoverableDatabaseCorruption.confirmRebuild')
-        : undefined,
+        : diagnosticsKind === 'data_migration'
+          ? t('common.backendStartup.dataMigration.resetButton')
+          : undefined,
     reportText:
       diagnosticsKind === 'recoverable_database_corruption'
         ? t('common.backendStartup.recoverableDatabaseCorruption.sendDiagnostics')
@@ -206,7 +208,10 @@ export const InstallationIntegrityFooter: React.FC<{
   const [recovering, setRecovering] = useState(false);
   const actions = getInstallationIntegrityModalActions(t, {
     diagnosticsKind,
-    onRecoverCorruptedDatabase: () => window.electronAPI?.recoverCorruptedDatabase?.(),
+    onRecoverCorruptedDatabase: () =>
+      diagnosticsKind === 'data_migration'
+        ? window.electronAPI?.resetLocalData?.()
+        : window.electronAPI?.recoverCorruptedDatabase?.(),
     onReportDiagnostics: diagnostics
       ? () => reportInstallationIntegrityDiagnostics(diagnostics, t, diagnosticsKind)
       : undefined,
@@ -258,7 +263,11 @@ export const InstallationIntegrityFooter: React.FC<{
     try {
       await actions.onRecoverCorruptedDatabase();
     } catch {
-      Message.error(t('common.backendStartup.recoverableDatabaseCorruption.rebuildFailed'));
+      Message.error(
+        diagnosticsKind === 'data_migration'
+          ? t('common.backendStartup.dataMigration.resetFailed')
+          : t('common.backendStartup.recoverableDatabaseCorruption.rebuildFailed')
+      );
       setRecovering(false);
     }
   };
@@ -303,7 +312,9 @@ export function showInstallationIntegrityModal(
       ? t('common.backendStartup.recoverableDatabaseCorruption.diagnosticsHint')
       : diagnosticsKind === 'transient_concurrent_startup'
         ? t('common.backendStartup.transientConcurrentStartup.diagnosticsHint')
-        : undefined;
+        : diagnosticsKind === 'data_migration'
+          ? t('common.backendStartup.dataMigration.resetHint')
+          : undefined;
 
   modal.error({
     title: getInstallationIntegrityTitle(t, diagnosticsKind),

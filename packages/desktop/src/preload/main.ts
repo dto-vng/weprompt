@@ -137,6 +137,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Feedback: export a local diagnostic package chosen by the user
   exportLocalFeedbackDiagnostics: (input: unknown) => ipcRenderer.invoke('feedback:export-local', input),
   recoverCorruptedDatabase: () => ipcRenderer.invoke('backend:recover-corrupted-database'),
+  // Archive the incompatible local database and restart fresh (migration version mismatch)
+  resetLocalData: () => ipcRenderer.invoke('backend:reset-local-data'),
   // Microsoft SSO: user-initiated sign-in (resolves to the account) and sign-out (WP 24045)
   signInSso: () => ipcRenderer.invoke('sso:login'),
   signOutSso: () => ipcRenderer.invoke('sso:logout'),

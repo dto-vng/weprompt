@@ -103,7 +103,10 @@
       "sendDiagnostics": "診断情報を保存",
       "diagnosticsSent": "診断情報を保存しました",
       "diagnosticsReportSuccess": "診断パッケージを保存しました",
-      "diagnosticsReportFailed": "診断パッケージを保存できませんでした"
+      "diagnosticsReportFailed": "診断パッケージを保存できませんでした",
+      "resetButton": "Reset & restart",
+      "resetHint": "This data was created by a different version of WePrompt and can't be opened. Reset & restart backs up the old data and starts fresh — nothing is permanently deleted.",
+      "resetFailed": "Reset failed. Please try again."
     },
     "localDataRepair": {
       "title": "Local data repair failed",

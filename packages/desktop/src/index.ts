@@ -487,6 +487,62 @@ ipcMain.handle('backend:recover-corrupted-database', async () => {
   });
 });
 
+ipcMain.handle('backend:reset-local-data', async () => {
+  const { resetLocalDatabaseAfterUserConfirmation, archiveBackendDatabaseFiles } =
+    await import('./process/startup/resetLocalDatabase');
+  const { getDataPath } = await import('./process/utils/utils');
+  const { getSystemDir } = await import('./process/utils/initStorage');
+
+  await resetLocalDatabaseAfterUserConfirmation({
+    getFailure: () => backendStartupFailureInfo,
+    getDataDir: getDataPath,
+    now: () => Date.now(),
+    archiveDatabaseFiles: archiveBackendDatabaseFiles,
+    stopBackend: stopBackendWithPresentationRuntimeLifecycle,
+    startBackend: async () => {
+      try {
+        const sysDir = getSystemDir();
+        return await backendManager.start(
+          getDataPath(),
+          sysDir.logDir,
+          {
+            cacheDir: sysDir.cacheDir,
+            workDir: sysDir.workDir,
+            logDir: sysDir.logDir,
+          },
+          {
+            allowPendingOnHealthTimeout: false,
+            onHealthTimeout: async (error) => {
+              markBackendStartupFailed(error);
+              await captureBackendStartupFailure(error);
+            },
+            onPendingExit: async (error) => {
+              markBackendStartupFailed(error);
+              await captureBackendStartupFailure(error);
+            },
+            onReady: (backendPort) => {
+              markBackendReady(backendPort, 'backendManager.resetLocalDatabase.lateReady');
+            },
+            allowedOrigins: rendererAllowedOrigins(),
+          }
+        );
+      } catch (error) {
+        markBackendStartupFailed(error);
+        await captureBackendStartupFailure(error);
+        throw error;
+      }
+    },
+    markReady: markBackendReady,
+    reloadMainWindow: () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.reload();
+      }
+    },
+    logInfo: console.info,
+    logWarn: console.warn,
+  });
+});
+
 function markBackendStartupFailed(error: unknown): void {
   backendStartupFailed = true;
   backendStartupFailureInfo = classifyBackendStartupFailure(error);

@@ -103,7 +103,10 @@
       "sendDiagnostics": "진단 정보 저장",
       "diagnosticsSent": "진단 정보를 저장했습니다",
       "diagnosticsReportSuccess": "진단 패키지를 저장했습니다",
-      "diagnosticsReportFailed": "진단 패키지를 저장하지 못했습니다"
+      "diagnosticsReportFailed": "진단 패키지를 저장하지 못했습니다",
+      "resetButton": "Reset & restart",
+      "resetHint": "This data was created by a different version of WePrompt and can't be opened. Reset & restart backs up the old data and starts fresh — nothing is permanently deleted.",
+      "resetFailed": "Reset failed. Please try again."
     },
     "localDataRepair": {
       "title": "Local data repair failed",

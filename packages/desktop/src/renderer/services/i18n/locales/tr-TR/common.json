@@ -103,7 +103,10 @@
       "sendDiagnostics": "Tanıları kaydet",
       "diagnosticsSent": "Tanılar kaydedildi",
       "diagnosticsReportSuccess": "Tanı paketi kaydedildi",
-      "diagnosticsReportFailed": "Tanı paketi kaydedilemedi"
+      "diagnosticsReportFailed": "Tanı paketi kaydedilemedi",
+      "resetButton": "Reset & restart",
+      "resetHint": "This data was created by a different version of WePrompt and can't be opened. Reset & restart backs up the old data and starts fresh — nothing is permanently deleted.",
+      "resetFailed": "Reset failed. Please try again."
     },
     "localDataRepair": {
       "title": "Local data repair failed",

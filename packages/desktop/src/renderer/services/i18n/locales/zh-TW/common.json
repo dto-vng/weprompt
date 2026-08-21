@@ -103,7 +103,10 @@
       "sendDiagnostics": "儲存診斷資訊",
       "diagnosticsSent": "診斷資訊已儲存",
       "diagnosticsReportSuccess": "診斷套件已儲存",
-      "diagnosticsReportFailed": "無法儲存診斷套件"
+      "diagnosticsReportFailed": "無法儲存診斷套件",
+      "resetButton": "重置並重新啟動",
+      "resetHint": "這些資料由其他版本的 WePrompt 建立，無法開啟。重置並重新啟動會先備份舊資料再重新開始——不會永久刪除任何內容。",
+      "resetFailed": "重置失敗，請重試。"
     },
     "localDataRepair": {
       "title": "本機資料修復失敗",

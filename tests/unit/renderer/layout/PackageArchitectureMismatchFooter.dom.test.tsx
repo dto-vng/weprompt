@@ -84,4 +84,27 @@ describe('PackageArchitectureMismatchFooter', () => {
     await waitFor(() => expect(recoverCorruptedDatabase).toHaveBeenCalledOnce());
     expect(screen.queryByTestId('installation-integrity-report')).not.toBeInTheDocument();
   });
+
+  it('offers a reset action for a data migration failure and archives via the desktop path', async () => {
+    const resetLocalData = vi.fn().mockResolvedValue(undefined);
+    const recoverCorruptedDatabase = vi.fn().mockResolvedValue(undefined);
+    (window as unknown as { electronAPI?: Record<string, unknown> }).electronAPI = {
+      resetLocalData,
+      recoverCorruptedDatabase,
+    };
+
+    render(
+      <InstallationIntegrityFooter
+        diagnostics={{ source: 'backend_startup_failure' }}
+        diagnosticsKind='data_migration'
+      />
+    );
+
+    expect(screen.getByText('common.backendStartup.dataMigration.resetButton')).toBeVisible();
+    fireEvent.click(screen.getByTestId('recoverable-database-corruption-rebuild'));
+
+    await waitFor(() => expect(resetLocalData).toHaveBeenCalledOnce());
+    // A version mismatch is not recoverable through aioncore's corruption flag, so it must not be used here.
+    expect(recoverCorruptedDatabase).not.toHaveBeenCalled();
+  });
 });

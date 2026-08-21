@@ -103,7 +103,10 @@
       "sendDiagnostics": "保存诊断信息",
       "diagnosticsSent": "诊断信息已保存",
       "diagnosticsReportSuccess": "诊断包已保存",
-      "diagnosticsReportFailed": "无法保存诊断包"
+      "diagnosticsReportFailed": "无法保存诊断包",
+      "resetButton": "重置并重启",
+      "resetHint": "这些数据由其他版本的 WePrompt 创建，无法打开。重置并重启会先备份旧数据再重新开始——不会永久删除任何内容。",
+      "resetFailed": "重置失败，请重试。"
     },
     "localDataRepair": {
       "title": "本地数据修复失败",

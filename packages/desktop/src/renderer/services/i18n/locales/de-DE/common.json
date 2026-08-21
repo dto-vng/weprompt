@@ -102,7 +102,10 @@
       "sendDiagnostics": "Diagnosen speichern",
       "diagnosticsSent": "Diagnosen gespeichert",
       "diagnosticsReportSuccess": "Diagnosepaket gespeichert",
-      "diagnosticsReportFailed": "Diagnosepaket konnte nicht gespeichert werden"
+      "diagnosticsReportFailed": "Diagnosepaket konnte nicht gespeichert werden",
+      "resetButton": "Reset & restart",
+      "resetHint": "This data was created by a different version of WePrompt and can't be opened. Reset & restart backs up the old data and starts fresh — nothing is permanently deleted.",
+      "resetFailed": "Reset failed. Please try again."
     },
     "localDataRepair": {
       "title": "Local data repair failed",

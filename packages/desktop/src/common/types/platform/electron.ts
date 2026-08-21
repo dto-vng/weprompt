@@ -51,6 +51,7 @@ export interface ElectronBridgeAPI {
     input: LocalFeedbackDiagnosticExportInput
   ) => Promise<LocalFeedbackDiagnosticExportResult>;
   recoverCorruptedDatabase?: () => Promise<void>;
+  resetLocalData?: () => Promise<void>;
   // Microsoft SSO (WP 24045): user-initiated sign-in (resolves to the signed-in account) / sign-out
   signInSso?: () => Promise<{ username: string; name?: string; homeAccountId: string } | null>;
   signOutSso?: () => Promise<void>;
