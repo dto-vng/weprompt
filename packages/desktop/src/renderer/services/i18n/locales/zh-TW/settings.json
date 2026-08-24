@@ -1459,5 +1459,9 @@
     "banner": "偵測到 OpenClaw 與 {{platform}} 衝突，助手切換將無法生效。",
     "learnMore": "了解更多"
   },
-  "bugReportCancelled": "已取消儲存診斷套件。"
+  "bugReportCancelled": "已取消儲存診斷套件。",
+  "versionLabel": "版本",
+  "ssoStatusLabel": "Microsoft 登入 (SSO)",
+  "ssoStatusEnabled": "已啟用",
+  "ssoStatusDisabled": "未啟用"
 }

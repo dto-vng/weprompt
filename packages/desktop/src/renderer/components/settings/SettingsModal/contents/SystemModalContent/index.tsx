@@ -24,6 +24,9 @@ import DirInputItem from './DirInputItem';
 import PreferenceRow from './PreferenceRow';
 import VoiceInputSection from './VoiceInputSection';
 
+// Build-time app version (Vite define), so users can self-check which build they run.
+declare const __APP_VERSION__: string;
+
 /**
  * System settings content component
  *
@@ -39,6 +42,11 @@ const SystemModalContent: React.FC = () => {
   const viewMode = useSettingsViewMode();
   const isPageMode = viewMode === 'page';
   const initializingRef = useRef(true);
+
+  // Surfaced at the top of the tab so users (and support) can self-check the
+  // running build and whether Microsoft SSO is baked into it.
+  const appVersion = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '';
+  const ssoEnabled = Boolean((window as typeof window & { __ssoEnabled?: boolean }).__ssoEnabled);
 
   const [startOnBoot, setStartOnBoot] = useState<IStartOnBootStatus>({
     supported: false,
@@ -405,6 +413,18 @@ const SystemModalContent: React.FC = () => {
 
       <AionScrollArea className='flex-1 min-h-0 pb-16px' disableOverflow={isPageMode}>
         <div className='space-y-16px'>
+          <div className='px-[12px] md:px-[32px] py-16px bg-2 rd-16px'>
+            <div className='w-full flex flex-col divide-y divide-border-2'>
+              <PreferenceRow label={t('settings.versionLabel')}>
+                <span className='text-13px color-text-3 font-mono'>{appVersion}</span>
+              </PreferenceRow>
+              <PreferenceRow label={t('settings.ssoStatusLabel')}>
+                <span className='text-13px color-text-3'>
+                  {ssoEnabled ? t('settings.ssoStatusEnabled') : t('settings.ssoStatusDisabled')}
+                </span>
+              </PreferenceRow>
+            </div>
+          </div>
           <div className='px-[12px] md:px-[32px] py-16px bg-2 rd-16px space-y-12px'>
             <div className='w-full flex flex-col divide-y divide-border-2'>
               {preferenceItems.map((item) => (

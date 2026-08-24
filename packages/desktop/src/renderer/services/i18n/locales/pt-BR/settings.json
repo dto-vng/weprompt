@@ -1466,5 +1466,9 @@
     "banner": "Conflito entre OpenClaw e {{platform}} detectado; a troca de assistentes não funcionará.",
     "learnMore": "Saiba mais"
   },
-  "bugReportCancelled": "O salvamento do pacote de diagnóstico foi cancelado."
+  "bugReportCancelled": "O salvamento do pacote de diagnóstico foi cancelado.",
+  "versionLabel": "Versão",
+  "ssoStatusLabel": "Entrar com Microsoft (SSO)",
+  "ssoStatusEnabled": "Ativado",
+  "ssoStatusDisabled": "Desativado"
 }

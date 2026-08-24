@@ -1463,5 +1463,9 @@
     "banner": "Se detectó un conflicto de OpenClaw con {{platform}}; el cambio de asistentes no funcionará.",
     "learnMore": "Más información"
   },
-  "bugReportCancelled": "Se canceló el guardado del paquete de diagnóstico."
+  "bugReportCancelled": "Se canceló el guardado del paquete de diagnóstico.",
+  "versionLabel": "Versión",
+  "ssoStatusLabel": "Inicio de sesión de Microsoft (SSO)",
+  "ssoStatusEnabled": "Activado",
+  "ssoStatusDisabled": "Desactivado"
 }

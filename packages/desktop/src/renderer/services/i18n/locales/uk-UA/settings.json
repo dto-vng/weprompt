@@ -1467,5 +1467,9 @@
     "banner": "Виявлено конфлікт OpenClaw і {{platform}}; перемикання асистента не працюватиме.",
     "learnMore": "Докладніше"
   },
-  "bugReportCancelled": "Збереження діагностичного пакета скасовано."
+  "bugReportCancelled": "Збереження діагностичного пакета скасовано.",
+  "versionLabel": "Версія",
+  "ssoStatusLabel": "Вхід через Microsoft (SSO)",
+  "ssoStatusEnabled": "Увімкнено",
+  "ssoStatusDisabled": "Вимкнено"
 }

@@ -1460,5 +1460,9 @@
     "banner": "تداخل OpenClaw با {{platform}} شناسایی شد؛ تغییر دستیار کار نمی‌کند.",
     "learnMore": "بیشتر بدانید"
   },
-  "bugReportCancelled": "ذخیره بسته تشخیصی لغو شد."
+  "bugReportCancelled": "ذخیره بسته تشخیصی لغو شد.",
+  "versionLabel": "نسخه",
+  "ssoStatusLabel": "ورود مایکروسافت (SSO)",
+  "ssoStatusEnabled": "فعال",
+  "ssoStatusDisabled": "غیرفعال"
 }

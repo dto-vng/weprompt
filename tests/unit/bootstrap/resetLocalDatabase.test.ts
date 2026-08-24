@@ -75,6 +75,46 @@ describe('resetLocalDatabaseAfterUserConfirmation', () => {
     expect(deps.reloadMainWindow).toHaveBeenCalledOnce();
   });
 
+  it('clears provider recovery flags after archiving so model config re-populates', async () => {
+    const clearProviderRecoveryFlags = vi.fn().mockResolvedValue(undefined);
+    const deps = {
+      ...makeDeps({
+        reason: 'backend_data_migration_failed',
+        backendBoundaryCode: 'BOOTSTRAP_DATA_INIT_FAILED',
+        backendBoundaryStage: 'database.migration',
+      }),
+      clearProviderRecoveryFlags,
+    };
+
+    await resetLocalDatabaseAfterUserConfirmation(deps);
+
+    expect(clearProviderRecoveryFlags).toHaveBeenCalledOnce();
+    // Must run after the DB is archived and before the backend restarts.
+    expect(deps.archiveDatabaseFiles.mock.invocationCallOrder[0]).toBeLessThan(
+      clearProviderRecoveryFlags.mock.invocationCallOrder[0]
+    );
+    expect(clearProviderRecoveryFlags.mock.invocationCallOrder[0]).toBeLessThan(
+      deps.startBackend.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('still completes the reset when clearing provider recovery flags throws', async () => {
+    const clearProviderRecoveryFlags = vi.fn().mockRejectedValue(new Error('config write failed'));
+    const deps = {
+      ...makeDeps({
+        reason: 'backend_data_migration_failed',
+        backendBoundaryCode: 'BOOTSTRAP_DATA_INIT_FAILED',
+        backendBoundaryStage: 'database.migration',
+      }),
+      clearProviderRecoveryFlags,
+    };
+
+    await resetLocalDatabaseAfterUserConfirmation(deps);
+
+    expect(deps.startBackend).toHaveBeenCalledOnce();
+    expect(deps.markReady).toHaveBeenCalledOnce();
+  });
+
   it('does not mark ready or reload when the restart fails', async () => {
     const deps = makeDeps({
       reason: 'backend_data_migration_failed',

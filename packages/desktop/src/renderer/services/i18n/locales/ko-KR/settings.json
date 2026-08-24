@@ -1459,5 +1459,9 @@
     "banner": "OpenClaw {{platform}} 충돌이 감지되었습니다. 어시스턴트 전환이 작동하지 않습니다.",
     "learnMore": "자세히 알아보기"
   },
-  "bugReportCancelled": "진단 패키지 저장이 취소되었습니다."
+  "bugReportCancelled": "진단 패키지 저장이 취소되었습니다.",
+  "versionLabel": "버전",
+  "ssoStatusLabel": "Microsoft 로그인 (SSO)",
+  "ssoStatusEnabled": "사용",
+  "ssoStatusDisabled": "사용 안 함"
 }

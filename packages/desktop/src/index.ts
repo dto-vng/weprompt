@@ -492,7 +492,7 @@ ipcMain.handle('backend:reset-local-data', async () => {
   const { resetLocalDatabaseAfterUserConfirmation, archiveBackendDatabaseFiles } =
     await import('./process/startup/resetLocalDatabase');
   const { getDataPath } = await import('./process/utils/utils');
-  const { getSystemDir } = await import('./process/utils/initStorage');
+  const { getSystemDir, ProcessConfig } = await import('./process/utils/initStorage');
 
   await resetLocalDatabaseAfterUserConfirmation({
     getFailure: () => backendStartupFailureInfo,
@@ -538,6 +538,12 @@ ipcMain.handle('backend:reset-local-data', async () => {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.reload();
       }
+    },
+    clearProviderRecoveryFlags: async () => {
+      // Re-arm the one-shot provider migration + built-in seed so the fresh DB is
+      // re-populated from the surviving on-disk config on the next launch.
+      await ProcessConfig.set('migration.providersMigrated_v1', false);
+      await ProcessConfig.set('migration.greennodeProviderSeeded_v1', false);
     },
     logInfo: console.info,
     logWarn: console.warn,

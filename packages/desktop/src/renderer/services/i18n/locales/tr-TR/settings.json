@@ -1460,5 +1460,9 @@
     "banner": "OpenClaw ve {{platform}} çakışması algılandı; asistan değiştirme çalışmaz.",
     "learnMore": "Daha fazla bilgi"
   },
-  "bugReportCancelled": "Tanı paketi kaydetme işlemi iptal edildi."
+  "bugReportCancelled": "Tanı paketi kaydetme işlemi iptal edildi.",
+  "versionLabel": "Sürüm",
+  "ssoStatusLabel": "Microsoft Oturum Açma (SSO)",
+  "ssoStatusEnabled": "Etkin",
+  "ssoStatusDisabled": "Devre dışı"
 }

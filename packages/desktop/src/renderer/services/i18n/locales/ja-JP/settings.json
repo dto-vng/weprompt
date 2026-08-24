@@ -1459,5 +1459,9 @@
     "banner": "OpenClaw と {{platform}} の競合を検出しました。アシスタントの切り替えは機能しません。",
     "learnMore": "詳細を見る"
   },
-  "bugReportCancelled": "診断パッケージの保存を中止しました。"
+  "bugReportCancelled": "診断パッケージの保存を中止しました。",
+  "versionLabel": "バージョン",
+  "ssoStatusLabel": "Microsoft サインイン (SSO)",
+  "ssoStatusEnabled": "有効",
+  "ssoStatusDisabled": "無効"
 }

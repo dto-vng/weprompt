@@ -10,6 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import os from 'os';
 import { applyAppIdentity } from '@/common/platform/appIdentity';
+import { migrateLegacyUserData } from '../startup/migrateLegacyUserData';
 import { applyGpuRecoveryFlags } from './gpuRecovery';
 
 // ============ E2E test isolation ============
@@ -32,6 +33,28 @@ applyAppIdentity(
     fs.mkdirSync(userDataPath, { recursive: true });
   }
 );
+
+// Recover user data stranded by an app-identity generation change
+// (`<appData>/WePrompt` or `<appData>/AionUi` -> `<appData>/Forge`). Runs once,
+// only for packaged installs (dev/E2E use their own roots), and only copies when
+// the current root is still empty — so it can never overwrite a live install.
+// MUST run after applyAppIdentity (userData is now pinned) and before any code
+// reads the data tree.
+if (app.isPackaged && !e2eUserDataDir) {
+  try {
+    const recovery = migrateLegacyUserData({
+      appDataPath: app.getPath('appData'),
+      userDataPath: app.getPath('userData'),
+      nowMs: Date.now(),
+    });
+    if (recovery.migrated) {
+      console.log(`[AionUi] Recovered stranded user data from ${recovery.from} (${recovery.copied.join(', ')})`);
+    }
+  } catch (error) {
+    // Never block startup on recovery; the app still opens on the empty root.
+    console.warn('[AionUi] Legacy user-data migration skipped:', error);
+  }
+}
 
 // app.disableHardwareAcceleration() must run before app is ready.
 applyGpuRecoveryFlags();

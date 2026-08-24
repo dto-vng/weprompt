@@ -1463,5 +1463,9 @@
     "banner": "OpenClaw {{platform}} conflict detected — assistant switching will not work.",
     "learnMore": "Learn more"
   },
-  "bugReportCancelled": "Saving the diagnostic package was cancelled."
+  "bugReportCancelled": "Saving the diagnostic package was cancelled.",
+  "versionLabel": "Version",
+  "ssoStatusLabel": "Microsoft Sign-in (SSO)",
+  "ssoStatusEnabled": "Enabled",
+  "ssoStatusDisabled": "Disabled"
 }

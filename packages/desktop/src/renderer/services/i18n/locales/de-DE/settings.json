@@ -1460,5 +1460,9 @@
     "banner": "OpenClaw-{{platform}}-Konflikt erkannt — Assistentenwechsel funktioniert nicht.",
     "learnMore": "Mehr erfahren"
   },
-  "bugReportCancelled": "Das Speichern des Diagnosepakets wurde abgebrochen."
+  "bugReportCancelled": "Das Speichern des Diagnosepakets wurde abgebrochen.",
+  "versionLabel": "Version",
+  "ssoStatusLabel": "Microsoft-Anmeldung (SSO)",
+  "ssoStatusEnabled": "Aktiviert",
+  "ssoStatusDisabled": "Deaktiviert"
 }

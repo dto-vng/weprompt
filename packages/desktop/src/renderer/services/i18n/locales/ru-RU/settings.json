@@ -1466,5 +1466,9 @@
     "banner": "Обнаружен конфликт OpenClaw и {{platform}}; переключение ассистента не сработает.",
     "learnMore": "Подробнее"
   },
-  "bugReportCancelled": "Сохранение диагностического пакета отменено."
+  "bugReportCancelled": "Сохранение диагностического пакета отменено.",
+  "versionLabel": "Версия",
+  "ssoStatusLabel": "Вход через Microsoft (SSO)",
+  "ssoStatusEnabled": "Включено",
+  "ssoStatusDisabled": "Отключено"
 }

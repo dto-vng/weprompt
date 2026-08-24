@@ -43,6 +43,15 @@ export type ResetLocalDatabaseDeps = {
   startBackend: () => Promise<number>;
   markReady: (port: number, source: string) => void;
   reloadMainWindow: () => void;
+  /**
+   * Clears the one-shot provider migration/seed flags so the fresh database is
+   * re-populated from the surviving on-disk config (legacy `model.config` + the
+   * built-in provider seeds) on the next launch. Without this, archiving the
+   * backend DB permanently loses the user's model config: the flags in the
+   * (non-archived) config file keep re-migration/re-seed from ever running again.
+   * Optional so existing callers/tests need not provide it.
+   */
+  clearProviderRecoveryFlags?: () => Promise<void>;
   logInfo: (message: string) => void;
   logWarn: (message: string) => void;
 };
@@ -67,6 +76,15 @@ export async function resetLocalDatabaseAfterUserConfirmation(deps: ResetLocalDa
   await deps.stopBackend();
   const archived = deps.archiveDatabaseFiles(deps.getDataDir(), deps.now());
   deps.logInfo(`[AionUi] Archived ${archived.length} backend database file(s) before reset.`);
+  if (deps.clearProviderRecoveryFlags) {
+    try {
+      await deps.clearProviderRecoveryFlags();
+      deps.logInfo('[AionUi] Cleared provider migration/seed flags so model config re-populates on next launch.');
+    } catch (error) {
+      // Never block the reset on flag cleanup; the DB is already archived.
+      deps.logWarn(`[AionUi] Failed to clear provider recovery flags: ${String(error)}`);
+    }
+  }
   const port = await deps.startBackend();
   deps.markReady(port, 'backendManager.resetLocalDatabase');
   deps.reloadMainWindow();
