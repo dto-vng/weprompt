@@ -31,6 +31,10 @@ on:
         description: 'Build an internal WePrompt package with public update and telemetry configuration disabled'
         type: boolean
         default: false
+      sso_config_b64:
+        description: 'Optional base64 of resources/sso-config.json to bake Microsoft SSO (tenantId+clientId). Empty leaves SSO dormant.'
+        type: string
+        default: ''
 
 env:
   BUN_INSTALL_REGISTRY: 'https://registry.npmjs.org/'
@@ -381,6 +385,21 @@ jobs:
           # Don't force build_from_source - let prebuild-install try first
           MSVS_VERSION: 2022
           GYP_MSVS_VERSION: 2022
+
+      - name: Bake Microsoft SSO config (optional)
+        shell: bash
+        env:
+          SSO_CONFIG_B64: ${{ inputs.sso_config_b64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SSO_CONFIG_B64}" ]; then
+            echo "No sso_config_b64 provided — SSO stays dormant in this build."
+            exit 0
+          fi
+          mkdir -p resources
+          # Decode quietly; do not print the config (tenantId/clientId are public-client IDs but keep logs clean).
+          printf '%s' "${SSO_CONFIG_B64}" | base64 -d > resources/sso-config.json
+          node -e "const c=require('./resources/sso-config.json'); if(!c.tenantId||!c.clientId){console.error('::error::sso-config.json missing tenantId/clientId');process.exit(1)} console.log('SSO config baked: tenant '+String(c.tenantId).slice(0,8)+'… client '+String(c.clientId).slice(0,8)+'…')"
 
       - name: Prepare aioncore binary
         shell: bash

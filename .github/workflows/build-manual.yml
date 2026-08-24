@@ -37,6 +37,11 @@ on:
         required: false
         type: string
         default: ''
+      sso_config_b64:
+        description: 'Optional base64 of resources/sso-config.json to bake Microsoft SSO (tenantId+clientId). Empty leaves SSO dormant.'
+        required: false
+        type: string
+        default: ''
 
 env:
   BUN_INSTALL_REGISTRY: 'https://registry.npmjs.org/'
@@ -90,6 +95,7 @@ jobs:
       ref: ${{ inputs.branch }}
       skip_code_quality: ${{ inputs.skip_code_quality }}
       aioncore_run_id: ${{ inputs.aioncore_run_id }}
+      sso_config_b64: ${{ inputs.sso_config_b64 }}
       append_commit_hash: true
       upload_installers_only: true
       internal_release: true
