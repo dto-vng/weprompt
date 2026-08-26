@@ -108,4 +108,38 @@ describe('ArtifactScratchService', () => {
     );
     await expect(exists(redirectedRoot)).resolves.toBe(true);
   });
+
+  it('sweeps run directories past the age cutoff, clearing leftover intermediates (.ps1 etc.)', async () => {
+    const run = await service.allocate({ conversationId: 'conversation-1', templateId: 'business-review' });
+    // The external office tool can leave intermediates inside a run that never completed.
+    await writeFile(path.join(run.directory, 'render-helper.ps1'), 'Write-Host hi');
+    await service.retain(run.runId, 'interrupted');
+
+    // maxAgeMs: 0 => every run is past the cutoff.
+    const result = await service.sweepOrphans({ maxAgeMs: 0 });
+
+    expect(result.removed).toContain(run.runId);
+    await expect(exists(run.directory)).resolves.toBe(false);
+  });
+
+  it('keeps runs newer than the cutoff', async () => {
+    const run = await service.allocate({ conversationId: 'conversation-1', templateId: 'business-review' });
+
+    const result = await service.sweepOrphans(); // default TTL, run is brand new
+
+    expect(result.removed).toEqual([]);
+    await expect(exists(run.directory)).resolves.toBe(true);
+  });
+
+  it('never removes entries that are not run directories', async () => {
+    const strayDir = path.join(scratchRoot, 'not-a-run');
+    await mkdir(scratchRoot, { recursive: true });
+    await mkdir(strayDir);
+    await writeFile(path.join(scratchRoot, 'stray-file.txt'), 'keep me');
+
+    await service.sweepOrphans({ maxAgeMs: 0 });
+
+    await expect(exists(strayDir)).resolves.toBe(true);
+    await expect(exists(path.join(scratchRoot, 'stray-file.txt'))).resolves.toBe(true);
+  });
 });

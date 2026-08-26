@@ -513,6 +513,12 @@ const registerPresentationExternalDropHandler = (): void => {
 };
 
 export function initPresentationTemplateBridge(): void {
+  // Reclaim artifact-run scratch directories left by crashed/interrupted runs
+  // (including intermediates the external office tool drops, e.g. .ps1 scripts).
+  // Fire-and-forget at startup, when no run of this process is active.
+  void getArtifactScratchService()
+    .sweepOrphans()
+    .catch((error: unknown) => console.warn('[AionUi] Artifact scratch sweep skipped:', error));
   ipcBridge.presentationTemplates.list.provider(() => getService().list());
   ipcBridge.presentationTemplates.importSpec.provider(async ({ file_path }) => {
     try {

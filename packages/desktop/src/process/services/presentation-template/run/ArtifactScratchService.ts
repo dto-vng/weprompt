@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { chmod, lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { chmod, lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { ArtifactScratchAllocation, ArtifactScratchResult } from '@/common/types/office/presentationTemplate';
@@ -12,6 +13,15 @@ import type { ArtifactScratchAllocation, ArtifactScratchResult } from '@/common/
 const MANIFEST_FILE = 'manifest.json';
 const DELIVERY_READY_FILE = '.aionui-delivery-ready';
 const RUN_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * How long a run directory may linger before the startup sweep reclaims it. Runs
+ * that fail or are interrupted are retained on disk for debugging (and the
+ * external office tool may leave intermediates such as `.ps1` scripts inside);
+ * without a sweep those directories accumulate. A day keeps recent runs available
+ * for inspection while stopping unbounded temp growth.
+ */
+const ORPHAN_TTL_MS = 24 * 60 * 60 * 1000;
 
 type ArtifactScratchManifest = {
   version: 1;
@@ -86,6 +96,59 @@ export class ArtifactScratchService {
     await this.readOwnedManifest(directory, runId);
     await rm(directory, { recursive: true });
     return { status: 'cleaned' };
+  }
+
+  /**
+   * Remove run directories older than `maxAgeMs` (default {@link ORPHAN_TTL_MS}),
+   * including any intermediate files the external office tool left behind. Runs
+   * younger than the cutoff are kept (a concurrent run may still be using them, and
+   * failed/interrupted runs are retained briefly for debugging). Best-effort: a
+   * removal that fails is simply retried on the next sweep. Intended to run once at
+   * startup, when no run of this process is active.
+   */
+  async sweepOrphans(options?: { maxAgeMs?: number; nowMs?: number }): Promise<{ removed: string[] }> {
+    const maxAgeMs = options?.maxAgeMs ?? ORPHAN_TTL_MS;
+    const nowMs = options?.nowMs ?? Date.now();
+    const removed: string[] = [];
+    let entries: Dirent<string>[];
+    try {
+      await this.ensureRoot();
+      entries = await readdir(this.rootDir, { withFileTypes: true });
+    } catch {
+      return { removed };
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !RUN_ID_RE.test(entry.name)) continue;
+      const directory = path.join(this.rootDir, entry.name);
+      const ageMs = await this.resolveRunAgeMs(directory, nowMs);
+      if (ageMs !== null && ageMs < maxAgeMs) continue;
+      try {
+        await rm(directory, { recursive: true, force: true });
+        removed.push(entry.name);
+      } catch {
+        // Best-effort: a locked/removed dir is retried on the next startup sweep.
+      }
+    }
+    return { removed };
+  }
+
+  /** Age of a run in ms from its manifest timestamp, falling back to dir mtime; null if unknown. */
+  private async resolveRunAgeMs(directory: string, nowMs: number): Promise<number | null> {
+    try {
+      const manifest = JSON.parse(
+        await readFile(path.join(directory, MANIFEST_FILE), 'utf8')
+      ) as Partial<ArtifactScratchManifest>;
+      const stamp = Date.parse(manifest.updatedAt ?? manifest.createdAt ?? '');
+      if (Number.isFinite(stamp)) return Math.max(0, nowMs - stamp);
+    } catch {
+      // Missing/corrupt manifest → fall back to the directory mtime below.
+    }
+    try {
+      const stat = await lstat(directory);
+      return Math.max(0, nowMs - stat.mtimeMs);
+    } catch {
+      return null;
+    }
   }
 
   private resolveRunDirectory(runId: string): string {
