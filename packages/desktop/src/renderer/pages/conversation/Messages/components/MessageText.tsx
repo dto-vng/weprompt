@@ -474,6 +474,7 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
                 codeStyle={CODE_STYLE}
                 onLocalFileLink={handleLocalFileLink}
                 onKbCitationClick={citations?.openCitation}
+                workspace={conversationContext?.workspace}
               >
                 {linkifiedMarkdown}
               </MarkdownView>

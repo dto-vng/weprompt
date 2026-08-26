@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   resolveLocalFileLinkPath,
   resolveLocalFileLinkReference,
+  resolveWorkspaceRelativeHref,
   toLocalFileHref,
 } from '@/renderer/components/Markdown/markdownUtils';
 
@@ -147,5 +148,55 @@ describe('resolveLocalFileLinkPath', () => {
       'file:///C:/Users/Administrator/AppData/Roaming/AionUi/report.xlsx'
     );
     expect(toLocalFileHref('/var/folders/demo/report.xlsx')).toBe('file:///var/folders/demo/report.xlsx');
+  });
+});
+
+describe('resolveWorkspaceRelativeHref', () => {
+  const workspace = '/private/var/folders/tmp/aionui-workspace';
+
+  it('joins a workspace-relative artifact href into an absolute path', () => {
+    expect(resolveWorkspaceRelativeHref('report.html', workspace)).toBe(`${workspace}/report.html`);
+    expect(resolveWorkspaceRelativeHref('./output/report.md', workspace)).toBe(`${workspace}/output/report.md`);
+  });
+
+  it('makes a regular-chat relative artifact link resolvable (the #24141 fix)', () => {
+    // Bare relative hrefs are not local-file links on their own...
+    expect(resolveLocalFileLinkReference('report.html')).toBeNull();
+    // ...but once resolved against the workspace they become clickable references.
+    expect(resolveLocalFileLinkReference(resolveWorkspaceRelativeHref('report.html', workspace))).toEqual({
+      filePath: `${workspace}/report.html`,
+      rawReference: `${workspace}/report.html`,
+    });
+  });
+
+  it('normalizes Windows workspaces and backslash separators', () => {
+    expect(resolveWorkspaceRelativeHref('out\\report.xlsx', 'C:\\Users\\demo\\ws\\')).toBe(
+      'C:/Users/demo/ws/out/report.xlsx'
+    );
+  });
+
+  it('preserves line and hash suffixes so they still resolve', () => {
+    expect(resolveWorkspaceRelativeHref('src/app.ts:12', workspace)).toBe(`${workspace}/src/app.ts:12`);
+    expect(resolveWorkspaceRelativeHref('src/app.ts#L12', workspace)).toBe(`${workspace}/src/app.ts#L12`);
+  });
+
+  it('leaves external URLs, scheme links, anchors, and absolute paths unchanged', () => {
+    expect(resolveWorkspaceRelativeHref('https://aionui.com/report.html', workspace)).toBe(
+      'https://aionui.com/report.html'
+    );
+    expect(resolveWorkspaceRelativeHref('weprompt-kb://note.md', workspace)).toBe('weprompt-kb://note.md');
+    expect(resolveWorkspaceRelativeHref('#section', workspace)).toBe('#section');
+    expect(resolveWorkspaceRelativeHref('/Users/demo/report.html', workspace)).toBe('/Users/demo/report.html');
+    expect(resolveWorkspaceRelativeHref('C:/Users/demo/report.html', workspace)).toBe('C:/Users/demo/report.html');
+  });
+
+  it('does not resolve extension-less hrefs (app routes stay plain links)', () => {
+    expect(resolveWorkspaceRelativeHref('settings', workspace)).toBe('settings');
+    expect(resolveWorkspaceRelativeHref('some/route', workspace)).toBe('some/route');
+  });
+
+  it('returns the href unchanged when no workspace is available', () => {
+    expect(resolveWorkspaceRelativeHref('report.html', undefined)).toBe('report.html');
+    expect(resolveWorkspaceRelativeHref('report.html', '')).toBe('report.html');
   });
 });

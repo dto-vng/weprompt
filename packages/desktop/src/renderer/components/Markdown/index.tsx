@@ -25,7 +25,7 @@ import LocalImageView from '@renderer/components/media/LocalImageView';
 import CodeBlock from './CodeBlock';
 import LocalFileLink from './LocalFileLink';
 import ShadowView from './ShadowView';
-import { resolveLocalFileLinkPath, resolveLocalFileLinkReference } from './markdownUtils';
+import { resolveLocalFileLinkPath, resolveLocalFileLinkReference, resolveWorkspaceRelativeHref } from './markdownUtils';
 import type { LocalFileLinkReference } from './markdownUtils';
 import remarkLocalFilePaths from './remarkLocalFilePaths';
 
@@ -48,6 +48,12 @@ type MarkdownViewProps = {
   onKbCitationClick?: (fileName: string, anchor?: string) => void;
   /** Enable raw HTML rendering in markdown content. Use with caution — only for trusted sources. */
   allowHtml?: boolean;
+  /**
+   * Conversation workspace. When set, workspace-relative artifact hrefs (common in
+   * regular non-project chats) are resolved to absolute local-file links so they
+   * become clickable, matching project-chat behavior.
+   */
+  workspace?: string;
 };
 
 const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
@@ -59,6 +65,7 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
     onLocalFileLink,
     onKbCitationClick,
     allowHtml,
+    workspace,
     children: childrenProp,
   }) => {
     const { t } = useTranslation();
@@ -113,7 +120,9 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
         a: ({ node: _node, ...rest }: Record<string, unknown>) => {
           const anchorProps = rest as React.AnchorHTMLAttributes<HTMLAnchorElement>;
           const rawHref = typeof anchorProps.href === 'string' ? anchorProps.href : '';
-          const localFileReference = resolveLocalFileLinkReference(rawHref);
+          // Resolve workspace-relative artifact hrefs to absolute before recognition
+          // so regular (non-project) chats produce clickable links, not dead <a>s.
+          const localFileReference = resolveLocalFileLinkReference(resolveWorkspaceRelativeHref(rawHref, workspace));
           if (localFileReference) {
             return (
               <LocalFileLink reference={localFileReference} onOpen={onLocalFileLink}>
@@ -158,7 +167,7 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
           return <img {...imgProps} alt={imgProps.alt || ''} />;
         },
       }),
-      [codeStyle, hiddenCodeCopyButton, handleLinkClick, onLocalFileLink]
+      [codeStyle, hiddenCodeCopyButton, handleLinkClick, onLocalFileLink, workspace]
     );
 
     const rehypePlugins = useMemo(() => (allowHtml ? [rehypeRaw, rehypeKatex] : [rehypeKatex]), [allowHtml]);

@@ -223,6 +223,30 @@ export const toLocalFileHref = (filePath: string): string => {
 };
 
 /**
+ * Resolve a workspace-relative href (e.g. "report.html", "./out/report.md") into
+ * an absolute path so it can be recognized as a local-file link. Project chats
+ * reference artifacts by absolute path and already work; regular (non-project)
+ * chats reference them relative to a temporary workspace, so without this join
+ * they never resolve to an absolute path and stay non-clickable. External URLs,
+ * scheme links, pure anchors, extension-less hrefs, and already-absolute paths are
+ * returned unchanged; downstream validation (`resolveLocalFileLinkReference`) still
+ * decides whether the resolved path is a real file link.
+ */
+export const resolveWorkspaceRelativeHref = (rawHref: string, workspace?: string): string => {
+  const href = (rawHref || '').trim();
+  if (!href || !workspace) return rawHref;
+  if (/^(https?|data|blob|file|mailto|tel|weprompt-kb):/i.test(href)) return rawHref;
+  if (href.startsWith('#')) return rawHref;
+  if (/^\/[A-Za-z]:[\\/]/.test(href) || /^[A-Za-z]:[\\/]/.test(href) || href.startsWith('/')) return rawHref;
+  // Only resolve file-like hrefs (an extension, optionally followed by :line, ?query, or #hash).
+  if (!/\.[A-Za-z0-9]+(?:[:?#].*)?$/.test(href)) return rawHref;
+
+  const normalizedWorkspace = workspace.replace(/[\\/]+$/, '').replace(/\\/g, '/');
+  const normalizedHref = href.replace(/^\.?[\\/]+/, '').replace(/\\/g, '/');
+  return `${normalizedWorkspace}/${normalizedHref}`.replace(/\/+/g, '/');
+};
+
+/**
  * Get line background style for diff rendering.
  * Highlights additions (green), deletions (red), and hunk headers (blue).
  */
