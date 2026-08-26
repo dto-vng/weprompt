@@ -6,17 +6,14 @@
 }
 
 .chat-surface-fluid {
+  /* Center the chat column with a comfortable reading cap instead of letting
+     messages stretch to (and hug) the container edges. margin auto keeps the
+     column centered at any container width; below the cap it stays full width,
+     so split preview/project layouts still use all the room they have. */
   width: 100%;
-  max-width: 100%;
-}
-
-@container (min-width: 720px) {
-  .chat-surface-fluid {
-    width: calc(100% - clamp(80px, 10cqw, 240px));
-    max-width: none;
-    margin-left: auto;
-    margin-right: auto;
-  }
+  max-width: 860px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Mobile typography tuning: conversation readability */
