@@ -163,6 +163,17 @@ jobs:
           printf '%s' "${SSO_CONFIG_B64}" | base64 -d > resources/sso-config.json
           node -e "const c=require('./resources/sso-config.json'); if(!c.tenantId||!c.clientId){console.error('::error::sso-config.json missing tenantId/clientId');process.exit(1)} console.log('SSO config baked: tenant '+String(c.tenantId).slice(0,8)+'… client '+String(c.clientId).slice(0,8)+'…')"
 
+      - name: Assert built-in provider keys present
+        shell: bash
+        env:
+          FORGE_GREENNODE_API_KEY: ${{ secrets.FORGE_GREENNODE_API_KEY }}
+          FORGE_TAVILY_API_KEY: ${{ secrets.FORGE_TAVILY_API_KEY }}
+        run: |
+          set -euo pipefail
+          [ -n "${FORGE_GREENNODE_API_KEY}" ] || { echo "::error::FORGE_GREENNODE_API_KEY secret missing — GreenNode would not seed. Add it in repo Settings → Secrets."; exit 1; }
+          [ -n "${FORGE_TAVILY_API_KEY}" ] || { echo "::error::FORGE_TAVILY_API_KEY secret missing — web search would not seed."; exit 1; }
+          echo "Built-in provider keys present (values not printed)."
+
       - name: Build the installer
         shell: bash
         env:
@@ -177,6 +188,10 @@ jobs:
           ELECTRON_BUILDER_CACHE: ${{ runner.temp }}/.cache/electron-builder
           MSVS_VERSION: 2022
           GYP_MSVS_VERSION: 2022
+          # Built-in provider keys baked at build time (mirrors _build-reusable.yml).
+          # Empty when the repo has no secret → GreenNode/Tavily stay unseeded.
+          FORGE_GREENNODE_API_KEY: ${{ secrets.FORGE_GREENNODE_API_KEY }}
+          FORGE_TAVILY_API_KEY: ${{ secrets.FORGE_TAVILY_API_KEY }}
         run: bun run build-win:x64
 
       - name: Verify the backend shipped came from the local bundle
