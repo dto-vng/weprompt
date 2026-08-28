@@ -232,3 +232,6 @@ graphify-out/
 
 # Local scratch/analysis (wireframes, candidate mockups)
 .analysis/
+
+# Local FORGE provider keys for local builds — never commit
+.forge.env

@@ -57,7 +57,10 @@ export const useLocalFilePreview = (workspace?: string, conversationId?: string)
         if (metadata == null) throw null;
 
         if (contentType === 'image') {
-          const imageContent = await ipcBridge.fs.getImageBase64.invoke({ path: file_path, workspace: effectiveWorkspace });
+          const imageContent = await ipcBridge.fs.getImageBase64.invoke({
+            path: file_path,
+            workspace: effectiveWorkspace,
+          });
           if (imageContent == null) throw null;
           content = imageContent;
         } else if (shouldReadPreviewContent(contentType)) {
