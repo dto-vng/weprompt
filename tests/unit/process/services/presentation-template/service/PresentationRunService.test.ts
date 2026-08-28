@@ -1767,6 +1767,7 @@ describe('presentation run native provider policy', () => {
     vi.doMock('@process/services/presentation-template/run', () => ({
       ArtifactScratchService: class {
         allocate = vi.fn();
+        sweepOrphans = vi.fn(() => Promise.resolve({ removed: [] }));
       },
       PresentationRunFiles: class {
         roots = { runRoot: '/tmp/weprompt-task7/presentation-runs' };

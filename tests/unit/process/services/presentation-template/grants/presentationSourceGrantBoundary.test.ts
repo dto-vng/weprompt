@@ -106,6 +106,7 @@ vi.mock('@process/services/presentation-template/run', () => ({
     complete = vi.fn();
     discard = vi.fn();
     retain = vi.fn();
+    sweepOrphans = vi.fn(() => Promise.resolve({ removed: [] }));
   },
   createPresentationSourceGrantService: mocks.createPresentationSourceGrantService,
 }));
