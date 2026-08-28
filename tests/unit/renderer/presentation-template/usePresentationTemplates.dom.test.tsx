@@ -581,10 +581,13 @@ describe('usePresentationTemplates managed run recovery', () => {
     }
   );
 
-  it('keeps a supported-context recovery failure visible', async () => {
+  it('does not toast when the automatic mount refresh fails (WP24154)', async () => {
+    // The refresh on mount / conversation switch is a background poll. A failing
+    // backend (e.g. the Windows presentation-run store) must not stack a red toast
+    // on every session change — recoverable runs just stay hidden.
     const listReply = createDeferred<ListRecoverablePresentationRunsResult>();
     listRecoverableInvokeMock.mockReturnValue(listReply.promise);
-    renderHook(() => usePresentationTemplates('conversation-1'));
+    const { result } = renderHook(() => usePresentationTemplates('conversation-1'));
 
     await act(async () => {
       listReply.resolve({
@@ -598,7 +601,8 @@ describe('usePresentationTemplates managed run recovery', () => {
       await listReply.promise;
     });
 
-    expect(messageErrorMock).toHaveBeenCalledWith('conversation.presentationTemplates.recovery.loadError');
+    expect(result.current.recoverableRuns).toEqual([]);
+    expect(messageErrorMock).not.toHaveBeenCalled();
   });
 
   it('shows the review-required status, exact hash, and only main-authorized actions', async () => {

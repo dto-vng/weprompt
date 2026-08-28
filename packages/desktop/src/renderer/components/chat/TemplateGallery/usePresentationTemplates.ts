@@ -366,7 +366,12 @@ export function usePresentationTemplates(conversationId?: string) {
   }, [conversationId]);
 
   useEffect(() => {
-    void refreshRecoverableRuns();
+    // Background refresh on mount / conversation switch: never surface a red toast.
+    // This fires on every session change, so a backend that cannot load recovery
+    // status (e.g. the Windows presentation-run store) would otherwise stack an
+    // error toast on each switch (WP24154). Recoverable runs simply stay hidden;
+    // user-initiated open/discard still report their own failures.
+    void refreshRecoverableRuns(false);
     return () => {
       recoveryRequestRef.current += 1;
     };
