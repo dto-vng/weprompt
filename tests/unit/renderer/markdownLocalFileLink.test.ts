@@ -6,9 +6,11 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  isWorkspaceRelativeFileHref,
   resolveLocalFileLinkPath,
   resolveLocalFileLinkReference,
   resolveWorkspaceRelativeHref,
+  resolveWorkspaceRelativeReference,
   toLocalFileHref,
 } from '@/renderer/components/Markdown/markdownUtils';
 
@@ -198,5 +200,50 @@ describe('resolveWorkspaceRelativeHref', () => {
   it('returns the href unchanged when no workspace is available', () => {
     expect(resolveWorkspaceRelativeHref('report.html', undefined)).toBe('report.html');
     expect(resolveWorkspaceRelativeHref('report.html', '')).toBe('report.html');
+  });
+});
+
+describe('resolveWorkspaceRelativeReference (WP24151: clickable before the workspace loads)', () => {
+  it('recognizes a bare relative artifact href without any workspace', () => {
+    // This is the case that regressed: no workspace at render time, yet the link
+    // must still render so the open handler can resolve the workspace at click.
+    expect(resolveLocalFileLinkReference('report.html')).toBeNull();
+    expect(resolveWorkspaceRelativeReference('report.html')).toEqual({
+      filePath: 'report.html',
+      rawReference: 'report.html',
+    });
+  });
+
+  it('strips a leading ./ and normalizes nested relative paths', () => {
+    expect(resolveWorkspaceRelativeReference('./output/report.md')).toEqual({
+      filePath: 'output/report.md',
+      rawReference: 'output/report.md',
+    });
+  });
+
+  it('carries a #Lnn line target through as a reference', () => {
+    expect(resolveWorkspaceRelativeReference('src/app.ts#L12')).toEqual({
+      filePath: 'src/app.ts',
+      line: 12,
+      rawReference: 'src/app.ts#L12',
+    });
+  });
+
+  it('returns null for URLs, scheme links, anchors, absolute paths, and app routes', () => {
+    expect(resolveWorkspaceRelativeReference('https://aionui.com/report.html')).toBeNull();
+    expect(resolveWorkspaceRelativeReference('weprompt-kb://note.md')).toBeNull();
+    expect(resolveWorkspaceRelativeReference('#section')).toBeNull();
+    expect(resolveWorkspaceRelativeReference('/Users/demo/report.html')).toBeNull();
+    expect(resolveWorkspaceRelativeReference('C:/Users/demo/report.html')).toBeNull();
+    expect(resolveWorkspaceRelativeReference('settings')).toBeNull();
+    expect(resolveWorkspaceRelativeReference('some/route')).toBeNull();
+  });
+
+  it('agrees with isWorkspaceRelativeFileHref on what counts as a workspace file href', () => {
+    expect(isWorkspaceRelativeFileHref('report.html')).toBe(true);
+    expect(isWorkspaceRelativeFileHref('./out/report.md')).toBe(true);
+    expect(isWorkspaceRelativeFileHref('https://aionui.com/report.html')).toBe(false);
+    expect(isWorkspaceRelativeFileHref('/Users/demo/report.html')).toBe(false);
+    expect(isWorkspaceRelativeFileHref('settings')).toBe(false);
   });
 });

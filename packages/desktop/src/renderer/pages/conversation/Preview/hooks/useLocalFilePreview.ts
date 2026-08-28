@@ -28,7 +28,7 @@ const getPreviewLanguage = (file_name: string): string => {
 const shouldReadPreviewContent = (contentType: PreviewContentType): boolean =>
   !['pdf', 'word', 'excel', 'ppt'].includes(contentType);
 
-export const useLocalFilePreview = (workspace?: string) => {
+export const useLocalFilePreview = (workspace?: string, conversationId?: string) => {
   const { openPreview } = usePreviewContext();
 
   return useCallback(
@@ -38,16 +38,30 @@ export const useLocalFilePreview = (workspace?: string) => {
       let content = '';
       let isLargeTextTruncated = false;
 
+      // A relative artifact path needs its workspace to resolve. When the renderer
+      // never received the workspace (WP24151), fetch it from the conversation at
+      // click time so the link opens instead of showing a phantom missing file.
+      let effectiveWorkspace = workspace;
+      if ((typeof effectiveWorkspace !== 'string' || effectiveWorkspace.trim().length === 0) && conversationId) {
+        try {
+          const conversation = await ipcBridge.conversation.get.invoke({ id: conversationId });
+          effectiveWorkspace = conversation?.extra?.workspace;
+        } catch {
+          // Keep the undefined workspace; the metadata call below still runs and
+          // surfaces the standard missing-file preview if it cannot resolve.
+        }
+      }
+
       try {
-        const metadata = await ipcBridge.fs.getFileMetadata.invoke({ path: file_path, workspace });
+        const metadata = await ipcBridge.fs.getFileMetadata.invoke({ path: file_path, workspace: effectiveWorkspace });
         if (metadata == null) throw null;
 
         if (contentType === 'image') {
-          const imageContent = await ipcBridge.fs.getImageBase64.invoke({ path: file_path, workspace });
+          const imageContent = await ipcBridge.fs.getImageBase64.invoke({ path: file_path, workspace: effectiveWorkspace });
           if (imageContent == null) throw null;
           content = imageContent;
         } else if (shouldReadPreviewContent(contentType)) {
-          const textContent = await ipcBridge.fs.readFile.invoke({ path: file_path, workspace });
+          const textContent = await ipcBridge.fs.readFile.invoke({ path: file_path, workspace: effectiveWorkspace });
           if (textContent == null) throw null;
           content = textContent;
 
@@ -64,7 +78,7 @@ export const useLocalFilePreview = (workspace?: string) => {
             title: fileName,
             file_name: fileName,
             file_path,
-            workspace,
+            workspace: effectiveWorkspace,
             language: getPreviewLanguage(fileName),
             truncated: isLargeTextTruncated,
             targetLine: reference?.line,
@@ -81,7 +95,7 @@ export const useLocalFilePreview = (workspace?: string) => {
             title: fileName,
             file_name: fileName,
             file_path,
-            workspace,
+            workspace: effectiveWorkspace,
             language: getPreviewLanguage(fileName),
             targetLine: reference?.line,
             targetColumn: reference?.column,
@@ -92,6 +106,6 @@ export const useLocalFilePreview = (workspace?: string) => {
         );
       }
     },
-    [openPreview, workspace]
+    [openPreview, workspace, conversationId]
   );
 };

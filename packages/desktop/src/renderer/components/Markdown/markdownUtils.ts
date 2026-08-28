@@ -232,18 +232,62 @@ export const toLocalFileHref = (filePath: string): string => {
  * returned unchanged; downstream validation (`resolveLocalFileLinkReference`) still
  * decides whether the resolved path is a real file link.
  */
+/**
+ * True when the href is a workspace-relative reference to a real file — a
+ * relative path ending in a file extension (optionally followed by :line, ?query,
+ * or #hash). External URLs, scheme links, pure anchors, and already-absolute paths
+ * are excluded. This is the single gate shared by `resolveWorkspaceRelativeHref`
+ * (join against a known workspace) and `resolveWorkspaceRelativeReference` (defer
+ * the workspace to click time), so the two never drift apart.
+ */
+export const isWorkspaceRelativeFileHref = (rawHref: string): boolean => {
+  const href = (rawHref || '').trim();
+  if (!href) return false;
+  if (/^(https?|data|blob|file|mailto|tel|weprompt-kb):/i.test(href)) return false;
+  if (href.startsWith('#')) return false;
+  if (/^\/[A-Za-z]:[\\/]/.test(href) || /^[A-Za-z]:[\\/]/.test(href) || href.startsWith('/')) return false;
+  return /\.[A-Za-z0-9]+(?:[:?#].*)?$/.test(href);
+};
+
 export const resolveWorkspaceRelativeHref = (rawHref: string, workspace?: string): string => {
   const href = (rawHref || '').trim();
   if (!href || !workspace) return rawHref;
-  if (/^(https?|data|blob|file|mailto|tel|weprompt-kb):/i.test(href)) return rawHref;
-  if (href.startsWith('#')) return rawHref;
-  if (/^\/[A-Za-z]:[\\/]/.test(href) || /^[A-Za-z]:[\\/]/.test(href) || href.startsWith('/')) return rawHref;
-  // Only resolve file-like hrefs (an extension, optionally followed by :line, ?query, or #hash).
-  if (!/\.[A-Za-z0-9]+(?:[:?#].*)?$/.test(href)) return rawHref;
+  if (!isWorkspaceRelativeFileHref(href)) return rawHref;
 
   const normalizedWorkspace = workspace.replace(/[\\/]+$/, '').replace(/\\/g, '/');
   const normalizedHref = href.replace(/^\.?[\\/]+/, '').replace(/\\/g, '/');
   return `${normalizedWorkspace}/${normalizedHref}`.replace(/\/+/g, '/');
+};
+
+/**
+ * Recognize a workspace-relative artifact href as a local-file link *without*
+ * needing the workspace at render time. Regular (non-project) chats reference
+ * artifacts relative to a temporary workspace that is only known to the main
+ * process (via the conversation record); when the renderer has not yet received
+ * that workspace, `resolveWorkspaceRelativeHref` cannot build an absolute path and
+ * the link goes dead — the intermittent-artifact-link regression (WP24151). This
+ * returns a reference carrying the *relative* path so the link still renders; the
+ * open handler resolves the workspace at click time. Returns null for anything
+ * that is not a workspace-relative file href.
+ */
+export const resolveWorkspaceRelativeReference = (rawHref: string): LocalFileLinkReference | null => {
+  if (!isWorkspaceRelativeFileHref(rawHref)) return null;
+  const href = safeDecodeURIComponent((rawHref || '').trim());
+  const candidate = splitHashLocation(href);
+  if (candidate.hasInvalidHash) return null;
+
+  const filePath = candidate.filePath.replace(/^\.?[\\/]+/, '');
+  if (!filePath) return null;
+
+  const publicReference = {
+    filePath,
+    line: candidate.hashLocation?.line,
+    endLine: candidate.hashLocation?.endLine,
+  };
+  return {
+    ...publicReference,
+    rawReference: formatRawReference(publicReference, publicReference.line == null ? undefined : 'hash'),
+  };
 };
 
 /**

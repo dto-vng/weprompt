@@ -25,7 +25,12 @@ import LocalImageView from '@renderer/components/media/LocalImageView';
 import CodeBlock from './CodeBlock';
 import LocalFileLink from './LocalFileLink';
 import ShadowView from './ShadowView';
-import { resolveLocalFileLinkPath, resolveLocalFileLinkReference, resolveWorkspaceRelativeHref } from './markdownUtils';
+import {
+  resolveLocalFileLinkPath,
+  resolveLocalFileLinkReference,
+  resolveWorkspaceRelativeHref,
+  resolveWorkspaceRelativeReference,
+} from './markdownUtils';
 import type { LocalFileLinkReference } from './markdownUtils';
 import remarkLocalFilePaths from './remarkLocalFilePaths';
 
@@ -122,7 +127,13 @@ const MarkdownView: React.FC<MarkdownViewProps> = React.memo(
           const rawHref = typeof anchorProps.href === 'string' ? anchorProps.href : '';
           // Resolve workspace-relative artifact hrefs to absolute before recognition
           // so regular (non-project) chats produce clickable links, not dead <a>s.
-          const localFileReference = resolveLocalFileLinkReference(resolveWorkspaceRelativeHref(rawHref, workspace));
+          // When the workspace has not reached the renderer yet, fall back to a
+          // relative reference so the link still renders — the open handler resolves
+          // the workspace at click time from the conversation (WP24151 regression:
+          // the link was clickable only when the workspace happened to be loaded).
+          const localFileReference =
+            resolveLocalFileLinkReference(resolveWorkspaceRelativeHref(rawHref, workspace)) ??
+            resolveWorkspaceRelativeReference(rawHref);
           if (localFileReference) {
             return (
               <LocalFileLink reference={localFileReference} onOpen={onLocalFileLink}>

@@ -279,7 +279,7 @@ const MessageText: React.FC<{ message: IMessageText; showCopyRow?: boolean; isSt
   const conversationContext = useConversationContextSafe();
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
-  const handleLocalFileLink = useLocalFilePreview(conversationContext?.workspace);
+  const handleLocalFileLink = useLocalFilePreview(conversationContext?.workspace, conversationContext?.conversation_id);
   const resolvedFiles = useMemo(
     () => visibleFiles.map((file_path) => resolveMessageFilePath(file_path, conversationContext?.workspace)),
     [conversationContext?.workspace, visibleFiles]
