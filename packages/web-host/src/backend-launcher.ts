@@ -230,6 +230,11 @@ export function buildSpawnArgs(config: SpawnConfig): string[] {
  */
 export function buildSpawnEnv(dirs?: BackendDirConfig, security?: BackendSecurityConfig): NodeJS.ProcessEnv {
   return {
+    // We ship a pinned officecli inside bundled managed-resources, so pin it:
+    // aioncore must not re-download officecli when the GitHub "latest" release
+    // drifts ahead of the bundled version (WP24148). Placed before process.env
+    // so an explicit AIONUI_OFFICECLI_DISABLE_UPDATE=0 can still re-enable it.
+    AIONUI_OFFICECLI_DISABLE_UPDATE: '1',
     ...process.env,
     ...(dirs
       ? {

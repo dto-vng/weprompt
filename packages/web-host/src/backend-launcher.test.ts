@@ -263,6 +263,28 @@ describe('buildSpawnEnv', () => {
     expect(env.AIONUI_LOCAL_TOKEN).toBe('abc');
     expect(env.AIONUI_LOCAL_ALLOWED_ORIGINS).toBeUndefined();
   });
+
+  it('pins the bundled officecli by disabling its auto-update by default (WP24148)', () => {
+    const previous = process.env.AIONUI_OFFICECLI_DISABLE_UPDATE;
+    delete process.env.AIONUI_OFFICECLI_DISABLE_UPDATE;
+    try {
+      expect(buildSpawnEnv().AIONUI_OFFICECLI_DISABLE_UPDATE).toBe('1');
+    } finally {
+      if (previous === undefined) delete process.env.AIONUI_OFFICECLI_DISABLE_UPDATE;
+      else process.env.AIONUI_OFFICECLI_DISABLE_UPDATE = previous;
+    }
+  });
+
+  it('lets an explicit environment override re-enable officecli auto-update', () => {
+    const previous = process.env.AIONUI_OFFICECLI_DISABLE_UPDATE;
+    process.env.AIONUI_OFFICECLI_DISABLE_UPDATE = '0';
+    try {
+      expect(buildSpawnEnv().AIONUI_OFFICECLI_DISABLE_UPDATE).toBe('0');
+    } finally {
+      if (previous === undefined) delete process.env.AIONUI_OFFICECLI_DISABLE_UPDATE;
+      else process.env.AIONUI_OFFICECLI_DISABLE_UPDATE = previous;
+    }
+  });
 });
 
 describe('createLocalToken', () => {
