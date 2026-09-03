@@ -36,11 +36,15 @@ describe('builtinCapabilities descriptors', () => {
     expect(memory?.credential).toBeUndefined();
   });
 
-  it('tier2 set is exactly tavily, github, postgres and all disabled by default', () => {
+  it('tier2 set is exactly tavily, github, postgres; tavily on by default (WP24178), the rest off', () => {
     expect(TIER2_CAPABILITIES.map((c) => c.name).toSorted()).toEqual(
       [BUILTIN_TAVILY_NAME, 'aionui-github', BUILTIN_POSTGRES_NAME].toSorted()
     );
-    expect(TIER2_CAPABILITIES.every((c) => c.defaultEnabled === false)).toBe(true);
+    const tavily = TIER2_CAPABILITIES.find((c) => c.name === BUILTIN_TAVILY_NAME);
+    expect(tavily?.defaultEnabled).toBe(true);
+    expect(
+      TIER2_CAPABILITIES.filter((c) => c.name !== BUILTIN_TAVILY_NAME).every((c) => c.defaultEnabled === false)
+    ).toBe(true);
     expect(TIER2_CAPABILITIES.every((c) => c.credential !== undefined)).toBe(true);
   });
 });
@@ -50,7 +54,8 @@ describe('buildBuiltinCapabilityServer', () => {
     const tavily = findCapabilityDescriptor(BUILTIN_TAVILY_NAME)!;
     const seed = buildBuiltinCapabilityServer(tavily);
     expect(seed.builtin).toBe(true);
-    expect(seed.enabled).toBe(false);
+    // tavily ships on by default (WP24178); the seed mirrors descriptor.defaultEnabled.
+    expect(seed.enabled).toBe(true);
     expect(seed.name).toBe(BUILTIN_TAVILY_NAME);
     expect(seed.transport.type).toBe('stdio');
     expect((seed.transport as IMcpServerTransportStdio).env).toEqual({});

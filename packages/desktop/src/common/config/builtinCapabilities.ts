@@ -71,7 +71,13 @@ export const BUILTIN_CAPABILITIES: BuiltinCapabilityDescriptor[] = [
     command: 'npx',
     baseArgs: ['-y', 'tavily-mcp@latest'],
     tier: 'tier2',
-    defaultEnabled: false,
+    // On by default so web search auto-attaches to new chats without the user
+    // ticking it each time (WP24178). Forge builds bake FORGE_TAVILY_API_KEY (CI
+    // asserts its presence) and seedTavilyWebSearch installs it, so the enabled
+    // server ships with a working key. A build with no baked key would seed this
+    // enabled-but-keyless (a failing tool); that path is gated out by the CI key
+    // assertion for shipped builds.
+    defaultEnabled: true,
     seedDescription: 'Web search powered by Tavily. Requires a Tavily API key.',
     labelKey: 'settings.capabilityWebSearch',
     descriptionKey: 'settings.capabilityWebSearchDesc',

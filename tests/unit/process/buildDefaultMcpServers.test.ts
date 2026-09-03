@@ -18,8 +18,15 @@ describe('buildDefaultMcpServers', () => {
     expect(memory?.builtin).toBe(true);
   });
 
-  it('seeds tier2 servers disabled by default', () => {
-    for (const name of [BUILTIN_TAVILY_NAME, BUILTIN_GITHUB_NAME, BUILTIN_POSTGRES_NAME]) {
+  it('seeds web-search (tavily) enabled by default (WP24178)', () => {
+    const tavily = byName.get(BUILTIN_TAVILY_NAME);
+    expect(tavily).toBeDefined();
+    expect(tavily?.enabled).toBe(true);
+    expect(tavily?.builtin).toBe(true);
+  });
+
+  it('seeds the remaining tier2 servers (github, postgres) disabled by default', () => {
+    for (const name of [BUILTIN_GITHUB_NAME, BUILTIN_POSTGRES_NAME]) {
       const s = byName.get(name);
       expect(s, name).toBeDefined();
       expect(s?.enabled, name).toBe(false);
