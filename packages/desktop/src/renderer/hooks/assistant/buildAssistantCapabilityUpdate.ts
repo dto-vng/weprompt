@@ -20,16 +20,28 @@ export interface AssistantCapabilityEdits {
 }
 
 /**
- * Build a loss-free `UpdateAssistantRequest` that rewrites only the skill/MCP
- * capability of an assistant while re-sending every other editable field verbatim
- * from `detail`.
+ * A scalar default (model / permission / thought_level) whose write-mode the
+ * `PUT /api/assistants/:id` validator only accepts as `auto | fixed`. A GET can
+ * return other markers (e.g. `default`), so re-sending it verbatim is rejected —
+ * the save then throws and surfaces "Could not save to preset" (WP24179).
+ */
+const normalizeScalarDefault = (
+  scalar: AssistantDetail['defaults']['model']
+): { mode: 'auto' | 'fixed'; value?: string } =>
+  scalar.mode === 'fixed' ? { mode: 'fixed', value: scalar.value } : { mode: 'auto' };
+
+/**
+ * Build an `UpdateAssistantRequest` that rewrites only the skill/MCP capability of
+ * an assistant while re-sending every other editable field from `detail`.
  *
  * `PUT /api/assistants/:id` is the only assistant-mutation endpoint and its
- * merge-vs-replace semantics are owned by the external aioncore backend (not
- * verifiable here). To be safe regardless, we mirror the canonical editor's full
- * payload: re-send `name`/`description`/`avatar`/`agent_id`/`recommended_prompts`
- * and the complete `defaults` (all five sub-fields) from `detail`, so a wholesale
- * replace loses nothing. Only `skills`/`mcps` carry the edited selection.
+ * merge-vs-replace semantics are owned by the external aioncore backend. We mirror
+ * the *proven* canonical editor (`useAssistantEditor`) so the payload the backend
+ * already accepts is the one we send (WP24179):
+ *  - scalar defaults are normalized to `auto | fixed` (never a raw GET marker like
+ *    `default`, which the PUT validator rejects);
+ *  - `generated` presets omit `name` / `avatar` / `agent_id`, which the backend
+ *    does not accept for that source (the canonical editor omits them too).
  *
  * Skills/MCP are pinned to `fixed` mode: the user explicitly saved this selection
  * to reuse it, so new chats must take exactly these values rather than an `auto`
@@ -38,21 +50,31 @@ export interface AssistantCapabilityEdits {
 export const buildAssistantCapabilityUpdate = (
   detail: AssistantDetail,
   edits: AssistantCapabilityEdits
-): UpdateAssistantRequest => ({
-  id: detail.id,
-  name: detail.profile.name,
-  description: detail.profile.description,
-  avatar: detail.profile.avatar,
-  agent_id: detail.engine.agent_id,
-  enabled_skills: edits.enabledSkillNames,
-  custom_skill_names: detail.capabilities.custom_skill_names,
-  disabled_builtin_skills: edits.disabledBuiltinNames.length > 0 ? edits.disabledBuiltinNames : undefined,
-  recommended_prompts: detail.prompts.recommended,
-  defaults: {
-    model: detail.defaults.model,
-    permission: detail.defaults.permission,
-    thought_level: detail.defaults.thought_level,
-    skills: { mode: 'fixed', value: edits.enabledSkillNames },
-    mcps: { mode: 'fixed', value: edits.selectedMcpIds },
-  },
-});
+): UpdateAssistantRequest => {
+  const base: UpdateAssistantRequest = {
+    id: detail.id,
+    description: detail.profile.description,
+    enabled_skills: edits.enabledSkillNames,
+    custom_skill_names: detail.capabilities.custom_skill_names,
+    disabled_builtin_skills: edits.disabledBuiltinNames.length > 0 ? edits.disabledBuiltinNames : undefined,
+    recommended_prompts: detail.prompts.recommended,
+    defaults: {
+      model: normalizeScalarDefault(detail.defaults.model),
+      permission: normalizeScalarDefault(detail.defaults.permission),
+      thought_level: normalizeScalarDefault(detail.defaults.thought_level),
+      skills: { mode: 'fixed', value: edits.enabledSkillNames },
+      mcps: { mode: 'fixed', value: edits.selectedMcpIds },
+    },
+  };
+
+  // Generated presets reject name/avatar/agent_id; user presets carry them.
+  if (detail.source === 'generated') {
+    return base;
+  }
+  return {
+    ...base,
+    name: detail.profile.name,
+    avatar: detail.profile.avatar,
+    agent_id: detail.engine.agent_id,
+  };
+};

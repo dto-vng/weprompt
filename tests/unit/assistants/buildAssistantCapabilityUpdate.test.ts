@@ -45,13 +45,41 @@ describe('buildAssistantCapabilityUpdate', () => {
     expect(update.name).toBe('My Preset');
     expect(update.agent_id).toBe('aionrs');
     expect(update.recommended_prompts).toEqual(['keep me']);
-    // model / permission / thought_level must survive untouched.
+    // Scalar defaults are normalized to the auto|fixed modes the PUT validator
+    // accepts: 'fixed' survives with its value, any other marker ('default') → 'auto'.
     expect(update.defaults?.model).toEqual({ mode: 'fixed', value: 'gpt-x' });
-    expect(update.defaults?.permission).toEqual({ mode: 'default' });
+    expect(update.defaults?.permission).toEqual({ mode: 'auto' });
     expect(update.defaults?.thought_level).toEqual({ mode: 'fixed', value: 'high' });
     // skills / mcps carry the edited values pinned to 'fixed' so new chats take them verbatim.
     expect(update.defaults?.skills).toEqual({ mode: 'fixed', value: ['skill-a', 'skill-b'] });
     expect(update.defaults?.mcps).toEqual({ mode: 'fixed', value: ['mcp-x', 'mcp-y'] });
+  });
+
+  it('omits name/avatar/agent_id for a generated preset (rejected by the PUT for that source)', () => {
+    const detail = makeDetail({ source: 'generated' });
+    const update = buildAssistantCapabilityUpdate(detail, {
+      enabledSkillNames: ['skill-a'],
+      disabledBuiltinNames: [],
+      selectedMcpIds: ['mcp-x'],
+    });
+
+    expect(update).not.toHaveProperty('name');
+    expect(update).not.toHaveProperty('avatar');
+    expect(update).not.toHaveProperty('agent_id');
+    // The edited capability + normalized defaults are still sent.
+    expect(update.defaults?.mcps).toEqual({ mode: 'fixed', value: ['mcp-x'] });
+    expect(update.defaults?.permission).toEqual({ mode: 'auto' });
+  });
+
+  it('keeps name/avatar/agent_id for a user preset', () => {
+    const update = buildAssistantCapabilityUpdate(makeDetail({ source: 'user' }), {
+      enabledSkillNames: [],
+      disabledBuiltinNames: [],
+      selectedMcpIds: [],
+    });
+
+    expect(update).toHaveProperty('name');
+    expect(update).toHaveProperty('agent_id');
   });
 
   it('omits disabled_builtin_skills when nothing is disabled', () => {
