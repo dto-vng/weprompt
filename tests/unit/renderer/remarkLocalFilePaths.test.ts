@@ -49,8 +49,51 @@ describe('splitTextValue', () => {
     expect(splitTextValue('no paths here, just words')).toEqual([{ type: 'text', value: 'no paths here, just words' }]);
   });
 
-  it('does not link a relative path', () => {
-    expect(splitTextValue('open report.pptx now')).toEqual([{ type: 'text', value: 'open report.pptx now' }]);
+  it('links a bare workspace-relative artifact filename in prose (WP24141)', () => {
+    const parts = splitTextValue('Report created successfully at daily_ai_news_report_sep_2026.html now');
+    expect(parts).toEqual([
+      { type: 'text', value: 'Report created successfully at ' },
+      {
+        type: 'link',
+        url: 'daily_ai_news_report_sep_2026.html',
+        title: null,
+        children: [{ type: 'text', value: 'daily_ai_news_report_sep_2026.html' }],
+      },
+      { type: 'text', value: ' now' },
+    ]);
+  });
+
+  it('keeps trailing sentence punctuation out of a linked relative filename', () => {
+    const parts = splitTextValue('Updated presentation daily_ai_news_insight_report.html.');
+    expect(parts).toEqual([
+      { type: 'text', value: 'Updated presentation ' },
+      {
+        type: 'link',
+        url: 'daily_ai_news_insight_report.html',
+        title: null,
+        children: [{ type: 'text', value: 'daily_ai_news_insight_report.html' }],
+      },
+      { type: 'text', value: '.' },
+    ]);
+  });
+
+  it('links a relative filename inside a nested folder', () => {
+    const parts = splitTextValue('see out/harry_potter_1997_2007.html');
+    expect(parts).toEqual([
+      { type: 'text', value: 'see ' },
+      {
+        type: 'link',
+        url: 'out/harry_potter_1997_2007.html',
+        title: null,
+        children: [{ type: 'text', value: 'out/harry_potter_1997_2007.html' }],
+      },
+    ]);
+  });
+
+  it('does not link a relative name whose extension is not a known artifact type', () => {
+    expect(splitTextValue('run index.js and visit example.com now')).toEqual([
+      { type: 'text', value: 'run index.js and visit example.com now' },
+    ]);
   });
 
   it('links a Windows drive-letter path', () => {
@@ -109,6 +152,40 @@ describe('linkifyMarkdownTree', () => {
     };
     linkifyMarkdownTree(tree);
     expect(tree.children![0].children).toEqual([{ type: 'inlineCode', value: 'npm run dev' }]);
+  });
+
+  it('converts inline code holding a workspace-relative artifact filename into a link (WP24141)', () => {
+    const tree: MdastNode = {
+      type: 'root',
+      children: [
+        {
+          type: 'paragraph',
+          children: [
+            { type: 'text', value: 'Report created successfully at ' },
+            { type: 'inlineCode', value: 'daily_ai_news_report_sep_2026.html' },
+          ],
+        },
+      ],
+    };
+    linkifyMarkdownTree(tree);
+    expect(tree.children![0].children).toEqual([
+      { type: 'text', value: 'Report created successfully at ' },
+      {
+        type: 'link',
+        url: 'daily_ai_news_report_sep_2026.html',
+        title: null,
+        children: [{ type: 'text', value: 'daily_ai_news_report_sep_2026.html' }],
+      },
+    ]);
+  });
+
+  it('leaves inline code with a non-artifact extension untouched', () => {
+    const tree: MdastNode = {
+      type: 'root',
+      children: [{ type: 'paragraph', children: [{ type: 'inlineCode', value: 'example.com' }] }],
+    };
+    linkifyMarkdownTree(tree);
+    expect(tree.children![0].children).toEqual([{ type: 'inlineCode', value: 'example.com' }]);
   });
 
   it('does not descend into existing links or fenced code blocks', () => {
