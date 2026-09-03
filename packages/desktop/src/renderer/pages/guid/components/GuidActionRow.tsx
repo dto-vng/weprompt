@@ -26,6 +26,7 @@ import { Button, Checkbox, Dropdown, Menu, Message, Tooltip } from '@arco-design
 import { ArrowUp, Brain, FolderUpload, Lightning, Plus, Shield, UploadOne } from '@icon-park/react';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { resolveGuidModeDisplayLabel } from '../utils/permissionModeLabel';
 import styles from '../index.module.css';
 
 /**
@@ -186,8 +187,7 @@ const GuidActionRow: React.FC<GuidActionRowProps> = ({
     [managedPresentationPending, onFilesUploaded, t]
   );
 
-  const getModeDisplayLabel = (mode: AgentModeOption): string =>
-    t(`agentMode.${mode.value}`, { defaultValue: mode.label });
+  const getModeDisplayLabel = (mode: AgentModeOption): string => resolveGuidModeDisplayLabel(mode, t);
 
   const isWebUI = !isElectronDesktop();
 
