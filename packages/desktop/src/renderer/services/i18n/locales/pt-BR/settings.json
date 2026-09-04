@@ -1470,5 +1470,7 @@
   "versionLabel": "Versão",
   "ssoStatusLabel": "Entrar com Microsoft (SSO)",
   "ssoStatusEnabled": "Ativado",
-  "ssoStatusDisabled": "Desativado"
+  "ssoStatusDisabled": "Desativado",
+  "openLogsFolder": "Abrir pasta de logs",
+  "mcpErrorRemoteAuthHint": "{{name}}: {{error}}. O primeiro login pode ser lento ou estar sendo bloqueado por rede/proxy. Verifique sua rede/VPN, confirme que o Node.js está instalado ou redefina o login do MCP (exclua a pasta ~/.mcp-auth) e tente novamente."
 }

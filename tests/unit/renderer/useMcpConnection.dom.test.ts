@@ -158,3 +158,52 @@ describe('useMcpConnection — ELECTRON-1A1 unmount race', () => {
     });
   });
 });
+
+/**
+ * WP24181: a failed connect on a fixed npx/mcp-remote server (atlassian/fdl-datahub)
+ * gets the actionable network/proxy/auth hint instead of the generic "review the JSON"
+ * one. The i18n mock returns the key verbatim, so the chosen key is directly assertable.
+ */
+describe('useMcpConnection — WP24181 remote sign-in failure hint', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const remoteSignInServer: IMcpServer = {
+    id: 'atlassian',
+    name: 'atlassian',
+    transport: { type: 'stdio', command: 'npx', args: ['-y', 'mcp-remote@0.8.3', 'https://mcp.atlassian.com/v1/mcp', '--transport', 'http-only'] },
+  } as unknown as IMcpServer;
+
+  it('uses the remote-auth hint when a fixed mcp-remote server fails to connect', async () => {
+    vi.mocked(mcpService.testMcpConnection.invoke).mockResolvedValue({ success: false, error: 'handshake failed' } as never);
+    const error = vi.fn();
+    const message = { warning: vi.fn(), success: vi.fn(), error } as unknown as Parameters<typeof useMcpConnection>[1];
+
+    const { result } = renderHook(() => useMcpConnection(vi.fn(), message));
+
+    await act(async () => {
+      await result.current.handleTestMcpConnection(remoteSignInServer);
+    });
+
+    await waitFor(() => {
+      expect(error).toHaveBeenCalledWith(expect.objectContaining({ content: 'settings.mcpErrorRemoteAuthHint' }));
+    });
+  });
+
+  it('keeps the generic hint for a plain stdio server', async () => {
+    vi.mocked(mcpService.testMcpConnection.invoke).mockResolvedValue({ success: false, error: 'boom' } as never);
+    const error = vi.fn();
+    const message = { warning: vi.fn(), success: vi.fn(), error } as unknown as Parameters<typeof useMcpConnection>[1];
+
+    const { result } = renderHook(() => useMcpConnection(vi.fn(), message));
+
+    await act(async () => {
+      await result.current.handleTestMcpConnection(server);
+    });
+
+    await waitFor(() => {
+      expect(error).toHaveBeenCalledWith(expect.objectContaining({ content: 'settings.mcpTestConnectionFailedWithHint' }));
+    });
+  });
+});

@@ -1464,5 +1464,7 @@
   "versionLabel": "Version",
   "ssoStatusLabel": "Microsoft-Anmeldung (SSO)",
   "ssoStatusEnabled": "Aktiviert",
-  "ssoStatusDisabled": "Deaktiviert"
+  "ssoStatusDisabled": "Deaktiviert",
+  "openLogsFolder": "Protokollordner öffnen",
+  "mcpErrorRemoteAuthHint": "{{name}}: {{error}}. Die erste Anmeldung kann langsam sein oder durch ein Netzwerk/einen Proxy blockiert werden. Überprüfe dein Netzwerk/VPN, stelle sicher, dass Node.js installiert ist, oder setze die MCP-Anmeldung zurück (lösche den Ordner ~/.mcp-auth) und versuche es erneut."
 }

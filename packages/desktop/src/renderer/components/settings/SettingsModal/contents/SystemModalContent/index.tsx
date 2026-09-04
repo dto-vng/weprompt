@@ -13,7 +13,8 @@ import LanguageSwitcher from '@/renderer/components/settings/LanguageSwitcher';
 import { getClientBusinessSetting, setClientBusinessSetting } from '@/renderer/services/clientBusinessSettings';
 import { notifyManualRestartRequired } from '@/renderer/utils/appRestart';
 import { isElectronDesktop } from '@/renderer/utils/platform';
-import { Alert, Collapse, Form, InputNumber, Message, Modal, Switch } from '@arco-design/web-react';
+import { Alert, Button, Collapse, Form, InputNumber, Message, Modal, Switch } from '@arco-design/web-react';
+import { FolderOpen } from '@icon-park/react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useSWR from 'swr';
@@ -479,6 +480,19 @@ const SystemModalContent: React.FC = () => {
             <Form form={form} layout='vertical' className='!mt-32px space-y-16px' onValuesChange={handleValuesChange}>
               <DirInputItem label={t('settings.workDir')} field='workDir' />
               <DirInputItem label={t('settings.logDir')} field='logDir' />
+              {/* Reveal the log folder so users can inspect run logs when an MCP or
+                  backend step misbehaves (WP24181, "làm sao đọc log"). */}
+              <Button
+                size='small'
+                type='outline'
+                disabled={!systemInfo?.logDir}
+                icon={<FolderOpen theme='outline' size={14} />}
+                onClick={() => {
+                  if (systemInfo?.logDir) void ipcBridge.shell.showItemInFolder.invoke(systemInfo.logDir);
+                }}
+              >
+                {t('settings.openLogsFolder', { defaultValue: 'Open logs folder' })}
+              </Button>
               {error && (
                 <Alert
                   className='mt-16px'

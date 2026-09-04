@@ -1471,5 +1471,7 @@
   "versionLabel": "Версія",
   "ssoStatusLabel": "Вхід через Microsoft (SSO)",
   "ssoStatusEnabled": "Увімкнено",
-  "ssoStatusDisabled": "Вимкнено"
+  "ssoStatusDisabled": "Вимкнено",
+  "openLogsFolder": "Відкрити папку логів",
+  "mcpErrorRemoteAuthHint": "{{name}}: {{error}}. Перший вхід може бути повільним, або його блокує мережа/проксі. Перевірте мережу/VPN, переконайтеся, що встановлено Node.js, або скиньте вхід MCP (видаліть папку ~/.mcp-auth) і повторіть спробу."
 }

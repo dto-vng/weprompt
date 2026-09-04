@@ -1465,5 +1465,7 @@
   "versionLabel": "版本",
   "ssoStatusLabel": "Microsoft 登录 (SSO)",
   "ssoStatusEnabled": "已启用",
-  "ssoStatusDisabled": "未启用"
+  "ssoStatusDisabled": "未启用",
+  "openLogsFolder": "打开日志目录",
+  "mcpErrorRemoteAuthHint": "{{name}}: {{error}}。首次登录可能较慢，或被网络/代理拦截。请检查网络/VPN，确认已安装 Node.js，或重置 MCP 登录（删除 ~/.mcp-auth 目录）后重试。"
 }

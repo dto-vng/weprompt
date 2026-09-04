@@ -1467,5 +1467,7 @@
   "versionLabel": "Versión",
   "ssoStatusLabel": "Inicio de sesión de Microsoft (SSO)",
   "ssoStatusEnabled": "Activado",
-  "ssoStatusDisabled": "Desactivado"
+  "ssoStatusDisabled": "Desactivado",
+  "openLogsFolder": "Abrir carpeta de registros",
+  "mcpErrorRemoteAuthHint": "{{name}}: {{error}}. El primer inicio de sesión puede ser lento o estar bloqueado por la red/proxy. Comprueba tu red/VPN, asegúrate de que Node.js esté instalado o restablece el inicio de sesión de MCP (elimina la carpeta ~/.mcp-auth) e inténtalo de nuevo."
 }

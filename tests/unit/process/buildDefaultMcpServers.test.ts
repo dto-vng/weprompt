@@ -57,7 +57,9 @@ describe('buildDefaultMcpServers', () => {
 
     const atlassian = byName.get('atlassian');
     expect(atlassian?.transport.type).toBe('stdio');
-    expect(atlassian?.transport.type === 'stdio' && atlassian.transport.args).toContain('mcp-remote@latest');
+    // Pinned, not @latest, so npx does not re-resolve the package every launch (WP24181).
+    expect(atlassian?.transport.type === 'stdio' && atlassian.transport.args).toContain('mcp-remote@0.8.3');
+    expect(atlassian?.transport.type === 'stdio' && atlassian.transport.args).not.toContain('mcp-remote@latest');
 
     const datahub = byName.get('fdl-datahub');
     expect(datahub?.transport.type).toBe('stdio');

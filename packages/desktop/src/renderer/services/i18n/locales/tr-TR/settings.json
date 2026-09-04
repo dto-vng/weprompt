@@ -1464,5 +1464,7 @@
   "versionLabel": "Sürüm",
   "ssoStatusLabel": "Microsoft Oturum Açma (SSO)",
   "ssoStatusEnabled": "Etkin",
-  "ssoStatusDisabled": "Devre dışı"
+  "ssoStatusDisabled": "Devre dışı",
+  "openLogsFolder": "Günlük klasörünü aç",
+  "mcpErrorRemoteAuthHint": "{{name}}: {{error}}. İlk oturum açma yavaş olabilir veya bir ağ/proxy tarafından engelleniyor olabilir. Ağ/VPN bağlantınızı kontrol edin, Node.js'in kurulu olduğundan emin olun ya da MCP oturumunu sıfırlayın (~/.mcp-auth klasörünü silin) ve yeniden deneyin."
 }

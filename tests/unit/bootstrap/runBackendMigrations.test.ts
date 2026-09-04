@@ -177,6 +177,44 @@ describe('runBackendMigrations', () => {
     expect(configFileSetMock).not.toHaveBeenCalledWith('tools.imageGenerationModel', expect.anything());
   });
 
+  const fixedAtlassian = (mcpRemoteSpec: string): IMcpServer => ({
+    id: 'atlassian-id',
+    name: 'atlassian',
+    description: 'Atlassian (Jira & Confluence). Sign in on first use.',
+    enabled: true,
+    builtin: false,
+    transport: {
+      type: 'stdio',
+      command: 'npx',
+      args: ['-y', mcpRemoteSpec, 'https://mcp.atlassian.com/v1/mcp', '--transport', 'http-only'],
+    },
+    created_at: 1,
+    updated_at: 1,
+    original_json: '{}',
+  });
+
+  it('re-pins an existing atlassian server from mcp-remote@latest to the pinned version (WP24181)', async () => {
+    listServersMock.mockResolvedValue([fixedAtlassian('mcp-remote@latest')]);
+
+    await runBackendMigrations(configFile as never);
+
+    const pinCall = updateServerMock.mock.calls.find(([arg]: [{ id?: string }]) => arg?.id === 'atlassian-id');
+    expect(pinCall).toBeTruthy();
+    const data = pinCall![0].data;
+    expect(data.transport.args).toContain('mcp-remote@0.8.3');
+    expect(data.transport.args).not.toContain('mcp-remote@latest');
+    expect(data.original_json).toContain('mcp-remote@0.8.3');
+  });
+
+  it('leaves an already-pinned fixed server untouched (idempotent)', async () => {
+    listServersMock.mockResolvedValue([fixedAtlassian('mcp-remote@0.8.3')]);
+
+    await runBackendMigrations(configFile as never);
+
+    const pinCall = updateServerMock.mock.calls.find(([arg]: [{ id?: string }]) => arg?.id === 'atlassian-id');
+    expect(pinCall).toBeUndefined();
+  });
+
   it('does not sync the built-in image MCP server when bootstrap makes no effective change', async () => {
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
     listServersMock.mockResolvedValue([imageServer()]);

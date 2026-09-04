@@ -1464,5 +1464,7 @@
   "versionLabel": "نسخه",
   "ssoStatusLabel": "ورود مایکروسافت (SSO)",
   "ssoStatusEnabled": "فعال",
-  "ssoStatusDisabled": "غیرفعال"
+  "ssoStatusDisabled": "غیرفعال",
+  "openLogsFolder": "باز کردن پوشه لاگ",
+  "mcpErrorRemoteAuthHint": "{{name}}: {{error}}. ورود اول ممکن است کند باشد یا توسط شبکه/پروکسی مسدود شده باشد. شبکه/VPN خود را بررسی کنید، مطمئن شوید Node.js نصب است، یا ورود MCP را بازنشانی کنید (پوشه ~/.mcp-auth را حذف کنید) و دوباره تلاش کنید."
 }

@@ -266,6 +266,14 @@ function isSameStdioTransport(left: IMcpServer['transport'], right: IMcpServer['
  * and delete controls (the ticket asks for these to stay editable). They are
  * OAuth-protected — people sign in on first use; no credentials are baked in.
  */
+// Pinned mcp-remote spec for the fixed VNG MCP servers. `mcp-remote@latest` made
+// npx re-resolve the package from npm on every launch, which is slow and hangs
+// (past the 30s connect timeout) behind a slow network/proxy — so the sign-in
+// window never opened for atlassian/fdl-datahub (WP24181). Pinning lets npx reuse
+// the cached package. Bump deliberately when a newer mcp-remote is validated.
+const MCP_REMOTE_PINNED = 'mcp-remote@0.8.3';
+const MCP_REMOTE_LATEST_LEGACY = 'mcp-remote@latest';
+
 function buildFixedMcpServers(): McpImportServer[] {
   const fixed: Array<Pick<IMcpServer, 'name' | 'description' | 'transport'>> = [
     {
@@ -274,7 +282,7 @@ function buildFixedMcpServers(): McpImportServer[] {
       transport: {
         type: 'stdio',
         command: 'npx',
-        args: ['-y', 'mcp-remote@latest', 'https://mcp.atlassian.com/v1/mcp', '--transport', 'http-only'],
+        args: ['-y', MCP_REMOTE_PINNED, 'https://mcp.atlassian.com/v1/mcp', '--transport', 'http-only'],
       },
     },
     {
@@ -293,7 +301,7 @@ function buildFixedMcpServers(): McpImportServer[] {
         command: 'npx',
         args: [
           '-y',
-          'mcp-remote@latest',
+          MCP_REMOTE_PINNED,
           'https://aigw.vng.vn/mcp-connect/default-tse-datahub-mcp-3fa296edm25h4',
           '--transport',
           'http-only',
@@ -380,6 +388,42 @@ async function ensureBuiltinNpxServerAvailability(server?: IMcpServer): Promise<
   }
 }
 
+// Names of the fixed VNG MCP servers launched via `npx mcp-remote` (WP24111). The
+// http-transport 'Outlook VNG' server is intentionally excluded — it never used npx.
+const FIXED_MCP_REMOTE_NAMES = ['atlassian', 'fdl-datahub'];
+
+/**
+ * Re-pin the fixed atlassian/fdl-datahub servers on an existing install from
+ * `mcp-remote@latest` to the pinned version (WP24181). Only rewrites a server that
+ * still carries the exact seeded `@latest` arg, so a user who edited the version is
+ * left untouched. Idempotent: once pinned, the `@latest` arg is gone and it skips.
+ */
+async function pinLegacyFixedMcpRemoteVersion(existingByName: Map<string, IMcpServer>): Promise<void> {
+  for (const name of FIXED_MCP_REMOTE_NAMES) {
+    const server = existingByName.get(name);
+    if (!server || server.transport.type !== 'stdio') continue;
+    const args = server.transport.args ?? [];
+    if (!args.includes(MCP_REMOTE_LATEST_LEGACY)) continue;
+
+    const nextTransport = {
+      ...server.transport,
+      args: args.map((arg) => (arg === MCP_REMOTE_LATEST_LEGACY ? MCP_REMOTE_PINNED : arg)),
+    };
+    await mcpService.updateServer.invoke({
+      id: server.id,
+      data: {
+        transport: nextTransport,
+        original_json: buildOriginalJsonFromTransport({
+          name: server.name,
+          description: server.description,
+          transport: nextTransport,
+        }),
+      },
+    });
+    console.info(`[Migration] Pinned ${name} MCP from ${MCP_REMOTE_LATEST_LEGACY} to ${MCP_REMOTE_PINNED}`);
+  }
+}
+
 function buildOriginalJsonFromTransport(server: Pick<IMcpServer, 'name' | 'description' | 'transport'>): string {
   const transport_config =
     server.transport.type === 'stdio'
@@ -456,6 +500,11 @@ async function ensureBootstrapMcpServersInDb(configFile: ConfigFile): Promise<vo
       },
     });
   }
+
+  // WP24181: existing installs seeded the fixed atlassian/fdl-datahub servers with
+  // `mcp-remote@latest`. Re-pin them to a fixed version so npx stops re-resolving
+  // the package from npm on every launch (the cause of the slow/stuck sign-in).
+  await pinLegacyFixedMcpRemoteVersion(existingByName);
 
   const refreshedServers = await mcpService.listServers.invoke();
   const npxBuiltinNames = new Set<string>([

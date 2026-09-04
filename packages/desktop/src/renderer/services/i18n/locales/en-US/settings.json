@@ -1467,5 +1467,7 @@
   "versionLabel": "Version",
   "ssoStatusLabel": "Microsoft Sign-in (SSO)",
   "ssoStatusEnabled": "Enabled",
-  "ssoStatusDisabled": "Disabled"
+  "ssoStatusDisabled": "Disabled",
+  "openLogsFolder": "Open logs folder",
+  "mcpErrorRemoteAuthHint": "{{name}}: {{error}}. First sign-in can be slow, or a network/proxy may be blocking it. Check your network/VPN, make sure Node.js is installed, or reset the MCP sign-in (delete the ~/.mcp-auth folder) and try again."
 }

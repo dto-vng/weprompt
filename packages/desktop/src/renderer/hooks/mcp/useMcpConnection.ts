@@ -18,6 +18,38 @@ const truncateErrorMessage = (message: string, maxLength: number = 150): string 
   return message.substring(0, maxLength) + '...';
 };
 
+/**
+ * True for a stdio MCP server launched via `npx … mcp-remote …` (the fixed
+ * atlassian/fdl-datahub servers). These sign in through a browser OAuth flow and
+ * their first connect can be slow or blocked by a network/proxy, so a failure here
+ * gets a more actionable hint than the generic "review the JSON" one (WP24181).
+ */
+const isRemoteSignInMcpServer = (server: IMcpServer): boolean =>
+  server.transport.type === 'stdio' && (server.transport.args ?? []).some((arg) => arg.startsWith('mcp-remote'));
+
+/**
+ * Pick the failure hint: remote sign-in servers get network/proxy/auth guidance;
+ * everything else keeps the generic "review the MCP JSON configuration" hint.
+ */
+const mcpFailureHint = (
+  t: TFunction,
+  server: IMcpServer,
+  errorMsg: string
+): string => {
+  if (isRemoteSignInMcpServer(server)) {
+    return t('settings.mcpErrorRemoteAuthHint', {
+      name: server.name,
+      error: errorMsg,
+      defaultValue: `${server.name}: ${errorMsg}. First sign-in can be slow, or a network/proxy may be blocking it. Check your network/VPN, make sure Node.js is installed, or reset the MCP sign-in (delete the ~/.mcp-auth folder) and try again.`,
+    });
+  }
+  return t('settings.mcpTestConnectionFailedWithHint', {
+    name: server.name,
+    error: errorMsg,
+    defaultValue: `${server.name}: ${errorMsg}. Please review the MCP JSON configuration and test again.`,
+  });
+};
+
 type McpErrorPayload = {
   error?: string;
   code?: string;
@@ -217,11 +249,7 @@ export const useMcpConnection = (
             await globalMessageQueue.add(() => {
               try {
                 message.error({
-                  content: t('settings.mcpTestConnectionFailedWithHint', {
-                    name: server.name,
-                    error: errorMsg,
-                    defaultValue: `${server.name}: ${errorMsg}. Please review the MCP JSON configuration and test again.`,
-                  }),
+                  content: mcpFailureHint(t, server, errorMsg),
                   duration: 5000,
                 });
               } catch {
@@ -238,11 +266,7 @@ export const useMcpConnection = (
           await globalMessageQueue.add(() => {
             try {
               message.error({
-                content: t('settings.mcpTestConnectionFailedWithHint', {
-                  name: server.name,
-                  error: errorMsg,
-                  defaultValue: `${server.name}: ${errorMsg}. Please review the MCP JSON configuration and test again.`,
-                }),
+                content: mcpFailureHint(t, server, errorMsg),
                 duration: 5000,
               });
             } catch {

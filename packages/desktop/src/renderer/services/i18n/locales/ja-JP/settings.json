@@ -1463,5 +1463,7 @@
   "versionLabel": "バージョン",
   "ssoStatusLabel": "Microsoft サインイン (SSO)",
   "ssoStatusEnabled": "有効",
-  "ssoStatusDisabled": "無効"
+  "ssoStatusDisabled": "無効",
+  "openLogsFolder": "ログフォルダを開く",
+  "mcpErrorRemoteAuthHint": "{{name}}: {{error}}。初回サインインは時間がかかる場合があり、ネットワークやプロキシによってブロックされることもあります。ネットワーク/VPN を確認し、Node.js がインストールされていることを確認するか、MCP のサインインをリセット（~/.mcp-auth フォルダを削除）してから再試行してください。"
 }
