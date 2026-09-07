@@ -25,10 +25,11 @@ env:
 jobs:
   build:
     name: Build installer
-    # Intel runner so aioncore, prepare-managed-resources (runs the built x86_64
-    # binary) and electron-builder all build/run natively — no cross-compile, no
-    # Rosetta. macos-14 (arm64) would need Rosetta to run the x86_64 binary.
-    runs-on: macos-13
+    # arm64 runner (plentiful; Intel macos-13 queues for a long time as GitHub
+    # winds Intel down). aioncore is cross-compiled to x86_64 and the one step
+    # that must RUN it (prepare-managed-resources) runs it through Rosetta 2,
+    # installed below. electron-builder produces the x64 app on an arm64 host.
+    runs-on: macos-14
     timeout-minutes: 120
 
     steps:
@@ -63,7 +64,7 @@ jobs:
           CARGO_NET_RETRY: '10'
           # git2/libgit2-sys vendors libgit2 statically by default, BUT if it finds a
           # system libgit2 via pkg-config (Homebrew ships one on the runner) it links
-          # dynamically against /usr/local/opt/libgit2 — a path absent on customer
+          # dynamically against /opt/homebrew/opt/libgit2 — a path absent on customer
           # Macs without Homebrew, so aioncore would fail to start there. Force the
           # vendored static build and drop any pkg-config path so nothing leaks in.
           LIBGIT2_NO_PKG_CONFIG: '1'
@@ -81,6 +82,16 @@ jobs:
             echo "::error::aioncore links non-system dylibs (would fail on a Mac without them):"; echo "$LEAK"; exit 1
           fi
           echo "aioncore portability OK (system libraries only)."
+
+      - name: Install Rosetta 2 (to run the cross-built x86_64 aioncore)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # prepare-managed-resources below runs the x86_64 aioncore binary. On this
+          # arm64 runner that needs Rosetta 2. Idempotent — a no-op if already present.
+          softwareupdate --install-rosetta --agree-to-license
+          # Sanity: the x86_64 binary must actually execute here.
+          arch -x86_64 /usr/bin/true && echo "Rosetta 2 ready (x86_64 execution OK)."
 
       - name: Assemble the backend bundle
         shell: bash
